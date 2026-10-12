@@ -32,7 +32,6 @@ function App() {
   const [marketLoading, setMarketLoading] = useState(false);
   const [marketError, setMarketError] = useState('');
   const [marketCategory, setMarketCategory] = useState('Hot');
-  const [marketQuery, setMarketQuery] = useState('');
   const [marketPage, setMarketPage] = useState(1);
   const [marketHasMore, setMarketHasMore] = useState(true);
   const [marketSort, setMarketSort] = useState<'market_cap' | 'volume' | 'change'>('market_cap');
@@ -131,8 +130,6 @@ function App() {
   };
   const filteredMarketTokens = useMemo(() => {
     let result = [...marketTokens];
-    const query = marketQuery.trim().toLowerCase();
-    if (query) result = result.filter(token => token.name.toLowerCase().includes(query) || token.symbol.toLowerCase().includes(query) || token.id.toLowerCase().includes(query));
     if (marketCategory === 'Favorites') result = result.filter(token => favoriteTokens.includes(token.id));
     if (marketCategory === 'Gainers') result = result.filter(token => (token.price_change_percentage_24h ?? -Infinity) > 0).sort((a, b) => (b.price_change_percentage_24h ?? 0) - (a.price_change_percentage_24h ?? 0));
     else if (marketCategory === 'Losers') result = result.filter(token => (token.price_change_percentage_24h ?? Infinity) < 0).sort((a, b) => (a.price_change_percentage_24h ?? 0) - (b.price_change_percentage_24h ?? 0));
@@ -145,7 +142,7 @@ function App() {
     else if (marketSort === 'volume') result.sort((a, b) => (b.total_volume ?? 0) - (a.total_volume ?? 0));
     else if (marketSort === 'change') result.sort((a, b) => (b.price_change_percentage_24h ?? -Infinity) - (a.price_change_percentage_24h ?? -Infinity));
     return result;
-  }, [marketTokens, marketQuery, marketCategory, favoriteTokens, marketSort, trendingTokenIds]);
+  }, [marketTokens, marketCategory, favoriteTokens, marketSort, trendingTokenIds]);
 
   const connect = async () => {
     if (!window.ethereum) { setNotice('No compatible browser wallet detected. Install a wallet extension, then reload this page.'); return; }
@@ -199,7 +196,7 @@ function App() {
     </aside>
     {mobileNav && <button className="mobile-overlay" onClick={() => setMobileNav(false)} aria-label="Close navigation"/>}
     <main className="main-content">
-      <header className="sire-home-header">
+      {activeTab === 'Overview' && (<header className="sire-home-header">
         <button type="button" className="sire-home-icon sire-home-profile-button" aria-label="Profile" onClick={() => address ? setNotice(`Connected wallet: ${shortAddress(address)}. Use the wallet controls below to disconnect.`) : setModal('help')}>
           <CircleUserRound size={23} />
         </button>
@@ -208,7 +205,7 @@ function App() {
           <button type="button" className="sire-home-icon" aria-label="Notifications" onClick={() => setNotice('You’re all caught up.')}><Bell size={21} /></button>
           <button type="button" className="sire-home-icon" aria-label="Help" onClick={() => setModal('help')}><CircleHelp size={22} /></button>
         </div>
-      </header>
+      </header>)}
 {activeTab !== 'Overview' && activeTab !== 'Activity' && activeTab !== 'Market' && (
       <div className="home-wallet-controls">
         <div className="breadcrumb">Wallet <span>/</span> <strong>{activeTab}</strong></div>
@@ -224,17 +221,7 @@ function App() {
         )}
 
         {activeTab === 'Market' ? <section className="market-page">
-          <div className="market-page-heading">
-            <div><div className="market-eyebrow"><span className="market-eyebrow-dot" /> LIVE CRYPTO MARKET</div><h1>Market</h1><p>Explore prices, trading volume, market caps, and daily moves across crypto.</p></div>
-            <button className="market-refresh" type="button" onClick={() => void loadMarketTokens(1, false)} disabled={marketLoading}><RefreshCw size={15} className={marketLoading ? 'spin' : ''}/><span>Refresh</span></button>
-          </div>
-          <div className="market-summary-grid">
-            <article className="market-summary-card"><span>Tokens tracked</span><strong>{marketTokens.length ? marketTokens.length.toLocaleString('en-US') + (marketHasMore ? '+' : '') : '—'}</strong><small>Market catalogue</small></article>
-            <article className="market-summary-card"><span>24h gainers</span><strong>{marketTokens.filter(token => (token.price_change_percentage_24h ?? 0) > 0).length.toLocaleString('en-US')}</strong><small>In loaded catalogue</small></article>
-            <article className="market-summary-card"><span>Favorites</span><strong>{favoriteTokens.length.toLocaleString('en-US')}</strong><small>Saved on this browser</small></article>
-          </div>
           <div className="market-toolbar">
-            <label className="market-search"><Search size={17}/><input value={marketQuery} onChange={event => setMarketQuery(event.target.value)} placeholder="Search token name or symbol" aria-label="Search token name or symbol"/>{marketQuery && <button type="button" onClick={() => setMarketQuery('')} aria-label="Clear search"><X size={15}/></button>}</label>
             <div className="market-category-list" role="tablist" aria-label="Market categories">
               {['Hot', 'All tokens', 'Favorites', 'Gainers', 'Losers', 'Volume'].map(category => <button type="button" role="tab" aria-selected={marketCategory === category} className={marketCategory === category ? 'active' : ''} key={category} onClick={() => { setMarketCategory(category); if (category === 'Volume') setMarketSort('volume'); else if (category === 'Gainers' || category === 'Losers') setMarketSort('change'); else setMarketSort('market_cap'); }}>{category === 'Hot' && <Flame size={14}/>} {category === 'Favorites' && <Star size={14}/>} {category === 'Gainers' && <TrendingUp size={14}/>} {category === 'Losers' && <TrendingDown size={14}/>} {category}</button>)}
             </div>
@@ -251,7 +238,7 @@ function App() {
               <td className="market-metric">{marketNumber(token.total_volume)}</td><td className="market-metric">{marketNumber(token.market_cap)}</td>
               <td><button type="button" className={`market-favorite ${isFavorite ? 'saved' : ''}`} aria-label={isFavorite ? `Remove ${token.name} from favorites` : `Add ${token.name} to favorites`} onClick={() => toggleFavorite(token.id)}><Star size={17} fill={isFavorite ? 'currentColor' : 'none'}/></button></td>
             </tr>; })}
-            {!marketLoading && filteredMarketTokens.length === 0 && <tr><td colSpan={7}><div className="market-empty">{marketError ? 'Market data could not be loaded.' : marketCategory === 'Favorites' && !marketQuery ? 'No favorites yet. Tap the star beside a token to save it here.' : 'No tokens match your search or category.'}</div></td></tr>}
+            {!marketLoading && filteredMarketTokens.length === 0 && <tr><td colSpan={7}><div className="market-empty">{marketError ? 'Market data could not be loaded.' : marketCategory === 'Favorites' && !marketQuery ? 'No favorites yet. Tap the star beside a token to save it here.' : 'No tokens match this category.'}</div></td></tr>}
             {marketLoading && marketTokens.length === 0 && <tr><td colSpan={7}><div className="market-loading"><span className="market-loader"/><span>Loading live market catalogue…</span></div></td></tr>}
             </tbody></table></div>
             <div className="market-table-footer"><span>Prices, volume and market caps from CoinGecko. Market data may be delayed.</span>{marketHasMore && marketCategory !== 'Hot' && marketCategory !== 'Favorites' && <button type="button" onClick={() => void loadMarketTokens(marketPage + 1, true)} disabled={marketLoading}>{marketLoading ? 'Loading…' : 'Load more tokens'} <ArrowDownLeft size={14}/></button>}</div>
