@@ -5,3 +5,143 @@
 @media(max-width:1180px){.sidebar{width:220px}.main-content{margin-left:220px}.topbar{padding:0 25px}.page-wrap{padding:30px 25px 20px}.stats-grid{grid-template-columns:1.2fr 1fr 1fr;gap:11px}.stat-card{padding:17px 15px}.content-grid{grid-template-columns:minmax(0,1.2fr) minmax(285px,1fr);gap:11px}.asset-header,.asset-row{padding-left:14px;padding-right:14px}.connect-banner{padding:24px;gap:16px}}
 @media(max-width:900px){.sidebar{width:248px;transform:translateX(-100%);transition:transform .25s ease;box-shadow:none}.sidebar.sidebar-open{transform:translateX(0);box-shadow:15px 0 55px #0008}.mobile-overlay{display:block;position:fixed;inset:0;background:#040711a8;border:0;z-index:19}.mobile-close,.mobile-menu{display:inline-grid}.main-content{margin-left:0}.topbar{height:68px;padding:0 24px}.topbar-left{display:flex;align-items:center;gap:10px}.page-wrap{padding:29px 24px 20px}.stats-grid{grid-template-columns:1fr 1fr}.balance-card{grid-column:span 2}.content-grid{grid-template-columns:1fr}.assets-panel,.quick-panel{min-height:unset}.quick-panel{padding-bottom:4px}.quick-actions{display:grid;grid-template-columns:1fr 1fr}.quick-action:nth-child(2){border-bottom:1px solid #222b3e}.quick-action:nth-child(odd){border-right:1px solid #222b3e}.quick-note{margin-top:12px}.asset-row{padding-top:17px;padding-bottom:17px}}
 @media(max-width:560px){.topbar{padding:0 15px}.topbar-actions{gap:7px}.network-picker{padding:0 8px;gap:6px;height:35px}.network-picker span:nth-child(2){max-width:65px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.top-icon{display:none}.connect-button{padding:10px 9px;font-size:10px;gap:5px}.page-wrap{padding:25px 14px 17px}.welcome-row{align-items:flex-start}.welcome-row h1{font-size:27px}.page-subtitle{max-width:280px;font-size:11px}.refresh-button{padding:9px}.refresh-button span{display:none}.connect-banner{padding:22px 19px;gap:12px;align-items:flex-start}.banner-art{width:62px;height:70px;flex-shrink:0;margin-top:8px}.banner-coin{width:48px;height:48px;border-radius:16px}.banner-coin svg{width:22px}.banner-orbit{width:62px;height:29px}.orbit-two{width:67px;height:32px}.banner-copy h2{font-size:18px}.banner-copy p{font-size:10px}.banner-buttons{gap:12px;flex-wrap:wrap}.banner-decoration{right:9px;top:5px;font-size:110px}.stats-grid{gap:9px}.stat-card{padding:15px 13px;min-height:147px}.balance-number{font-size:27px}.stat-main{font-size:17px}.stat-description{font-size:9px;line-height:1.5}.stat-foot{gap:5px}.muted{font-size:8px}.stat-icon{width:27px;height:27px}.panel-heading{padding:17px 14px 14px}.panel-heading h2{font-size:13px}.panel-action{padding:7px;font-size:8px}.asset-header{padding:10px 11px;font-size:7px;grid-template-columns:1.3fr .85fr 1.2fr}.asset-row{padding:14px 11px;gap:6px;grid-template-columns:1.3fr .85fr 1.2fr}.asset-icon{width:29px;height:29px;font-size:13px}.asset-name{gap:7px}.asset-name strong,.asset-balance strong{font-size:9px}.asset-name span,.asset-balance span{font-size:8px}.asset-price{font-size:9px}.asset-price span{font-size:7px}.asset-footer{padding-left:11px;font-size:7px}.quick-actions{padding:0 7px}.quick-action{gap:8px;padding:11px 6px}.quick-icon{width:30px;height:30px}.quick-action strong{font-size:9px}.quick-action small{font-size:8px}.quick-action .soon-tag{font-size:7px;padding:4px}.quick-note{margin-left:12px;margin-right:12px}.activity-empty{padding:15px 12px;gap:9px;flex-wrap:wrap}.activity-empty p{max-width:220px;line-height:1.6}.activity-empty .text-button{margin-left:auto}.activity-list{padding:0 13px}.activity-right .explorer-link{font-size:8px}.footer{align-items:flex-start;flex-direction:column;gap:12px;padding:15px 1px}.footer-right{width:100%;justify-content:space-between}.modal-card{padding:19px}.toast{right:12px;bottom:12px}.breadcrumb{font-size:10px}.breadcrumb span{margin:0 5px}}
+
+
+/* Sire-inspired home surface: darkest black and white typography */
+:root { color-scheme: dark; }
+html, body, #root { min-height: 100%; background: #000; color: #fff; }
+body { background: #000; color: #fff; }
+.app-shell { background: #000; color: #fff; }
+.sidebar { background: #030303; border-right-color: rgba(255,255,255,.07); color: #fff; }
+.brand, .brand > span, .profile-info strong, .security-card strong { color: #fff; }
+.brand-mark { background: #fff; color: #050505; box-shadow: none; }
+.workspace-label { color: rgba(255,255,255,.38); }
+.nav-item { color: rgba(255,255,255,.62); }
+.nav-item:hover { background: rgba(255,255,255,.06); color: #fff; }
+.nav-item.active { background: rgba(255,255,255,.08); color: #fff; box-shadow: inset 2px 0 #fff; }
+.security-card { background: #080808; border-color: rgba(255,255,255,.09); }
+.security-icon, .footer-logo svg { color: rgba(255,255,255,.8); }
+.profile-row { border-top-color: rgba(255,255,255,.09); }
+.profile-avatar { background: #fff; color: #000; }
+.main-content { background: #000; }
+.home-wallet-controls {
+  min-height: 54px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 42px;
+  background: #000;
+  border-bottom: 1px solid rgba(255,255,255,.055);
+}
+.home-wallet-controls .breadcrumb { color: rgba(255,255,255,.48); }
+.home-wallet-controls .breadcrumb strong { color: rgba(255,255,255,.88); }
+.home-wallet-controls .topbar-actions { gap: 10px; }
+.sire-home-header {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  height: 68px;
+  padding: 0 18px;
+  background: linear-gradient(180deg, rgba(8,10,12,.96) 0%, rgba(8,10,12,.78) 100%);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-bottom: 1px solid rgba(255,255,255,.035);
+}
+.sire-home-header-actions { display: flex; align-items: center; gap: 9px; }
+.sire-home-icon {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 39px; height: 39px; padding: 0;
+  border: 1px solid rgba(255,255,255,.075); border-radius: 50%;
+  background: rgba(255,255,255,.035); color: rgba(255,255,255,.88);
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+.sire-home-icon:hover { background: rgba(255,255,255,.075); border-color: rgba(255,255,255,.12); }
+.sire-home-icon:active { transform: scale(.94); }
+.sire-home-value-card {
+  position: relative; overflow: hidden; width: 100%; min-height: 300px;
+  padding: 25px; border: 1px solid rgba(255,255,255,.065); border-radius: 26px;
+  background: radial-gradient(circle at 82% 15%, rgba(255,255,255,.035), transparent 34%),
+    linear-gradient(145deg, #0c0d0f 0%, #08090a 55%, #050506 100%);
+  box-shadow: 0 18px 45px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.025);
+  color: #fff; margin: 0 0 22px;
+}
+.sire-home-value-main {
+  position: relative; display: flex; flex-direction: column; justify-content: space-between; min-height: 205px;
+}
+.sire-home-value-copy { position: relative; z-index: 2; }
+.sire-home-value-card-top {
+  display: flex; align-items: center; gap: 9px; margin-bottom: 13px;
+  color: rgba(255,255,255,.48); font-size: 11px; font-weight: 700; letter-spacing: .12em;
+}
+.sire-home-value-eye {
+  display: inline-flex; align-items: center; justify-content: center; width: 27px; height: 27px; padding: 0;
+  border: 0; border-radius: 50%; background: rgba(255,255,255,.045); color: rgba(255,255,255,.62); cursor: pointer;
+}
+.sire-home-value-amount {
+  display: flex; align-items: baseline; gap: 8px; font-size: 37px; font-weight: 650;
+  line-height: 1; letter-spacing: -.045em; overflow-wrap: anywhere;
+}
+.sire-home-value-amount small { color: rgba(255,255,255,.42); font-size: 12px; font-weight: 600; letter-spacing: .03em; }
+.sire-home-value-chart { position: absolute; right: -8px; bottom: -3px; width: 55%; height: 105px; color: rgba(255,255,255,.38); opacity: .72; pointer-events: none; }
+.sire-home-value-chart svg { display: block; width: 100%; height: 100%; }
+.sire-home-value-actions { position: relative; z-index: 3; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 22px; }
+.sire-home-value-login, .sire-home-value-signup, .sire-home-value-add-funds {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; height: 43px;
+  border-radius: 13px; font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: transform 160ms ease, background 160ms ease;
+}
+.sire-home-value-login { border: 1px solid rgba(255,255,255,.09); background: rgba(255,255,255,.045); color: rgba(255,255,255,.88); }
+.sire-home-value-signup { border: 1px solid rgba(255,255,255,.12); background: #fff; color: #08090a; }
+.sire-home-value-add-funds { position: relative; z-index: 3; width: 100%; margin-top: 22px; border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.055); color: #fff; }
+.sire-home-value-login:active, .sire-home-value-signup:active, .sire-home-value-add-funds:active { transform: scale(.98); }
+
+/* Bring the remaining wallet panels into the same monochrome black theme. */
+.topbar { background: #000; border-bottom-color: rgba(255,255,255,.055); }
+.stat-card, .panel { background: #070707; border-color: rgba(255,255,255,.08); }
+.balance-card { background: radial-gradient(ellipse at 92% 10%, rgba(255,255,255,.045) 0%, transparent 47%), #070707; }
+.connect-banner { background: radial-gradient(ellipse at 78% 0%, rgba(255,255,255,.07) 0%, transparent 43%), linear-gradient(110deg,#090909,#050505 60%,#080808); border-color: rgba(255,255,255,.09); }
+.banner-coin { background: #fff; color: #050505; box-shadow: 0 8px 35px rgba(255,255,255,.08); }
+.banner-orbit { border-color: rgba(255,255,255,.22); }
+.orbit-two { border-color: rgba(255,255,255,.13); }
+.banner-kicker, .eyebrow, .card-link, .text-button:hover { color: rgba(255,255,255,.78); }
+.eyebrow-line { background: #fff; }
+.primary-button, .connect-button { background: #fff; color: #050505; }
+.primary-button:hover, .connect-button:hover { background: #e8e8e8; }
+.network-picker, .refresh-button, .panel-action { background: #090909; border-color: rgba(255,255,255,.1); color: rgba(255,255,255,.86); }
+.stat-icon.purple, .quick-heading-icon, .quick-icon.send, .activity-icon, .activity-empty-icon { background: rgba(255,255,255,.07); color: rgba(255,255,255,.9); }
+.stat-icon.green, .quick-icon.receive { background: rgba(255,255,255,.06); color: rgba(255,255,255,.86); }
+.quick-icon.swap, .quick-icon.network { background: rgba(255,255,255,.055); color: rgba(255,255,255,.8); }
+.asset-header { background: #030303; }
+.asset-row, .quick-action, .activity-row { border-color: rgba(255,255,255,.07); }
+.quick-action { color: #fff; }
+.quick-action:hover, .quick-note, .neutral-pill { background: rgba(255,255,255,.045); border-color: rgba(255,255,255,.09); }
+.quick-note { color: rgba(255,255,255,.58); }
+.quick-note svg, .quick-arrow, .explorer-link { color: rgba(255,255,255,.72); }
+.modal-card { background: #070707; border-color: rgba(255,255,255,.12); }
+.network-option, .receive-card { background: #0a0a0a; border-color: rgba(255,255,255,.1); color: #fff; }
+.network-option:hover, .network-option.selected { background: #141414; border-color: rgba(255,255,255,.3); }
+.form-input, .receive-address { background: #030303; border-color: rgba(255,255,255,.15); color: #fff; }
+.form-input:focus { border-color: rgba(255,255,255,.55); }
+.modal-eyebrow, .modal-head h2 { color: #fff; }
+.form-warning { background: #0a0a0a; border-color: rgba(255,255,255,.09); }
+.form-warning svg, .security-list > div { color: rgba(255,255,255,.8); }
+.toast { background: #111; border-color: rgba(255,255,255,.15); color: #fff; }
+.toast-dot { background: #fff; }
+.soon-tag { color: #fff; background: rgba(255,255,255,.07); border-color: rgba(255,255,255,.12); }
+.status-dot, .connected-dot { background: #d8d8d8; box-shadow: 0 0 0 3px rgba(255,255,255,.08); }
+.change-positive { color: rgba(255,255,255,.65) !important; }
+@media(max-width:1180px) { .home-wallet-controls { padding-left:25px; padding-right:25px; } }
+@media(max-width:900px) { .home-wallet-controls { padding:8px 24px; } }
+@media(max-width:560px) {
+  .home-wallet-controls { padding:8px 14px; align-items:flex-start; flex-direction:column; }
+  .home-wallet-controls .topbar-actions { width:100%; justify-content:space-between; }
+  .sire-home-value-card { min-height:280px; padding:21px; border-radius:23px; }
+  .sire-home-value-amount { font-size:clamp(27px,8vw,37px); }
+  .sire-home-value-chart { width:65%; }
+  .sire-home-header { padding:0 14px; }
+}
