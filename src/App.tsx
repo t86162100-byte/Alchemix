@@ -168,10 +168,7 @@ function App() {
               </svg>
             </div>
           </div>
-          {!accountUser ? <div className="sire-home-value-actions">
-            <button type="button" className="sire-home-value-login" onClick={() => void connect()}>Log in</button>
-            <button type="button" className="sire-home-value-signup" onClick={() => void connect()}>Sign up <ArrowRight size={17} /></button>
-          </div> : <button type="button" className="sire-home-value-add-funds" onClick={() => setModal('receive')}><Plus size={17} /> Add funds</button>}
+          <button type="button" className="sire-home-value-add-funds" onClick={() => address ? setModal('receive') : void connect()}><Plus size={17} /> Add funds</button>
         </section>
 
         {!address && <div className="connect-banner"><div className="banner-art"><div className="banner-orbit orbit-one"/><div className="banner-orbit orbit-two"/><div className="banner-coin"><Sparkles size={28}/></div></div><div className="banner-copy"><div className="banner-kicker">WELCOME TO NOVA</div><h2>Your assets. Your rules.</h2><p>Connect a browser wallet to see your onchain balance and get started. Nova never asks for your recovery phrase.</p><div className="banner-buttons"><button className="primary-button" onClick={connect}>Connect wallet <ArrowUpRight size={16}/></button><button className="text-button" onClick={() => setModal('help')}>How it works <ExternalLink size={14}/></button></div></div><div className="banner-decoration">N<span>.</span></div></div>}
