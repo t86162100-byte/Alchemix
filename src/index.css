@@ -307,3 +307,57 @@ body { background: #000; color: #fff; }
             drop-shadow(0 0 9px rgba(255,255,255,.22));
   }
 }
+
+
+/* Final Overview spacing and persistent header polish. */
+.sire-home-header {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: rgba(3,3,3,.96);
+  box-shadow: 0 8px 22px rgba(0,0,0,.24);
+  isolation: isolate;
+}
+.page-wrap.overview-page-wrap > .sire-home-value-card {
+  padding-left: 24px;
+  padding-right: 24px;
+}
+.page-wrap.overview-page-wrap > .sire-home-value-card .sire-home-value-main {
+  min-height: 164px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+}
+.page-wrap.overview-page-wrap > .sire-home-value-card .sire-home-value-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: 120px;
+}
+.page-wrap.overview-page-wrap > .sire-home-value-card .sire-home-value-chart {
+  height: 128px;
+  align-self: center;
+  margin: 0;
+}
+@media (max-width: 560px) {
+  .sire-home-header {
+    height: 62px;
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .page-wrap.overview-page-wrap > .sire-home-value-card {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .page-wrap.overview-page-wrap > .sire-home-value-card .sire-home-value-main {
+    min-height: 144px;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 10px;
+  }
+  .page-wrap.overview-page-wrap > .sire-home-value-card .sire-home-value-copy {
+    min-height: 110px;
+  }
+  .page-wrap.overview-page-wrap > .sire-home-value-card .sire-home-value-chart {
+    height: 108px;
+  }
+}
