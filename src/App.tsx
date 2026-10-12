@@ -222,7 +222,6 @@ function App() {
 
         {activeTab === 'Market' ? <section className="market-page">
           <div className="market-topline">
-            <span className="market-topline-label">MARKET PULSE</span>
             <button type="button" className="market-search-icon-button" aria-label="Search market" onClick={() => setNotice('Market search will be added in a later step.')}><Search size={20}/></button>
           </div>
           <div className="market-ticker-viewport" aria-label="Market highlights">
