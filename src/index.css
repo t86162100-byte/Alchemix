@@ -259,3 +259,51 @@ body { background: #000; color: #fff; }
     gap: 8px;
   }
 }
+
+
+/* Overview balance card: restore breathing room and use a crisp white graph glow. */
+.page-wrap.overview-page-wrap > .sire-home-value-card {
+  padding-top: 22px;
+  padding-bottom: 20px;
+  box-shadow:
+    0 16px 34px rgba(0,0,0,.32),
+    inset 0 -1px 0 rgba(255,255,255,.18),
+    0 8px 24px rgba(255,255,255,.035);
+}
+.page-wrap.overview-page-wrap > .sire-home-value-card::after {
+  content: "";
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: 0;
+  height: 1px;
+  pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.78) 22%, rgba(255,255,255,.92) 50%, rgba(255,255,255,.78) 78%, transparent);
+  box-shadow: 0 0 8px rgba(255,255,255,.34), 0 0 20px rgba(255,255,255,.12);
+}
+.page-wrap.overview-page-wrap > .sire-home-value-card .sire-home-value-main {
+  min-height: 132px;
+}
+.page-wrap.overview-page-wrap > .sire-home-value-card .sire-home-value-chart {
+  height: 108px;
+  color: #fff;
+  filter: drop-shadow(0 0 4px rgba(255,255,255,.68))
+          drop-shadow(0 0 11px rgba(255,255,255,.24));
+}
+.page-wrap.overview-page-wrap > .sire-home-value-card .sire-home-value-chart path:first-child {
+  fill: url(#balanceGradient);
+}
+@media (max-width: 560px) {
+  .page-wrap.overview-page-wrap > .sire-home-value-card {
+    padding-top: 18px;
+    padding-bottom: 17px;
+  }
+  .page-wrap.overview-page-wrap > .sire-home-value-card .sire-home-value-main {
+    min-height: 112px;
+  }
+  .page-wrap.overview-page-wrap > .sire-home-value-card .sire-home-value-chart {
+    height: 91px;
+    filter: drop-shadow(0 0 4px rgba(255,255,255,.65))
+            drop-shadow(0 0 9px rgba(255,255,255,.22));
+  }
+}
