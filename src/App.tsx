@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowUpRight, Bell, ChevronDown, CircleHelp, Copy, ExternalLink, Eye, EyeOff, Globe2, LayoutGrid, LockKeyhole, LogOut, Menu, Plus, QrCode, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Wallet, X, Zap } from 'lucide-react';
+import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, CircleHelp, CircleUserRound, Copy, ExternalLink, Eye, EyeOff, Globe2, LayoutGrid, LockKeyhole, Menu, Plus, QrCode, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Wallet, X, Zap } from 'lucide-react';
 
 type Chain = { id: number; name: string; symbol: string; label: string; rpc: string; explorer: string; color: string; priceId: string };
 type EthereumProvider = { request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>; on?: (event: string, cb: (...args: unknown[]) => void) => void; removeListener?: (event: string, cb: (...args: unknown[]) => void) => void };
@@ -33,6 +33,7 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [priceLoading, setPriceLoading] = useState(true);
   const [hideBalance, setHideBalance] = useState(false);
+  const [totalValueVisible, setTotalValueVisible] = useState(true);
   const [modal, setModal] = useState<'send' | 'receive' | 'network' | 'help' | null>(null);
   const [sendTo, setSendTo] = useState('');
   const [sendAmount, setSendAmount] = useState('');
@@ -111,6 +112,8 @@ function App() {
   const copyAddress = async () => { try { await navigator.clipboard.writeText(address); setNotice('Wallet address copied.'); } catch { setNotice(address); } };
   const navItems = [{ name: 'Overview', icon: LayoutGrid }, { name: 'Activity', icon: Activity }, { name: 'Swap', icon: ArrowLeftRight }, { name: 'Explore', icon: Globe2 }];
   const portfolio = useMemo(() => usdBalance, [usdBalance]);
+  const accountUser = Boolean(address);
+  const accountValue = portfolio === null ? null : money(portfolio);
   const showValue = (value: number | null) => hideBalance ? '••••••' : value === null ? '—' : money(value);
 
   return <div className="app-shell">
@@ -122,14 +125,54 @@ function App() {
     </aside>
     {mobileNav && <button className="mobile-overlay" onClick={() => setMobileNav(false)} aria-label="Close navigation"/>}
     <main className="main-content">
-      <header className="topbar"><div className="topbar-left"><button className="mobile-menu icon-button" onClick={() => setMobileNav(true)} aria-label="Open menu"><Menu size={21}/></button><div className="breadcrumb">Wallet <span>/</span> <strong>{activeTab}</strong></div></div><div className="topbar-actions"><div className="network-picker-wrap"><button className="network-picker" onClick={() => setModal('network')}><span className="chain-dot" style={{ background: chain.color }}/><span>{chain.name}</span><ChevronDown size={15}/></button></div><button className="icon-button top-icon" onClick={() => setNotice('You’re all caught up.')} aria-label="Notifications"><Bell size={18}/></button>{address ? <button className="connect-button connected" onClick={disconnect}><span className="connected-dot"/>{shortAddress(address)}<ChevronDown size={15}/></button> : <button className="connect-button" onClick={connect}><Wallet size={16}/> Connect wallet</button>}</div></header>
+      <header className="sire-home-header">
+        <button type="button" className="sire-home-icon sire-home-profile-button" aria-label="Profile" onClick={() => address ? setNotice(`Connected wallet: ${shortAddress(address)}. Use the wallet controls below to disconnect.`) : setModal('help')}>
+          <CircleUserRound size={23} />
+        </button>
+        <div className="sire-home-header-actions">
+          <button type="button" className="sire-home-icon" aria-label="Search" onClick={() => setNotice('Search is planned for a future release.')}><Search size={21} /></button>
+          <button type="button" className="sire-home-icon" aria-label="Notifications" onClick={() => setNotice('You’re all caught up.')}><Bell size={21} /></button>
+          <button type="button" className="sire-home-icon" aria-label="Help" onClick={() => setModal('help')}><CircleHelp size={22} /></button>
+        </div>
+      </header>
+      <div className="home-wallet-controls">
+        <div className="breadcrumb">Wallet <span>/</span> <strong>{activeTab}</strong></div>
+        <div className="topbar-actions">
+          <button className="network-picker" onClick={() => setModal('network')}><span className="chain-dot" style={{ background: chain.color }}/><span>{chain.name}</span><ChevronDown size={15}/></button>
+          {address ? <button className="connect-button connected" onClick={disconnect}><span className="connected-dot"/>{shortAddress(address)}<ChevronDown size={15}/></button> : <button className="connect-button" onClick={connect}><Wallet size={16}/> Connect wallet</button>}
+        </div>
+      </div>
       <div className="page-wrap">
         <div className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-line"/> YOUR WEB3 HOME</div><h1>{activeTab === 'Overview' ? 'Your crypto, clearly.' : activeTab}</h1><p className="page-subtitle">{activeTab === 'Overview' ? 'One calm place to see and manage your digital assets.' : activeTab === 'Activity' ? 'Keep track of transactions submitted from this session.' : activeTab === 'Swap' ? 'Token swaps will be available in a future release.' : 'Discover onchain tools and apps in a future release.'}</p></div><button className="refresh-button" onClick={() => address ? void refreshBalance() : void connect()}><RefreshCw size={15} className={loading ? 'spin' : ''}/><span>{address ? 'Refresh' : 'Get started'}</span></button></div>
+
+        <section className="sire-home-value-card" aria-label="Total account value">
+          <div className="sire-home-value-main">
+            <div className="sire-home-value-copy">
+              <div className="sire-home-value-card-top">
+                <span>TOTAL VALUE</span>
+                <button type="button" className="sire-home-value-eye" aria-label={totalValueVisible ? "Hide balance" : "Show balance"} onClick={() => setTotalValueVisible(visible => !visible)}>
+                  {totalValueVisible ? <Eye size={17} /> : <EyeOff size={17} />}
+                </button>
+              </div>
+              <div className="sire-home-value-amount">{totalValueVisible ? (accountValue ?? "$0.00") : "••••••"}<small>USD</small></div>
+            </div>
+            <div className="sire-home-value-chart" aria-hidden="true">
+              <svg viewBox="0 0 320 100" preserveAspectRatio="none">
+                <defs><linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="currentColor" stopOpacity="0.18" /><stop offset="100%" stopColor="currentColor" stopOpacity="0" /></linearGradient></defs>
+                <path d="M0 78 C35 75, 45 68, 72 71 S110 62, 132 66 S165 48, 188 53 S220 39, 242 45 S278 25, 320 31 L320 100 L0 100 Z" fill="url(#balanceGradient)" />
+                <path d="M0 78 C35 75, 45 68, 72 71 S110 62, 132 66 S165 48, 188 53 S220 39, 242 45 S278 25, 320 31" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </div>
+          </div>
+          {!accountUser ? <div className="sire-home-value-actions">
+            <button type="button" className="sire-home-value-login" onClick={() => void connect()}>Log in</button>
+            <button type="button" className="sire-home-value-signup" onClick={() => void connect()}>Sign up <ArrowRight size={17} /></button>
+          </div> : <button type="button" className="sire-home-value-add-funds" onClick={() => setModal('receive')}><Plus size={17} /> Add funds</button>}
+        </section>
 
         {!address && <div className="connect-banner"><div className="banner-art"><div className="banner-orbit orbit-one"/><div className="banner-orbit orbit-two"/><div className="banner-coin"><Sparkles size={28}/></div></div><div className="banner-copy"><div className="banner-kicker">WELCOME TO NOVA</div><h2>Your assets. Your rules.</h2><p>Connect a browser wallet to see your onchain balance and get started. Nova never asks for your recovery phrase.</p><div className="banner-buttons"><button className="primary-button" onClick={connect}>Connect wallet <ArrowUpRight size={16}/></button><button className="text-button" onClick={() => setModal('help')}>How it works <ExternalLink size={14}/></button></div></div><div className="banner-decoration">N<span>.</span></div></div>}
 
         <section className="stats-grid">
-          <article className="stat-card balance-card"><div className="stat-top"><span>Total balance</span><button className="subtle-icon" onClick={() => setHideBalance(v => !v)} aria-label={hideBalance ? 'Show balance' : 'Hide balance'}>{hideBalance ? <Eye size={17}/> : <EyeOff size={17}/>}</button></div><div className="balance-number">{showValue(portfolio)}</div><div className="stat-foot"><span className="neutral-pill"><span className="neutral-dot"/>{address ? chain.name : 'Not connected'}</span><span className="muted">{address ? (priceLoading ? 'Updating prices…' : 'Live network balance') : 'Connect to view your balance'}</span></div><div className="balance-sparkline"><svg viewBox="0 0 280 50" preserveAspectRatio="none" aria-hidden="true"><path d="M0 38 C20 35 24 16 42 25 S70 43 91 28 S116 8 133 23 S161 35 177 17 S205 27 222 13 S254 23 280 3" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/><path d="M0 38 C20 35 24 16 42 25 S70 43 91 28 S116 8 133 23 S161 35 177 17 S205 27 222 13 S254 23 280 3 L280 50 L0 50Z" fill="currentColor" opacity=".07"/></svg></div></article>
           <article className="stat-card"><div className="stat-top"><span>Active network</span><span className="stat-icon purple"><Globe2 size={17}/></span></div><div className="stat-main">{chain.name}</div><div className="stat-description"><span className="status-dot"/>{address ? 'Wallet connected to network' : 'Ready when you are'}</div><button className="card-link" onClick={() => setModal('network')}>Change network <ArrowUpRight size={14}/></button></article>
           <article className="stat-card"><div className="stat-top"><span>Wallet status</span><span className="stat-icon green"><ShieldCheck size={17}/></span></div><div className="stat-main">{address ? 'Connected' : 'Not connected'}</div><div className="stat-description">{address ? shortAddress(address) : 'Connect your wallet to begin'}</div><button className="card-link" onClick={address ? copyAddress : connect}>{address ? 'Copy address' : 'Connect wallet'} <ArrowUpRight size={14}/></button></article>
         </section>
