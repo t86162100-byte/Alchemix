@@ -256,10 +256,8 @@ function App() {
             <div className="market-compact-list">
               <div className="market-sort-bar" aria-label="Sort market tokens">
                 <span className="market-sort-label">#</span>
-                <button type="button" className="market-sort-mc" onClick={() => setMarketSort('market_cap')} aria-label="Sort by market cap">MC <ChevronsUpDown size={12}/></button>
-                <button type="button" className="market-sort-vol" onClick={() => setMarketSort('volume')} aria-label="Sort by volume">VOL <ChevronsUpDown size={12}/></button>
-                <button type="button" className="market-sort-price" onClick={() => setMarketSort('price')} aria-label="Sort by price">Price <ChevronsUpDown size={12}/></button>
-                <button type="button" className="market-sort-change" onClick={() => setMarketSort('change')} aria-label="Sort by change">{marketTimeRange} <ChevronsUpDown size={12}/></button>
+                <div className="market-sort-asset"><button type="button" onClick={() => setMarketSort('market_cap')} aria-label="Sort by market cap">MC <ChevronsUpDown size={12}/></button><button type="button" onClick={() => setMarketSort('volume')} aria-label="Sort by volume">VOL <ChevronsUpDown size={12}/></button></div>
+                <div className="market-sort-values"><button type="button" onClick={() => setMarketSort('price')} aria-label="Sort by price">Price <ChevronsUpDown size={12}/></button><button type="button" onClick={() => setMarketSort('change')} aria-label="Sort by change">{marketTimeRange} <ChevronsUpDown size={12}/></button></div>
                 <span className="market-sort-star" aria-hidden="true"><Star size={12}/></span>
               </div>
               {filteredMarketTokens.map((token, index) => {
