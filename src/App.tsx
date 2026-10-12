@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, CircleHelp, CircleUserRound, Copy, ExternalLink, Eye, EyeOff, Flame, Globe2, Home, LayoutGrid, LockKeyhole, Menu, MoreHorizontal, QrCode, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Star, TrendingDown, TrendingUp, Wallet, X, Zap } from 'lucide-react';
 
 type Chain = { id: number; name: string; symbol: string; label: string; rpc: string; explorer: string; color: string; priceId: string };
-type MarketToken = { id: string; symbol: string; name: string; image: string; current_price: number | null; market_cap: number | null; total_volume: number | null; price_change_percentage_24h: number | null; market_cap_rank: number | null };
+type MarketToken = { id: string; symbol: string; name: string; image: string; current_price: number | null; market_cap: number | null; total_volume: number | null; price_change_percentage_1h_in_currency?: number | null; price_change_percentage_24h: number | null; price_change_percentage_7d_in_currency?: number | null; price_change_percentage_30d_in_currency?: number | null; market_cap_rank: number | null };
 type EthereumProvider = { request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>; on?: (event: string, cb: (...args: unknown[]) => void) => void; removeListener?: (event: string, cb: (...args: unknown[]) => void) => void };
 declare global { interface Window { ethereum?: EthereumProvider } }
 
@@ -35,6 +35,8 @@ function App() {
   const [marketPage, setMarketPage] = useState(1);
   const [marketHasMore, setMarketHasMore] = useState(true);
   const [marketSort, setMarketSort] = useState<'market_cap' | 'volume' | 'change'>('market_cap');
+  const [marketTimeRange, setMarketTimeRange] = useState<'1h' | '24h' | '7d' | '30d'>('24h');
+  const [marketTimeOpen, setMarketTimeOpen] = useState(false);
   const [favoriteTokens, setFavoriteTokens] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('nova-market-favorites') || '[]') as string[]; } catch { return []; } });
   const [address, setAddress] = useState('');
   const [chainId, setChainId] = useState(1);
@@ -87,7 +89,7 @@ function App() {
     setMarketLoading(true);
     setMarketError('');
     try {
-      const response = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=${page}&sparkline=false&price_change_percentage=24h`);
+      const response = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=${page}&sparkline=false&price_change_percentage=1h%2C24h%2C7d%2C30d`);
       if (!response.ok) throw new Error(response.status === 429 ? 'Market data is rate-limited. Please wait a moment and retry.' : 'Market data is temporarily unavailable.');
       const data = await response.json() as MarketToken[];
       setMarketTokens(old => append ? [...old, ...data.filter(token => !old.some(existing => existing.id === token.id))] : data);
@@ -128,11 +130,12 @@ function App() {
     if (value == null) return '—';
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: value < 1 ? 4 : 2, maximumFractionDigits: value < 1 ? 8 : 2 }).format(value);
   };
+  const getMarketChange = (token: MarketToken) => marketTimeRange === '1h' ? token.price_change_percentage_1h_in_currency : marketTimeRange === '7d' ? token.price_change_percentage_7d_in_currency : marketTimeRange === '30d' ? token.price_change_percentage_30d_in_currency : token.price_change_percentage_24h;
   const filteredMarketTokens = useMemo(() => {
     let result = [...marketTokens];
     if (marketCategory === 'Favorites') result = result.filter(token => favoriteTokens.includes(token.id));
-    if (marketCategory === 'Gainers') result = result.filter(token => (token.price_change_percentage_24h ?? -Infinity) > 0).sort((a, b) => (b.price_change_percentage_24h ?? 0) - (a.price_change_percentage_24h ?? 0));
-    else if (marketCategory === 'Losers') result = result.filter(token => (token.price_change_percentage_24h ?? Infinity) < 0).sort((a, b) => (a.price_change_percentage_24h ?? 0) - (b.price_change_percentage_24h ?? 0));
+    if (marketCategory === 'Gainers') result = result.filter(token => (getMarketChange(token) ?? -Infinity) > 0).sort((a, b) => (getMarketChange(b) ?? 0) - (getMarketChange(a) ?? 0));
+    else if (marketCategory === 'Losers') result = result.filter(token => (getMarketChange(token) ?? Infinity) < 0).sort((a, b) => (getMarketChange(a) ?? 0) - (getMarketChange(b) ?? 0));
     else if (marketCategory === 'Hot') {
       if (trendingTokenIds.length) {
         const rank = new Map(trendingTokenIds.map((id, index) => [id, index]));
@@ -140,9 +143,9 @@ function App() {
       } else result = result.slice(0, 10);
     }
     else if (marketSort === 'volume') result.sort((a, b) => (b.total_volume ?? 0) - (a.total_volume ?? 0));
-    else if (marketSort === 'change') result.sort((a, b) => (b.price_change_percentage_24h ?? -Infinity) - (a.price_change_percentage_24h ?? -Infinity));
+    else if (marketSort === 'change') result.sort((a, b) => (getMarketChange(b) ?? -Infinity) - (getMarketChange(a) ?? -Infinity));
     return result;
-  }, [marketTokens, marketCategory, favoriteTokens, marketSort, trendingTokenIds]);
+  }, [marketTokens, marketCategory, favoriteTokens, marketSort, trendingTokenIds, marketTimeRange]);
 
   const connect = async () => {
     if (!window.ethereum) { setNotice('No compatible browser wallet detected. Install a wallet extension, then reload this page.'); return; }
@@ -240,11 +243,17 @@ function App() {
               {['Hot', 'All tokens', 'Favorites', 'Gainers', 'Losers', 'Volume'].map(category => <button type="button" role="tab" aria-selected={marketCategory === category} className={marketCategory === category ? 'active' : ''} key={category} onClick={() => { setMarketCategory(category); if (category === 'Volume') setMarketSort('volume'); else if (category === 'Gainers' || category === 'Losers') setMarketSort('change'); else setMarketSort('market_cap'); }}>{category === 'Hot' && <Flame size={14}/>} {category === 'Favorites' && <Star size={14}/>} {category === 'Gainers' && <TrendingUp size={14}/>} {category === 'Losers' && <TrendingDown size={14}/>} {category}</button>)}
             </div>
           </div>
+          <div className="market-controls-row">
+            <button type="button" className="market-network-select" onClick={() => setModal('network')} aria-label="Select network"><Globe2 size={15}/><span>{chain.name}</span><ChevronDown size={13}/></button>
+            <div className="market-range-wrap">
+              <button type="button" className="market-range-select" aria-label="Select price change range" aria-expanded={marketTimeOpen} onClick={() => setMarketTimeOpen(open => !open)}><span>{marketTimeRange}</span><ChevronDown size={12}/></button>
+              {marketTimeOpen && <div className="market-range-menu">{(['1h', '24h', '7d', '30d'] as const).map(range => <button type="button" key={range} className={marketTimeRange === range ? 'active' : ''} onClick={() => { setMarketTimeRange(range); setMarketTimeOpen(false); }}>{range}</button>)}</div>}
+            </div>
+          </div>
           <div className="market-table-panel">
-            <div className="market-table-title"><div><h2>{marketCategory === 'Hot' ? 'Trending tokens' : marketCategory === 'All tokens' ? 'All tokens' : marketCategory}</h2><p>Live market data · 24-hour change · USD</p></div><span className="market-live-indicator"><i/> LIVE</span></div>
             {marketError && <div className="market-error"><span>{marketError}</span><button type="button" onClick={() => void loadMarketTokens(1, false)}>Try again</button></div>}
-            <div className="market-table-scroll"><table className="market-table"><thead><tr><th className="market-rank-head">#</th><th className="market-asset-head">Asset</th><th className="market-price-head">Price <button type="button" aria-label="Sort by market cap" onClick={() => setMarketSort('market_cap')}><ChevronDown size={12}/></button></th><th className="market-change-head">24h</th><th className="market-volume-head">Vol (24h) <button type="button" aria-label="Sort by volume" onClick={() => setMarketSort('volume')}><ChevronDown size={12}/></button></th><th className="market-cap-head">Market cap</th><th className="market-favorite-head"></th></tr></thead>
-            <tbody>{filteredMarketTokens.map((token, index) => { const change = token.price_change_percentage_24h; const isFavorite = favoriteTokens.includes(token.id); return <tr key={token.id}>
+            <div className="market-table-scroll"><table className="market-table"><thead><tr><th className="market-rank-head">#</th><th className="market-asset-head">Asset</th><th className="market-price-head">Price <button type="button" aria-label="Sort by market cap" onClick={() => setMarketSort('market_cap')}><ChevronDown size={12}/></button></th><th className="market-change-head">{marketTimeRange}</th><th className="market-volume-head">Vol (24h) <button type="button" aria-label="Sort by volume" onClick={() => setMarketSort('volume')}><ChevronDown size={12}/></button></th><th className="market-cap-head">Market cap</th><th className="market-favorite-head"></th></tr></thead>
+            <tbody>{filteredMarketTokens.map((token, index) => { const change = getMarketChange(token); const isFavorite = favoriteTokens.includes(token.id); return <tr key={token.id}>
               <td className="market-rank">{token.market_cap_rank ?? index + 1}</td>
               <td><div className="market-token"><img src={token.image} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }}/><div><strong>{token.name}</strong><span>{token.symbol.toUpperCase()}</span></div></div></td>
               <td className="market-price">{marketPrice(token.current_price)}</td>
