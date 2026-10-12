@@ -443,3 +443,75 @@ body { background: #000; color: #fff; }
     height: 44px;
   }
 }
+
+
+/* Automatically scrolling supported-network pills directly below the balance card. */
+.network-marquee {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+  margin: -7px 0 23px;
+  padding: 5px 0 7px;
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 3%, #000 97%, transparent);
+}
+.network-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: network-marquee-scroll 32s linear infinite;
+  will-change: transform;
+}
+.network-marquee:hover .network-marquee-track { animation-play-state: paused; }
+.network-marquee-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 10px;
+}
+.network-marquee-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  flex: 0 0 auto;
+  min-height: 42px;
+  padding: 7px 15px 7px 9px;
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #111 0%, #080808 100%);
+  color: rgba(255,255,255,.9);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.035);
+}
+.network-marquee-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 25px;
+  height: 25px;
+  flex: 0 0 25px;
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 800;
+}
+.network-marquee-logo.ethereum { background: #20202a; color: #a7a7ff; }
+.network-marquee-logo.bnb { background: #30280e; color: #f0b90b; }
+.network-marquee-logo.base { background: #163eaa; color: #fff; font-size: 17px; }
+.network-marquee-logo.polygon { background: #2a1b48; color: #b99aff; font-size: 18px; }
+.network-marquee-logo.arbitrum { background: #172a37; color: #75c9f2; font-size: 15px; }
+.network-marquee-logo.optimism { background: #481d21; color: #ff6571; font-size: 10px; }
+@keyframes network-marquee-scroll {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .network-marquee-track { animation: none; }
+  .network-marquee-group[aria-hidden="true"] { display: none; }
+}
+@media (max-width: 560px) {
+  .network-marquee { margin: -5px 0 18px; }
+  .network-marquee-group { gap: 8px; padding-right: 8px; }
+  .network-marquee-pill { min-height: 39px; padding: 6px 12px 6px 7px; font-size: 11px; gap: 7px; }
+  .network-marquee-logo { width: 23px; height: 23px; flex-basis: 23px; }
+}
