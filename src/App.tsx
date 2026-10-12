@@ -221,6 +221,21 @@ function App() {
         )}
 
         {activeTab === 'Market' ? <section className="market-page">
+          <div className="market-topline">
+            <span className="market-topline-label">MARKET PULSE</span>
+            <button type="button" className="market-search-icon-button" aria-label="Search market" onClick={() => setNotice('Market search will be added in a later step.')}><Search size={20}/></button>
+          </div>
+          <div className="market-ticker-viewport" aria-label="Market highlights">
+            <div className="market-ticker-track">
+              {[0, 1].map(copy => <div className="market-ticker-group" key={copy} aria-hidden={copy === 1 ? true : undefined}>
+                <article className="market-ticker-card"><span className="market-ticker-symbol btc">₿</span><span className="market-ticker-copy"><strong>Bitcoin <small>BTC</small></strong><b>$67,420.80</b></span><span className="market-ticker-change up">+2.45%</span></article>
+                <article className="market-ticker-card"><span className="market-ticker-symbol eth">Ξ</span><span className="market-ticker-copy"><strong>Ethereum <small>ETH</small></strong><b>$3,520.14</b></span><span className="market-ticker-change up">+1.82%</span></article>
+                <article className="market-ticker-card"><span className="market-ticker-symbol sol">◎</span><span className="market-ticker-copy"><strong>Solana <small>SOL</small></strong><b>$148.62</b></span><span className="market-ticker-change down">−0.64%</span></article>
+                <article className="market-ticker-card market-ticker-stat"><span className="market-ticker-stat-label">TOTAL MARKET CAP</span><strong>$2.48T</strong><span className="market-ticker-change up">+1.26% today</span></article>
+                <article className="market-ticker-card market-ticker-stat"><span className="market-ticker-stat-label">24H VOLUME</span><strong>$84.6B</strong><span className="market-ticker-muted">Across all markets</span></article>
+              </div>)}
+            </div>
+          </div>
           <div className="market-toolbar">
             <div className="market-category-list" role="tablist" aria-label="Market categories">
               {['Hot', 'All tokens', 'Favorites', 'Gainers', 'Losers', 'Volume'].map(category => <button type="button" role="tab" aria-selected={marketCategory === category} className={marketCategory === category ? 'active' : ''} key={category} onClick={() => { setMarketCategory(category); if (category === 'Volume') setMarketSort('volume'); else if (category === 'Gainers' || category === 'Losers') setMarketSort('change'); else setMarketSort('market_cap'); }}>{category === 'Hot' && <Flame size={14}/>} {category === 'Favorites' && <Star size={14}/>} {category === 'Gainers' && <TrendingUp size={14}/>} {category === 'Losers' && <TrendingDown size={14}/>} {category}</button>)}
@@ -238,7 +253,7 @@ function App() {
               <td className="market-metric">{marketNumber(token.total_volume)}</td><td className="market-metric">{marketNumber(token.market_cap)}</td>
               <td><button type="button" className={`market-favorite ${isFavorite ? 'saved' : ''}`} aria-label={isFavorite ? `Remove ${token.name} from favorites` : `Add ${token.name} to favorites`} onClick={() => toggleFavorite(token.id)}><Star size={17} fill={isFavorite ? 'currentColor' : 'none'}/></button></td>
             </tr>; })}
-            {!marketLoading && filteredMarketTokens.length === 0 && <tr><td colSpan={7}><div className="market-empty">{marketError ? 'Market data could not be loaded.' : marketCategory === 'Favorites' && !marketQuery ? 'No favorites yet. Tap the star beside a token to save it here.' : 'No tokens match this category.'}</div></td></tr>}
+            {!marketLoading && filteredMarketTokens.length === 0 && <tr><td colSpan={7}><div className="market-empty">{marketError ? 'Market data could not be loaded.' : marketCategory === 'Favorites' ? 'No favorites yet. Tap the star beside a token to save it here.' : 'No tokens match this category.'}</div></td></tr>}
             {marketLoading && marketTokens.length === 0 && <tr><td colSpan={7}><div className="market-loading"><span className="market-loader"/><span>Loading live market catalogue…</span></div></td></tr>}
             </tbody></table></div>
             <div className="market-table-footer"><span>Prices, volume and market caps from CoinGecko. Market data may be delayed.</span>{marketHasMore && marketCategory !== 'Hot' && marketCategory !== 'Favorites' && <button type="button" onClick={() => void loadMarketTokens(marketPage + 1, true)} disabled={marketLoading}>{marketLoading ? 'Loading…' : 'Load more tokens'} <ArrowDownLeft size={14}/></button>}</div>
