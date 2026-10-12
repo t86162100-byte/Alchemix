@@ -615,7 +615,7 @@ body { background: #000; color: #fff; }
 .market-ticker-track { display:flex; width:max-content; animation:market-ticker-scroll 38s linear infinite; }
 .market-ticker-viewport:hover .market-ticker-track { animation-play-state:paused; }
 .market-ticker-group { display:flex; flex:0 0 auto; gap:10px; padding-right:10px; }
-.market-ticker-card { display:flex; align-items:center; gap:10px; min-width:205px; height:180px; min-height:180px; padding:14px; border:1px solid rgba(255,255,255,.16); border-radius:22px; background:linear-gradient(145deg,#171717 0%,#0d0d0d 58%,#080808 100%); box-shadow:0 8px 22px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.055); }
+.market-ticker-card { display:flex; align-items:center; gap:8px; min-width:180px; height:108px; min-height:108px; padding:11px; border:1px solid rgba(255,255,255,.16); border-radius:17px; background:linear-gradient(145deg,#171717 0%,#0d0d0d 58%,#080808 100%); box-shadow:0 6px 16px rgba(0,0,0,.32),inset 0 1px 0 rgba(255,255,255,.055); }
 .market-ticker-symbol { display:flex; flex:0 0 34px; width:34px; height:34px; align-items:center; justify-content:center; border:1px solid rgba(255,255,255,.11); border-radius:50%; color:#fff; font-size:17px; font-weight:700; }
 .market-ticker-symbol.btc { background:#17130c; color:#f4b64b; }
 .market-ticker-symbol.eth { background:#11131a; color:#c4c9ff; }
@@ -627,7 +627,7 @@ body { background: #000; color: #fff; }
 .market-ticker-change { display:inline-flex; align-items:center; margin-left:auto; padding:5px 6px; border-radius:7px; font-size:9px; font-weight:750; white-space:nowrap; }
 .market-ticker-change.up { background:rgba(255,255,255,.09); color:#f5f5f5; }
 .market-ticker-change.down { background:rgba(255,255,255,.045); color:rgba(255,255,255,.52); }
-.market-ticker-card.market-ticker-stat { display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:5px; min-width:175px; }
+.market-ticker-card.market-ticker-stat { display:flex; flex-direction:column; align-items:flex-start; justify-content:center; gap:4px; min-width:155px; }
 .market-ticker-stat-label { color:rgba(255,255,255,.36); font-size:8px; font-weight:750; letter-spacing:.1em; }
 .market-ticker-stat strong { color:#fff; font-size:16px; font-weight:700; letter-spacing:-.03em; }
 .market-ticker-muted { color:rgba(255,255,255,.35); font-size:9px; }
