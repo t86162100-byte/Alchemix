@@ -171,6 +171,24 @@ function App() {
           <button type="button" className="sire-home-value-add-funds" onClick={() => address ? setModal('receive') : void connect()}>Add funds</button>
         </section>
 
+        <section className="network-marquee" aria-label="Supported blockchain networks">
+          <div className="network-marquee-track">
+            {[0, 1].map(copy => <div className="network-marquee-group" key={copy} aria-hidden={copy === 1 ? true : undefined}>
+              {[
+                { name: 'Ethereum', mark: '◆', className: 'ethereum' },
+                { name: 'BNB Chain', mark: '◆', className: 'bnb' },
+                { name: 'Base', mark: '●', className: 'base' },
+                { name: 'Polygon', mark: '⬡', className: 'polygon' },
+                { name: 'Arbitrum', mark: 'A', className: 'arbitrum' },
+                { name: 'Optimism', mark: 'OP', className: 'optimism' },
+              ].map(network => <div className="network-marquee-pill" key={network.name}>
+                <span className={`network-marquee-logo ${network.className}`}>{network.mark}</span>
+                <span>{network.name}</span>
+              </div>)}
+            </div>)}
+          </div>
+        </section>
+
         {!address && <div className="connect-banner"><div className="banner-art"><div className="banner-orbit orbit-one"/><div className="banner-orbit orbit-two"/><div className="banner-coin"><Sparkles size={28}/></div></div><div className="banner-copy"><div className="banner-kicker">WELCOME TO NOVA</div><h2>Your assets. Your rules.</h2><p>Connect a browser wallet to see your onchain balance and get started. Nova never asks for your recovery phrase.</p><div className="banner-buttons"><button className="primary-button" onClick={connect}>Connect wallet <ArrowUpRight size={16}/></button><button className="text-button" onClick={() => setModal('help')}>How it works <ExternalLink size={14}/></button></div></div><div className="banner-decoration">N<span>.</span></div></div>}
 
         <section className="stats-grid">
