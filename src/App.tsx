@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, CircleHelp, CircleUserRound, Copy, ExternalLink, Eye, EyeOff, Globe2, LayoutGrid, LockKeyhole, Menu, QrCode, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Wallet, X, Zap } from 'lucide-react';
+import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, CircleHelp, CircleUserRound, Copy, ExternalLink, Eye, EyeOff, Globe2, LayoutGrid, LockKeyhole, Menu, MoreHorizontal, QrCode, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Wallet, X, Zap } from 'lucide-react';
 
 type Chain = { id: number; name: string; symbol: string; label: string; rpc: string; explorer: string; color: string; priceId: string };
 type EthereumProvider = { request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>; on?: (event: string, cb: (...args: unknown[]) => void) => void; removeListener?: (event: string, cb: (...args: unknown[]) => void) => void };
@@ -188,6 +188,13 @@ function App() {
             </div>)}
           </div>
         </section>
+
+        <nav className="wallet-quick-actions" aria-label="Wallet actions">
+          <button type="button" className="wallet-quick-action" onClick={() => setModal('send')}><span className="wallet-quick-icon"><ArrowUpRight size={20} /></span><span>Send</span></button>
+          <button type="button" className="wallet-quick-action" onClick={() => setModal('receive')}><span className="wallet-quick-icon"><ArrowDownLeft size={20} /></span><span>Receive</span></button>
+          <button type="button" className="wallet-quick-action" onClick={() => setActiveTab('Activity')}><span className="wallet-quick-icon"><Activity size={20} /></span><span>History</span></button>
+          <button type="button" className="wallet-quick-more" aria-label="More options" onClick={() => setModal('network')}><MoreHorizontal size={23} /></button>
+        </nav>
 
         {!address && <div className="connect-banner"><div className="banner-art"><div className="banner-orbit orbit-one"/><div className="banner-orbit orbit-two"/><div className="banner-coin"><Sparkles size={28}/></div></div><div className="banner-copy"><div className="banner-kicker">WELCOME TO NOVA</div><h2>Your assets. Your rules.</h2><p>Connect a browser wallet to see your onchain balance and get started. Nova never asks for your recovery phrase.</p><div className="banner-buttons"><button className="primary-button" onClick={connect}>Connect wallet <ArrowUpRight size={16}/></button><button className="text-button" onClick={() => setModal('help')}>How it works <ExternalLink size={14}/></button></div></div><div className="banner-decoration">N<span>.</span></div></div>}
 
