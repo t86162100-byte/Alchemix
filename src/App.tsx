@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, CircleHelp, CircleUserRound, Copy, ExternalLink, Eye, EyeOff, Flame, Globe2, Home, LayoutGrid, LockKeyhole, Menu, MoreHorizontal, QrCode, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Star, TrendingDown, TrendingUp, Wallet, X, Zap } from 'lucide-react';
+import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, ChevronsUpDown, CircleHelp, CircleUserRound, Copy, ExternalLink, Eye, EyeOff, Flame, Globe2, Home, LayoutGrid, LockKeyhole, Menu, MoreHorizontal, QrCode, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Star, TrendingDown, TrendingUp, Wallet, X, Zap } from 'lucide-react';
 
 type Chain = { id: number; name: string; symbol: string; label: string; rpc: string; explorer: string; color: string; priceId: string };
 type MarketToken = { id: string; symbol: string; name: string; image: string; current_price: number | null; market_cap: number | null; total_volume: number | null; price_change_percentage_1h_in_currency?: number | null; price_change_percentage_24h: number | null; price_change_percentage_7d_in_currency?: number | null; price_change_percentage_30d_in_currency?: number | null; market_cap_rank: number | null };
@@ -34,7 +34,7 @@ function App() {
   const [marketCategory, setMarketCategory] = useState('Hot');
   const [marketPage, setMarketPage] = useState(1);
   const [marketHasMore, setMarketHasMore] = useState(true);
-  const [marketSort, setMarketSort] = useState<'market_cap' | 'volume' | 'change'>('market_cap');
+  const [marketSort, setMarketSort] = useState<'market_cap' | 'volume' | 'change' | 'price'>('market_cap');
   const [marketTimeRange, setMarketTimeRange] = useState<'1h' | '24h' | '7d' | '30d'>('24h');
   const [marketTimeOpen, setMarketTimeOpen] = useState(false);
   const [favoriteTokens, setFavoriteTokens] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('nova-market-favorites') || '[]') as string[]; } catch { return []; } });
@@ -143,6 +143,7 @@ function App() {
       } else result = result.slice(0, 10);
     }
     else if (marketSort === 'volume') result.sort((a, b) => (b.total_volume ?? 0) - (a.total_volume ?? 0));
+    else if (marketSort === 'price') result.sort((a, b) => (b.current_price ?? 0) - (a.current_price ?? 0));
     else if (marketSort === 'change') result.sort((a, b) => (getMarketChange(b) ?? -Infinity) - (getMarketChange(a) ?? -Infinity));
     return result;
   }, [marketTokens, marketCategory, favoriteTokens, marketSort, trendingTokenIds, marketTimeRange]);
@@ -252,18 +253,31 @@ function App() {
           </div>
           <div className="market-table-panel">
             {marketError && <div className="market-error"><span>{marketError}</span><button type="button" onClick={() => void loadMarketTokens(1, false)}>Try again</button></div>}
-            <div className="market-table-scroll"><table className="market-table"><thead><tr><th className="market-rank-head">#</th><th className="market-asset-head">Asset</th><th className="market-price-head">Price <button type="button" aria-label="Sort by market cap" onClick={() => setMarketSort('market_cap')}><ChevronDown size={12}/></button></th><th className="market-change-head">{marketTimeRange}</th><th className="market-volume-head">Vol (24h) <button type="button" aria-label="Sort by volume" onClick={() => setMarketSort('volume')}><ChevronDown size={12}/></button></th><th className="market-cap-head">Market cap</th><th className="market-favorite-head"></th></tr></thead>
-            <tbody>{filteredMarketTokens.map((token, index) => { const change = getMarketChange(token); const isFavorite = favoriteTokens.includes(token.id); return <tr key={token.id}>
-              <td className="market-rank">{token.market_cap_rank ?? index + 1}</td>
-              <td><div className="market-token"><img src={token.image} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }}/><div><strong>{token.name}</strong><span>{token.symbol.toUpperCase()}</span></div></div></td>
-              <td className="market-price">{marketPrice(token.current_price)}</td>
-              <td><span className={change == null ? 'market-change neutral' : change >= 0 ? 'market-change positive' : 'market-change negative'}>{change == null ? '—' : `${change > 0 ? '+' : ''}${change.toFixed(2)}%`}</span></td>
-              <td className="market-metric">{marketNumber(token.total_volume)}</td><td className="market-metric">{marketNumber(token.market_cap)}</td>
-              <td><button type="button" className={`market-favorite ${isFavorite ? 'saved' : ''}`} aria-label={isFavorite ? `Remove ${token.name} from favorites` : `Add ${token.name} to favorites`} onClick={() => toggleFavorite(token.id)}><Star size={17} fill={isFavorite ? 'currentColor' : 'none'}/></button></td>
-            </tr>; })}
-            {!marketLoading && filteredMarketTokens.length === 0 && <tr><td colSpan={7}><div className="market-empty">{marketError ? 'Market data could not be loaded.' : marketCategory === 'Favorites' ? 'No favorites yet. Tap the star beside a token to save it here.' : 'No tokens match this category.'}</div></td></tr>}
-            {marketLoading && marketTokens.length === 0 && <tr><td colSpan={7}><div className="market-loading"><span className="market-loader"/><span>Loading live market catalogue…</span></div></td></tr>}
-            </tbody></table></div>
+            <div className="market-compact-list">
+              <div className="market-sort-bar" aria-label="Sort market tokens">
+                <span className="market-sort-label">#</span>
+                <button type="button" className="market-sort-mc" onClick={() => setMarketSort('market_cap')} aria-label="Sort by market cap">MC <ChevronsUpDown size={12}/></button>
+                <button type="button" className="market-sort-vol" onClick={() => setMarketSort('volume')} aria-label="Sort by volume">VOL <ChevronsUpDown size={12}/></button>
+                <button type="button" className="market-sort-price" onClick={() => setMarketSort('price')} aria-label="Sort by price">Price <ChevronsUpDown size={12}/></button>
+                <button type="button" className="market-sort-change" onClick={() => setMarketSort('change')} aria-label="Sort by change">{marketTimeRange} <ChevronsUpDown size={12}/></button>
+                <span className="market-sort-star" aria-hidden="true"><Star size={12}/></span>
+              </div>
+              {filteredMarketTokens.map((token, index) => {
+                const change = getMarketChange(token);
+                const isFavorite = favoriteTokens.includes(token.id);
+                return <article className="market-compact-row" key={token.id}>
+                  <span className="market-compact-rank">{token.market_cap_rank ?? index + 1}</span>
+                  <div className="market-compact-asset">
+                    <div className="market-token"><img src={token.image} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }}/><div><strong>{token.name}</strong><span>{token.symbol.toUpperCase()}</span></div></div>
+                    <div className="market-compact-metrics"><span><b>MC</b> {marketNumber(token.market_cap)}</span><span><b>VOL</b> {marketNumber(token.total_volume)}</span></div>
+                  </div>
+                  <div className="market-compact-price"><strong>{marketPrice(token.current_price)}</strong><span className={change == null ? 'neutral' : change >= 0 ? 'positive' : 'negative'}>{change == null ? '—' : `${change > 0 ? '+' : ''}${change.toFixed(2)}%`}</span></div>
+                  <button type="button" className={`market-favorite ${isFavorite ? 'saved' : ''}`} aria-label={isFavorite ? `Remove ${token.name} from favorites` : `Add ${token.name} to favorites`} onClick={() => toggleFavorite(token.id)}><Star size={16} fill={isFavorite ? 'currentColor' : 'none'}/></button>
+                </article>;
+              })}
+              {!marketLoading && filteredMarketTokens.length === 0 && <div className="market-empty">{marketError ? 'Market data could not be loaded.' : marketCategory === 'Favorites' ? 'No favorites yet. Tap the star beside a token to save it here.' : 'No tokens match this category.'}</div>}
+              {marketLoading && marketTokens.length === 0 && <div className="market-loading"><span className="market-loader"/><span>Loading live market catalogue…</span></div>}
+            </div>
             <div className="market-table-footer"><span>Prices, volume and market caps from CoinGecko. Market data may be delayed.</span>{marketHasMore && marketCategory !== 'Hot' && marketCategory !== 'Favorites' && <button type="button" onClick={() => void loadMarketTokens(marketPage + 1, true)} disabled={marketLoading}>{marketLoading ? 'Loading…' : 'Load more tokens'} <ArrowDownLeft size={14}/></button>}</div>
           </div>
         </section> : <>
