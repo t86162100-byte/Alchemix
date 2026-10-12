@@ -145,3 +145,6 @@ body { background: #000; color: #fff; }
   .sire-home-value-chart { width:65%; }
   .sire-home-header { padding:0 14px; }
 }
+
+/* Keep the Overview balance card close to the header after removing the intro rows. */
+.page-wrap.overview-page-wrap { padding-top: 8px; }
