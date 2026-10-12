@@ -135,7 +135,7 @@ function App() {
           <button type="button" className="sire-home-icon" aria-label="Help" onClick={() => setModal('help')}><CircleHelp size={22} /></button>
         </div>
       </header>
-{activeTab !== 'Overview' && (
+{activeTab !== 'Overview' && activeTab !== 'Activity' && (
       <div className="home-wallet-controls">
         <div className="breadcrumb">Wallet <span>/</span> <strong>{activeTab}</strong></div>
         <div className="topbar-actions">
@@ -145,7 +145,7 @@ function App() {
       </div>
       )}
       <div className={`page-wrap ${activeTab === 'Overview' ? 'overview-page-wrap' : ''}`}>
-{activeTab !== 'Overview' && (
+{activeTab !== 'Overview' && activeTab !== 'Activity' && (
         <div className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-line"/> YOUR WEB3 HOME</div><h1>{activeTab === 'Overview' ? 'Your crypto, clearly.' : activeTab}</h1><p className="page-subtitle">{activeTab === 'Overview' ? 'One calm place to see and manage your digital assets.' : activeTab === 'Activity' ? 'Keep track of transactions submitted from this session.' : activeTab === 'Swap' ? 'Token swaps will be available in a future release.' : 'Discover onchain tools and apps in a future release.'}</p></div><button className="refresh-button" onClick={() => address ? void refreshBalance() : void connect()}><RefreshCw size={15} className={loading ? 'spin' : ''}/><span>{address ? 'Refresh' : 'Get started'}</span></button></div>
         )}
 
