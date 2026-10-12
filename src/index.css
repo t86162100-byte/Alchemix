@@ -742,3 +742,70 @@ body { background: #000; color: #fff; }
   .market-table-footer { align-items: flex-start; flex-direction: column; padding: 12px 13px; }
   .market-error { align-items: flex-start; flex-direction: column; }
 }
+
+
+/* Compact network and performance-range controls below the market category pills. */
+.market-controls-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin:9px 0 13px;
+}
+.market-network-select,
+.market-range-select {
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:7px;
+  min-height:31px;
+  border:1px solid rgba(255,255,255,.13);
+  border-radius:999px;
+  background:#0b0b0b;
+  color:rgba(255,255,255,.78);
+  font:inherit;
+  font-size:10px;
+  font-weight:650;
+  cursor:pointer;
+  transition:background .16s ease,border-color .16s ease;
+}
+.market-network-select { padding:0 10px; }
+.market-network-select svg:first-child { color:rgba(255,255,255,.68); }
+.market-network-select:hover,
+.market-range-select:hover { background:#171717; border-color:rgba(255,255,255,.25); }
+.market-range-wrap { position:relative; }
+.market-range-select { min-width:58px; padding:0 8px 0 10px; text-transform:lowercase; }
+.market-range-select span { font-variant-numeric:tabular-nums; }
+.market-range-menu {
+  position:absolute;
+  z-index:25;
+  top:calc(100% + 6px);
+  right:0;
+  display:grid;
+  min-width:74px;
+  padding:4px;
+  border:1px solid rgba(255,255,255,.14);
+  border-radius:12px;
+  background:#111;
+  box-shadow:0 12px 30px rgba(0,0,0,.55);
+}
+.market-range-menu button {
+  min-height:29px;
+  padding:0 10px;
+  border:0;
+  border-radius:7px;
+  background:transparent;
+  color:rgba(255,255,255,.63);
+  text-align:left;
+  font:inherit;
+  font-size:10px;
+  font-weight:650;
+  cursor:pointer;
+}
+.market-range-menu button:hover { background:rgba(255,255,255,.07); color:#fff; }
+.market-range-menu button.active { background:#fff; color:#050505; }
+@media (max-width:560px) {
+  .market-controls-row { margin-top:8px; margin-bottom:11px; }
+  .market-network-select,.market-range-select { min-height:30px; }
+  .market-network-select { gap:6px; padding:0 9px; }
+}
