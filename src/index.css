@@ -809,3 +809,68 @@ body { background: #000; color: #fff; }
   .market-network-select,.market-range-select { min-height:30px; }
   .market-network-select { gap:6px; padding:0 9px; }
 }
+
+/* Dense exchange-style market catalogue: metrics sit beneath each token name. */
+.market-table-scroll { overflow: visible; }
+.market-compact-list { width:100%; min-width:0; }
+.market-sort-bar {
+  display:grid;
+  grid-template-columns:18px minmax(0,1fr) minmax(100px,auto) 24px;
+  align-items:center;
+  gap:7px;
+  min-height:34px;
+  padding:0 10px;
+  border-bottom:1px solid rgba(255,255,255,.09);
+  background:#080808;
+}
+.market-sort-label { color:rgba(255,255,255,.35); font-size:9px; }
+.market-sort-asset,.market-sort-values { display:flex; align-items:center; gap:10px; min-width:0; }
+.market-sort-values { justify-content:flex-end; gap:10px; }
+.market-sort-bar button {
+  display:inline-flex; align-items:center; gap:3px; padding:0;
+  border:0; background:transparent; color:rgba(255,255,255,.42);
+  font:inherit; font-size:9px; font-weight:700; cursor:pointer;
+}
+.market-sort-bar button svg { color:rgba(255,255,255,.3); flex-shrink:0; }
+.market-sort-bar button:hover,.market-sort-bar button:hover svg { color:#fff; }
+.market-sort-star { display:flex; justify-content:center; color:rgba(255,255,255,.22); }
+.market-compact-row {
+  display:grid;
+  grid-template-columns:18px minmax(0,1fr) auto 24px;
+  align-items:center;
+  gap:7px;
+  min-height:66px;
+  padding:8px 10px;
+  border-bottom:1px solid rgba(255,255,255,.055);
+  transition:background .14s ease;
+}
+.market-compact-row:last-child { border-bottom:0; }
+.market-compact-row:hover { background:rgba(255,255,255,.028); }
+.market-compact-rank { color:rgba(255,255,255,.32); font-size:9px; font-variant-numeric:tabular-nums; }
+.market-compact-asset { min-width:0; display:flex; flex-direction:column; gap:7px; }
+.market-compact-asset .market-token { gap:7px; min-width:0; }
+.market-compact-asset .market-token img { width:27px; height:27px; flex-basis:27px; }
+.market-compact-asset .market-token > div { gap:3px; min-width:0; }
+.market-compact-asset .market-token strong { display:block; max-width:100%; font-size:10px; }
+.market-compact-asset .market-token span { font-size:8px; }
+.market-compact-metrics { display:flex; flex-wrap:wrap; align-items:center; gap:5px 10px; padding-left:34px; color:rgba(255,255,255,.42); font-size:8px; line-height:1.1; font-variant-numeric:tabular-nums; }
+.market-compact-metrics b { color:rgba(255,255,255,.25); font-size:7px; font-weight:750; }
+.market-compact-price { display:flex; flex-direction:column; align-items:flex-end; justify-content:center; gap:7px; min-width:0; }
+.market-compact-price strong { color:#f5f5f5; font-size:10px; font-weight:700; font-variant-numeric:tabular-nums; }
+.market-compact-price > span { font-size:9px; font-weight:700; font-variant-numeric:tabular-nums; }
+.market-compact-price > span.positive { color:#63d9a1; }
+.market-compact-price > span.negative { color:#ff747d; }
+.market-compact-price > span.neutral { color:rgba(255,255,255,.38); }
+.market-compact-row .market-favorite { width:24px; height:26px; border-radius:7px; }
+@media (max-width:560px) {
+  .market-sort-bar { grid-template-columns:15px minmax(0,1fr) auto 20px; gap:5px; padding:0 8px; }
+  .market-sort-asset,.market-sort-values { gap:7px; }
+  .market-sort-bar button { gap:2px; font-size:8px; }
+  .market-sort-bar button svg { width:10px; height:10px; }
+  .market-compact-row { grid-template-columns:15px minmax(0,1fr) auto 20px; gap:5px; padding:8px; min-height:63px; }
+  .market-compact-asset .market-token img { width:25px; height:25px; flex-basis:25px; }
+  .market-compact-asset .market-token strong { max-width:132px; font-size:9px; }
+  .market-compact-metrics { padding-left:32px; gap:4px 8px; font-size:7px; }
+  .market-compact-price strong { font-size:9px; }
+  .market-compact-price > span { font-size:8px; }
+}
