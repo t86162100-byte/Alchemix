@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, ChevronsUpDown, CircleHelp, CircleUserRound, Copy, ExternalLink, Eye, EyeOff, Flame, Globe2, Home, LayoutGrid, LockKeyhole, Menu, MoreHorizontal, QrCode, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Star, TrendingDown, TrendingUp, Wallet, X, Zap } from 'lucide-react';
 
 type Chain = { id: number; name: string; symbol: string; label: string; rpc: string; explorer: string; color: string; priceId: string; icon?: string };
-type MarketToken = { id: string; symbol: string; name: string; image: string; address?: string; current_price: number | null; market_cap: number | null; total_volume: number | null; price_change_percentage_1h_in_currency?: number | null; price_change_percentage_24h: number | null; price_change_percentage_7d_in_currency?: number | null; price_change_percentage_30d_in_currency?: number | null; market_cap_rank: number | null };
+type MarketToken = { id: string; symbol: string; name: string; image: string; address?: string; chainName?: string; chainIcon?: string; current_price: number | null; market_cap: number | null; total_volume: number | null; price_change_percentage_1h_in_currency?: number | null; price_change_percentage_24h: number | null; price_change_percentage_7d_in_currency?: number | null; price_change_percentage_30d_in_currency?: number | null; market_cap_rank: number | null };
 type EthereumProvider = { request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>; on?: (event: string, cb: (...args: unknown[]) => void) => void; removeListener?: (event: string, cb: (...args: unknown[]) => void) => void };
 declare global { interface Window { ethereum?: EthereumProvider } }
 
@@ -224,18 +224,63 @@ function App() {
     return known[selected.id] || selected.name.toLowerCase().replace(/\b(chain|mainnet|network|smart chain|pos)\b/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
   };
 
+  const loadAllChainMarketTokens = async (page: number): Promise<MarketToken[]> => {
+    type TokenData = { id: string; type?: string; attributes?: { address?: string; name?: string; symbol?: string; image_url?: string; price_usd?: string; fdv_usd?: string; market_cap_usd?: string; volume_usd?: { h24?: string }; price_change_percentage?: { h1?: string; h24?: string; h7d?: string } } };
+    type PoolData = { attributes?: { base_token_price_usd?: string; quote_token_price_usd?: string; volume_usd?: { h24?: string }; price_change_percentage?: { h1?: string; h24?: string; h7d?: string } }; relationships?: { base_token?: { data?: { id?: string } }; quote_token?: { data?: { id?: string } } } };
+    const supported = new Set([1,56,8453,137,42161,10,43114,100,250,42220,25,324,59144,534352,81457,5000,7777777,169,34443,130,80094,480,42170,2020]);
+    const networks = availableChains.filter(item => supported.has(item.id));
+    const num = (value?: string | null) => value != null && Number.isFinite(Number(value)) ? Number(value) : null;
+    const results: MarketToken[] = [];
+    for (let offset = 0; offset < networks.length; offset += 4) {
+      const batch = networks.slice(offset, offset + 4);
+      const settled = await Promise.allSettled(batch.map(async selected => {
+        const network = geckoTerminalNetwork(selected);
+        const response = await fetch('https://api.geckoterminal.com/api/v2/networks/' + encodeURIComponent(network) + '/pools?include=base_token,quote_token&page=' + page + '&sort=h24_volume_usd_desc', { headers: { accept: 'application/json;version=20230302' } });
+        if (!response.ok) return [] as MarketToken[];
+        const payload = await response.json() as { data?: PoolData[]; included?: TokenData[] };
+        const included = new Map((payload.included || []).filter(token => token.type === 'token' || token.attributes?.address).map(token => [token.id, token]));
+        const tokenMap = new Map<string, MarketToken>();
+        for (const pool of payload.data || []) {
+          const attrs = pool.attributes || {};
+          const volume = num(attrs.volume_usd?.h24);
+          for (const [side, price] of [['base_token', attrs.base_token_price_usd], ['quote_token', attrs.quote_token_price_usd]] as const) {
+            const tokenId = pool.relationships?.[side]?.data?.id;
+            if (!tokenId || tokenMap.has(tokenId)) continue;
+            const entry = included.get(tokenId);
+            if (!entry) continue;
+            const a = entry.attributes || {};
+            const address = a.address || tokenId.split('_').slice(1).join('_');
+            tokenMap.set(tokenId, {
+              id: 'onchain-' + selected.id + '-' + (address || tokenId), address,
+              name: a.name || 'Unknown token', symbol: a.symbol || 'TOKEN', image: a.image_url || '',
+              chainName: selected.name, chainIcon: chainLogoUrl(selected),
+              current_price: num(a.price_usd) ?? num(price), market_cap: num(a.market_cap_usd) ?? num(a.fdv_usd),
+              total_volume: num(a.volume_usd?.h24) ?? volume,
+              price_change_percentage_1h_in_currency: num(a.price_change_percentage?.h1) ?? num(attrs.price_change_percentage?.h1),
+              price_change_percentage_24h: num(a.price_change_percentage?.h24) ?? num(attrs.price_change_percentage?.h24),
+              price_change_percentage_7d_in_currency: num(a.price_change_percentage?.h7d) ?? num(attrs.price_change_percentage?.h7d),
+              price_change_percentage_30d_in_currency: null, market_cap_rank: null,
+            });
+          }
+        }
+        return [...tokenMap.values()];
+      }));
+      for (const result of settled) if (result.status === 'fulfilled') results.push(...result.value);
+    }
+    return results.sort((a, b) => (b.total_volume ?? 0) - (a.total_volume ?? 0));
+  };
+
   const loadMarketTokens = useCallback(async (page = 1, append = false) => {
     setMarketLoading(true); setMarketError('');
     try {
       if (marketNetworkId === 'all') {
-        const response = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=${page}&sparkline=false&price_change_percentage=1h%2C24h%2C7d%2C30d`);
-        if (!response.ok) throw new Error(response.status === 429 ? 'Market data is rate-limited. Please wait a moment and retry.' : 'Market data is temporarily unavailable.');
-        const data = await response.json() as MarketToken[];
-        setMarketTokens(old => append ? [...old, ...data.filter(token => !old.some(existing => existing.id === token.id))] : data);
-        setMarketHasMore(data.length === 100); setMarketPage(page);
-        if (page === 1) {
-          try { const trendingResponse = await fetch('https://api.coingecko.com/api/v3/search/trending'); if (trendingResponse.ok) { const trendingData = await trendingResponse.json() as { coins?: { item?: { id?: string } }[] }; setTrendingTokenIds((trendingData.coins || []).map(item => item.item?.id || '').filter(Boolean)); } } catch { setTrendingTokenIds([]); }
-        }
+        const data = await loadAllChainMarketTokens(page);
+        if (!data.length) throw new Error('No indexed DEX token markets were returned from supported chains. Try again in a moment.');
+        setMarketTokens(old => {
+          const source = append ? [...old, ...data] : data;
+          return source.filter((token, index) => source.findIndex(other => other.id === token.id) === index);
+        });
+        setMarketHasMore(data.length > 0); setMarketPage(page); setTrendingTokenIds([]);
       } else {
         const selected = availableChains.find(item => String(item.id) === marketNetworkId);
         if (!selected) throw new Error('That network is not ready yet. Choose another chain.');
@@ -265,7 +310,7 @@ function App() {
             const address = a.address || tokenId.split('_').slice(1).join('_');
             tokenMap.set(tokenId, {
               id: `onchain-${selected.id}-${address || tokenId}`,
-              address,
+              address, chainName: selected.name, chainIcon: chainLogoUrl(selected),
               name: a.name || 'Unknown token',
               symbol: a.symbol || 'TOKEN',
               image: a.image_url || '',
@@ -318,7 +363,8 @@ function App() {
     if (marketCategory === 'Gainers') result = result.filter(token => (getMarketChange(token) ?? -Infinity) > 0).sort((a, b) => (getMarketChange(b) ?? 0) - (getMarketChange(a) ?? 0));
     else if (marketCategory === 'Losers') result = result.filter(token => (getMarketChange(token) ?? Infinity) < 0).sort((a, b) => (getMarketChange(a) ?? 0) - (getMarketChange(b) ?? 0));
     else if (marketCategory === 'Hot') {
-      if (trendingTokenIds.length) {
+      if (marketNetworkId !== 'all') result.sort((a, b) => (b.total_volume ?? 0) - (a.total_volume ?? 0));
+      else if (trendingTokenIds.length) {
         const rank = new Map(trendingTokenIds.map((id, index) => [id, index]));
         result = result.filter(token => rank.has(token.id)).sort((a, b) => (rank.get(a.id) ?? 999) - (rank.get(b.id) ?? 999));
       } else result = result.slice(0, 10);
@@ -327,7 +373,7 @@ function App() {
     else if (marketSort === 'price') result.sort((a, b) => (b.current_price ?? 0) - (a.current_price ?? 0));
     else if (marketSort === 'change') result.sort((a, b) => (getMarketChange(b) ?? -Infinity) - (getMarketChange(a) ?? -Infinity));
     return result;
-  }, [marketTokens, marketCategory, favoriteTokens, marketSort, trendingTokenIds, marketTimeRange, marketSearch]);
+  }, [marketTokens, marketCategory, favoriteTokens, marketSort, trendingTokenIds, marketTimeRange, marketSearch, marketNetworkId]);
 
   const connect = async () => {
     if (!window.ethereum) { setNotice('No compatible browser wallet detected. Install a wallet extension, then reload this page.'); return; }
@@ -435,7 +481,7 @@ function App() {
             </div>
           </div>
           <div className="market-controls-row">
-            <label className="market-network-select"><Globe2 size={15}/><select aria-label="Filter tokens by network" value={marketNetworkId} onChange={event => { setMarketNetworkId(event.target.value); setMarketCategory('All tokens'); setMarketPage(1); }}><option value="all">All chains · global listings</option>{availableChains.map(item => <option key={item.id} value={String(item.id)}>{item.name} · {item.symbol}</option>)}</select><ChevronDown size={13}/></label>
+            <label className="market-network-select"><Globe2 size={15}/><select aria-label="Filter tokens by network" value={marketNetworkId} onChange={event => { setMarketNetworkId(event.target.value); setMarketCategory('All tokens'); setMarketPage(1); }}><option value="all">All chains</option>{availableChains.map(item => <option key={item.id} value={String(item.id)}>{item.name} · {item.symbol}</option>)}</select><ChevronDown size={13}/></label>
             <div className="market-range-wrap">
               <button type="button" className="market-range-select" aria-label="Select price change range" aria-expanded={marketTimeOpen} onClick={() => setMarketTimeOpen(open => !open)}><span>{marketTimeRange}</span><ChevronDown size={12}/></button>
               {marketTimeOpen && <div className="market-range-menu">{(['1h', '24h', '7d', '30d'] as const).map(range => <button type="button" key={range} className={marketTimeRange === range ? 'active' : ''} onClick={() => { setMarketTimeRange(range); setMarketTimeOpen(false); }}>{range}</button>)}</div>}
@@ -456,7 +502,7 @@ function App() {
                 return <article className="market-compact-row" key={token.id}>
                   <span className="market-compact-rank">{token.market_cap_rank ?? index + 1}</span>
                   <div className="market-compact-asset">
-                    <div className="market-token">{token.image && <img src={token.image} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }}/>}<div><strong>{token.name}</strong><span>{token.symbol.toUpperCase()}{token.address ? ` · ${token.address.slice(0, 6)}…${token.address.slice(-4)}` : ''}</span></div></div>
+                    <div className="market-token"><span className="market-token-logos">{token.image && <img className="market-token-logo" src={token.image} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }}/ >}{token.chainIcon && <img className="market-chain-logo" src={token.chainIcon} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }}/>}</span><div className="market-token-copy"><strong>{token.name}</strong><span>{token.symbol.toUpperCase()}{token.address ? ` · ${token.address.slice(0, 6)}…${token.address.slice(-4)}` : ''}</span>{token.chainName && <span className="market-chain-name">{token.chainName}</span>}</div></div>
                     <div className="market-compact-metrics"><span><b>MC</b> {marketNumber(token.market_cap)}</span><span><b>VOL</b> {marketNumber(token.total_volume)}</span></div>
                   </div>
                   <div className="market-compact-price"><strong>{marketPrice(token.current_price)}</strong><span className={change == null ? 'neutral' : change >= 0 ? 'positive' : 'negative'}>{change == null ? '—' : `${change > 0 ? '+' : ''}${change.toFixed(2)}%`}</span></div>
