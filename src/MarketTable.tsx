@@ -11,7 +11,7 @@ type Props = {
 const money=(value?:number|string)=>{const n=Number(value);if(!Number.isFinite(n)||n<=0)return '—';return n>=1000?'$'+n.toLocaleString('en-US',{maximumFractionDigits:2}):n>=1?'$'+n.toLocaleString('en-US',{maximumFractionDigits:4}):'$'+n.toLocaleString('en-US',{maximumFractionDigits:8});};
 const compact=(value?:number)=>{if(!Number.isFinite(value)||!value)return '—';const n=Math.abs(value);return n>=1e12?'$'+(value/1e12).toFixed(2)+'T':n>=1e9?'$'+(value/1e9).toFixed(2)+'B':n>=1e6?'$'+(value/1e6).toFixed(2)+'M':n>=1e3?'$'+(value/1e3).toFixed(2)+'K':'$'+value.toFixed(2);};
 export default function MarketTable({networks,networkId,timeRange,category,search,sort,metrics,favorites,loading,error,onToggleFavorite}:Props){
-  const selected=networkId==='all'?networks.filter(n=>[1,56,8453,137,42161,10,43114,5000].includes(n.chainId)):networks.filter(n=>n.id===networkId);
+  const selected=networkId==='all'?networks:networks.filter(n=>n.id===networkId);
   const query=search.trim().toLowerCase();
   let rows=selected.flatMap(network=>network.tokens.map(token=>{
     const key=token.chainId+':'+token.address.toLowerCase(), data=metrics[key]||{};
