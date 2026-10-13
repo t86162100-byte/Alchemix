@@ -1042,6 +1042,39 @@ button:active, a:active, [role="button"]:active {
 }
 .network-option-logo > span { position:relative; z-index:0; }
 
+/* Refined network picker: quick access, clear hierarchy, and a mobile bottom-sheet layout. */
+.network-modal-card { width:min(100%, 500px); max-height:min(88vh, 760px); padding:22px; }
+.network-modal-card .modal-head { margin-bottom:9px; }
+.network-modal-card .modal-description { margin-bottom:12px; font-size:12px; line-height:1.65; }
+.network-modal-card .network-search-wrap { margin:12px 0 17px; min-height:48px; border-radius:15px; border-color:rgba(255,255,255,.12); background:#0c1220; }
+.network-search-shortcut { flex:0 0 auto; font-size:10px; color:#7e8aa3; border:1px solid #30394c; border-radius:6px; padding:3px 6px; }
+.network-section-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 1px 9px; color:#c5cde0; font-size:9px; font-weight:800; letter-spacing:1.1px; }
+.network-section-heading small { color:#77839b; font-size:10px; font-weight:500; letter-spacing:0; }
+.network-quick-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; margin-bottom:18px; }
+.network-quick-option { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px; min-width:0; min-height:83px; padding:10px 5px 9px; border:1px solid #273147; border-radius:14px; background:linear-gradient(155deg,#171f32,#111827); color:#dce4f4; font:inherit; font-size:10px; font-weight:650; cursor:pointer; transition:background .16s,border-color .16s,transform .16s; }
+.network-quick-option:hover,.network-quick-option.selected { border-color:#8e80ee; background:#201f3b; }
+.network-quick-option:active { transform:scale(.98); }
+.network-quick-logo { position:relative; display:inline-flex; align-items:center; justify-content:center; width:31px; height:31px; flex:0 0 31px; overflow:hidden; border-radius:50%; color:#fff; font-size:9px; font-weight:800; }
+.network-quick-logo img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; border-radius:50%; background:#111; z-index:1; }
+.network-quick-logo>span { position:relative; z-index:0; }
+.network-quick-option>span:nth-child(2) { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.network-quick-check { position:absolute; top:6px; right:7px; color:#8ce3c1; font-size:11px; }
+.network-directory-heading { margin-top:2px; }
+.network-modal-card .network-list { max-height:min(35vh,330px); display:grid; align-content:start; gap:6px; padding-right:3px; }
+.network-modal-card .network-option { min-height:58px; padding:9px 10px; border-radius:13px; background:rgba(255,255,255,.025); border-color:rgba(255,255,255,.08); }
+.network-modal-card .network-option:hover,.network-modal-card .network-option.selected { background:#201f3b; border-color:#8273d4; }
+.network-modal-card .network-option-text strong { font-size:12px; }
+.network-modal-card .network-option-text small { font-size:10px; line-height:1.4; }
+.network-modal-card .network-option-logo { width:36px; height:36px; flex-basis:36px; }
+@media (max-width:600px) {
+  .network-modal-backdrop { place-items:end center; padding:0; }
+  .network-modal-card { width:100%; max-height:90dvh; padding:19px 16px calc(18px + env(safe-area-inset-bottom)); border-radius:24px 24px 0 0; border-bottom:0; animation:network-sheet-in .22s ease-out; }
+  .network-modal-card .network-list { max-height:30dvh; }
+  .network-quick-grid { gap:6px; }
+  .network-quick-option { min-height:76px; font-size:9px; border-radius:12px; }
+}
+@keyframes network-sheet-in { from { opacity:0; transform:translateY(24px); } to { opacity:1; transform:translateY(0); } }
+
 
 /* Logo clarity and slower, readable network ticker. */
 .network-marquee-track {
