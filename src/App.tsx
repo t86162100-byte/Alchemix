@@ -178,8 +178,8 @@ else if (!cancelled) setMarketNetworkError('No supported EVM networks were retur
 return () => { cancelled = true; };
 }, []);
 useEffect(() => {
-if (marketNetworks.length) void loadMarketTokens(marketNetworkId);
-}, [marketNetworks.length, marketNetworkId, loadMarketTokens]);
+if (activeTab === 'Market' && marketNetworks.length) void loadMarketTokens(marketNetworkId);
+}, [activeTab, marketNetworks.length, marketNetworkId, loadMarketTokens]);
 useEffect(() => {
 const savedAddress = localStorage.getItem('nova-wallet-address');
 const savedChain = Number(localStorage.getItem('nova-wallet-chain-id') || '1');
