@@ -9,6 +9,7 @@ type Props = {
   onToggleFavorite:(key:string)=>void;
 };
 const money=(value?:number|string)=>{const n=Number(value);if(!Number.isFinite(n)||n<=0)return '—';return n>=1000?'$'+n.toLocaleString('en-US',{maximumFractionDigits:2}):n>=1?'$'+n.toLocaleString('en-US',{maximumFractionDigits:4}):'$'+n.toLocaleString('en-US',{maximumFractionDigits:8});};
+const isStockLike=(name:string,symbol:string)=>{const n=name.trim();const s=symbol.trim();return /(?:\\bstock\\b|\\bshares?\\b|\\bequit(?:y|ies)\\b|\\btokeni[sz]ed\\b|\\bpre[- ]?ipo\\b|\\bincorporated\\b|\\bcorporation\\b|\\bcommon stock\\b|\\bclass [a-c] shares?\\b|\\bETF\\b)/i.test(n)||/(?:\\binc\\.?|\\bcorp\\.?|\\bltd\\.?|\\blimited|\\bplc\\.?|\\bholdings?)\\s*$/i.test(n)||(/^[A-Z]{1,5}c$/.test(s)&&/(?:inc\\.?|corp\\.?|stock|shares?|holdings?|company|class [A-Z])/i.test(n));};
 const compact=(value?:number)=>{if(!Number.isFinite(value)||!value)return '—';const n=Math.abs(value);return n>=1e12?'$'+(value/1e12).toFixed(2)+'T':n>=1e9?'$'+(value/1e9).toFixed(2)+'B':n>=1e6?'$'+(value/1e6).toFixed(2)+'M':n>=1e3?'$'+(value/1e3).toFixed(2)+'K':'$'+value.toFixed(2);};
 export default function MarketTable({networks,networkId,timeRange,category,search,sort,metrics,favorites,loading,error,onToggleFavorite}:Props){
   const selected=networkId==='all'?networks:networks.filter(n=>n.id===networkId);
