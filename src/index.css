@@ -1283,6 +1283,8 @@ button:active, a:active, [role="button"]:active {
 .market-data-status:has(+ .market-toolbar) { margin-bottom:10px; }
 .market-compact-asset .market-token-logos { position:relative; display:grid; place-items:center; width:30px; height:30px; flex:0 0 30px; overflow:hidden; border-radius:50%; background:#202020; }
 .market-compact-asset .market-token-logos img { width:100%; height:100%; object-fit:contain; border-radius:50%; }
+.market-compact-asset .market-token-fallback { position:absolute; inset:0; display:grid; place-items:center; color:rgba(255,255,255,.78); font-size:9px; font-weight:800; letter-spacing:-.3px; pointer-events:none; }
+.market-compact-asset .market-token-logos img:not([src]), .market-compact-asset .market-token-logos img[src=''] { display:none; }
 .market-compact-row .market-favorite[aria-pressed="true"] { color:#fff; }
 .market-compact-metrics { flex-wrap:wrap; }
 
