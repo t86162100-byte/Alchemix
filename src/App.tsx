@@ -115,18 +115,11 @@ const results = await Promise.all(missing.map(async network => {
 const response = await fetch('https://li.quest/v1/tokens?chains=' + network.chainId);
 if (!response.ok) throw new Error('Token service unavailable');
 const payload = await response.json() as LifiTokenResponse;
-const tokens = (payload.tokens?.[String(network.chainId)] || [])
-.filter(token => {
-const symbol = String(token.symbol || '').trim();
-const name = String(token.name || '').trim();
-if (!symbol || !token.address || !Number.isFinite(token.decimals)) return false;
-// Hide common DeFi position/receipt tokens, not ordinary coins. LI.FI remains the source
-// of truth for the supported EVM networks and each network's token contracts.
-const positionName = /(?:\bLP token\b|\bliquidity provider\b|\bliquidity pool token\b|\bpool token\b|\buni[- ]?v[23]\b|\bslp\b|\baamm\b|\bvault (?:share|token|receipt)\b|\b(?:vault|strategy) shares?\b|\breceipt token\b|\bdeposit token\b)/i.test(name);
-const positionSymbol = /^(?:UNI-V[23]|SLP|BPT|CAKE-LP|AAMM.*)$/i.test(symbol);
-return !positionName && !positionSymbol;
-})
+const directoryTokens = (payload.tokens?.[String(network.chainId)] || []);
+const nativeToken = network.nativeToken;
+const tokens = (nativeToken && !directoryTokens.some(token => token.address.toLowerCase() === nativeToken.address.toLowerCase()) ? [...directoryTokens, nativeToken] : directoryTokens)
 .map(token => ({ ...token, chainId: network.chainId }))
+.filter(token => Boolean(String(token.symbol || '').trim()) && Boolean(token.address) && Number.isFinite(token.decimals))
 .sort((a, b) => {
 const aNative = a.address.toLowerCase() === '0x0000000000000000000000000000000000000000' || a.symbol.toLowerCase() === network.symbol.toLowerCase();
 const bNative = b.address.toLowerCase() === '0x0000000000000000000000000000000000000000' || b.symbol.toLowerCase() === network.symbol.toLowerCase();
