@@ -64,6 +64,7 @@ function App() {
   const [availableChains, setAvailableChains] = useState<Chain[]>(CHAINS);
   const [networkSearch, setNetworkSearch] = useState('');
   const [networkListLoading, setNetworkListLoading] = useState(false);
+  const [address, setAddress] = useState('');
   const [balance, setBalance] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [hideBalance, setHideBalance] = useState(false);
