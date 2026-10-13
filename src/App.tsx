@@ -115,7 +115,16 @@ const response = await fetch('https://li.quest/v1/tokens?chains=' + network.chai
 if (!response.ok) throw new Error('Token service unavailable');
 const payload = await response.json() as LifiTokenResponse;
 const tokens = (payload.tokens?.[String(network.chainId)] || [])
-.filter(token => token.symbol && token.address && Number.isFinite(token.decimals) && !/\b(stock|shares?|equity|tokenized stock|xstock|pre[- ]?ipo|incorporated|corporation|common stock|class [a-z] shares?)\b|\b(?:inc|corp|ltd|limited)\.?\s*$/i.test(token.name || '') && !/^(AAPLc|AMZNc|GOOGLc|GOOGc|METAc|MSFTc|MSTRc|NVDAc|TSLAc|SPCXc|SNDKc|COINc|CRCLc|INTCc|BRK[.-]?Bc|ORCLc|NFLXc|AMDc|QCOMc|AVGOc|DISc|JPMc|VTIc|SPYc|QQQc|IBMc|BABA c|PLTRc|BAc|COSTc|WMTc|XOMc|PFEc|KOc|PEPc|LLYc|UNHc|GS c|BACc|C c|V c|MA c|TMOc|CATc|GEc|NKEc|ADBEc|CRM c|UBERc|ABNBc|HOODc|ARMc|SMCIc|INTUc|CSCOc|TXNc|MRKc|CVXc|MCDc|LOWc|SBUXc|TGTc|PYPLc|SQc|SHOPc|SNOWc|RDDTc)$/i.test(token.symbol || ''))
+.filter(token => {
+const symbol = String(token.symbol || '').trim();
+const name = String(token.name || '').trim();
+if (!symbol || !token.address || !Number.isFinite(token.decimals)) return false;
+// The market is crypto-only: exclude tokenized equities and stock-like instruments.
+const stockName = /(?:\bstock\b|\bshares?\b|\bequity\b|\bequities\b|\btokeni[sz]ed\b|\bpre[- ]?ipo\b|\bincorporated\b|\bcorporation\b|\bcommon stock\b|\bclass [a-c] shares?\b|\bETF\b)/i.test(name);
+const companySuffix = /(?:\binc\.?|\bcorp\.?|\bltd\.?|\blimited|\bplc\.?|\bcompany|\bco\.?|\bholdings?)\s*$/i.test(name);
+const stockSymbol = /^(?:[A-Z]{1,5}c|[A-Z]{1,5}\.?(?:A|B))$/.test(symbol) && /(?:inc\.?|corp\.?|stock|shares?|holdings?|company|class [A-Z])/i.test(name);
+return !stockName && !companySuffix && !stockSymbol;
+})
 .map(token => ({ ...token, chainId: network.chainId }))
 .sort((a, b) => {
 const aNative = a.address.toLowerCase() === '0x0000000000000000000000000000000000000000' || a.symbol.toLowerCase() === network.symbol.toLowerCase();
