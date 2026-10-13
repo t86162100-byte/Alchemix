@@ -26,8 +26,8 @@ export async function fetchDexMarketMetrics(results: Array<{ chainId:number; tok
   const targets = results.flatMap(result => {
     const dexChain = dexChains[result.chainId];
     if (!dexChain) return [];
-    return result.tokens.filter(token => token.address && token.address.toLowerCase() !== '0x0000000000000000000000000000000000000000').slice(0,60)
-      .map(token => ({ token, chainId:result.chainId, dexChain }));
+    return result.tokens.filter(token => /^0x[a-fA-F0-9]{40}$/.test(token.address) && token.address.toLowerCase() !== '0x0000000000000000000000000000000000000000')
+      .slice(0,100).map(token => ({ token, chainId:result.chainId, dexChain }));
   });
   const chunks: Array<typeof targets> = [];
   for (const target of targets) {
@@ -42,22 +42,22 @@ export async function fetchDexMarketMetrics(results: Array<{ chainId:number; tok
       const payload = await response.json() as { pairs?: Pair[] };
       const best = new Map<string,Pair>();
       for (const pair of payload.pairs || []) {
-        if (pair.chainId !== chunk[0]?.dexChain) continue;
-        const address = pair.baseToken?.address;
-        if (!address) continue;
-          if (!address) continue;
-          const target = chunk.find(item => item.token.address.toLowerCase() === address.toLowerCase());
-          if (!target) continue;
-          const key = target.chainId + ':' + address.toLowerCase();
-          const previous = best.get(key);
-          if (!previous || Number(pair.liquidity?.usd || 0) > Number(previous.liquidity?.usd || 0)) best.set(key,pair);
+        if (pair.chainId !== chunk[0]?.dexChain || !pair.baseToken?.address) continue;
+        const target = chunk.find(item => item.token.address.toLowerCase() === pair.baseToken!.address!.toLowerCase());
+        if (!target) continue;
+        const liquidity = Number(pair.liquidity?.usd || 0);
+        const volume = Number(pair.volume?.h24 || 0);
+        const price = Number(pair.priceUsd || 0);
+        if (!Number.isFinite(price) || price <= 0 || liquidity < 10000 || volume < 1000) continue;
+        const key = target.chainId + ':' + target.token.address.toLowerCase();
+        const previous = best.get(key);
+        if (!previous || Number(pair.liquidity?.usd || 0) > Number(previous.liquidity?.usd || 0)) best.set(key,pair);
       }
       return [...best.entries()].map(([key,pair]) => [key,{
-        priceUsd:Number(pair.priceUsd) || undefined, priceChange:pair.priceChange, volume:pair.volume,
+        priceUsd:Number(pair.priceUsd), priceChange:pair.priceChange, volume:pair.volume,
         marketCap:pair.marketCap, fdv:pair.fdv, liquidity:pair.liquidity, pairAddress:pair.pairAddress, dexId:pair.dexId
       } as MarketMetrics] as [string,MarketMetrics]);
     } catch { return [] as Array<[string,MarketMetrics]>; }
   }));
   return Object.fromEntries(responses.flat());
 }
-
