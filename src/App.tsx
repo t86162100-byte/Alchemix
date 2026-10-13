@@ -66,7 +66,7 @@ function App() {
   const [trendingTokenIds, setTrendingTokenIds] = useState<string[]>([]);
   const [marketLoading, setMarketLoading] = useState(false);
   const [marketError, setMarketError] = useState('');
-  const [marketCategory, setMarketCategory] = useState('Hot');
+  const [marketCategory, setMarketCategory] = useState('All tokens');
   const [marketPage, setMarketPage] = useState(1);
   const [marketHasMore, setMarketHasMore] = useState(true);
   const [marketSort, setMarketSort] = useState<'market_cap' | 'volume' | 'change' | 'price'>('market_cap');
@@ -363,8 +363,8 @@ function App() {
     if (marketCategory === 'Gainers') result = result.filter(token => (getMarketChange(token) ?? -Infinity) > 0).sort((a, b) => (getMarketChange(b) ?? 0) - (getMarketChange(a) ?? 0));
     else if (marketCategory === 'Losers') result = result.filter(token => (getMarketChange(token) ?? Infinity) < 0).sort((a, b) => (getMarketChange(a) ?? 0) - (getMarketChange(b) ?? 0));
     else if (marketCategory === 'Hot') {
-      if (marketNetworkId !== 'all') result.sort((a, b) => (b.total_volume ?? 0) - (a.total_volume ?? 0));
-      else if (trendingTokenIds.length) {
+      result.sort((a, b) => (b.total_volume ?? 0) - (a.total_volume ?? 0));
+      if (false && trendingTokenIds.length) {
         const rank = new Map(trendingTokenIds.map((id, index) => [id, index]));
         result = result.filter(token => rank.has(token.id)).sort((a, b) => (rank.get(a.id) ?? 999) - (rank.get(b.id) ?? 999));
       } else result = result.slice(0, 10);
@@ -502,7 +502,7 @@ function App() {
                 return <article className="market-compact-row" key={token.id}>
                   <span className="market-compact-rank">{token.market_cap_rank ?? index + 1}</span>
                   <div className="market-compact-asset">
-                    <div className="market-token"><span className="market-token-logos">{token.image && <img className="market-token-logo" src={token.image} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }}/ >}{token.chainIcon && <img className="market-chain-logo" src={token.chainIcon} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }}/>}</span><div className="market-token-copy"><strong>{token.name}</strong><span>{token.symbol.toUpperCase()}{token.address ? ` · ${token.address.slice(0, 6)}…${token.address.slice(-4)}` : ''}</span>{token.chainName && <span className="market-chain-name">{token.chainName}</span>}</div></div>
+                    <div className="market-token"><span className="market-token-logos">{token.image && <img className="market-token-logo" src={token.image} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }}/>{token.chainIcon && <img className="market-chain-logo" src={token.chainIcon} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }}/>}</span><div className="market-token-copy"><strong>{token.name}</strong><span>{token.symbol.toUpperCase()}{token.address ? ` · ${token.address.slice(0, 6)}…${token.address.slice(-4)}` : ''}</span>{token.chainName && <span className="market-chain-name">{token.chainName}</span>}</div></div>
                     <div className="market-compact-metrics"><span><b>MC</b> {marketNumber(token.market_cap)}</span><span><b>VOL</b> {marketNumber(token.total_volume)}</span></div>
                   </div>
                   <div className="market-compact-price"><strong>{marketPrice(token.current_price)}</strong><span className={change == null ? 'neutral' : change >= 0 ? 'positive' : 'negative'}>{change == null ? '—' : `${change > 0 ? '+' : ''}${change.toFixed(2)}%`}</span></div>
