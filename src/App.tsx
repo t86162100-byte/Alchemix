@@ -32,7 +32,7 @@ const chainLogoUrls = (item: Chain) => {
     43114: 'avalanchec', 100: 'xdai', 250: 'fantom', 42220: 'celo',
     1313161554: 'aurora', 25: 'cronos', 1284: 'moonbeam', 1285: 'moonriver',
     1666600000: 'harmony', 1088: 'metis', 40: 'telos', 8217: 'klaytn',
-    122: 'fuse', 324: 'zksync', 59144: 'linea', 534352: 'scroll', 8453: 'base',
+    122: 'fuse', 324: 'zksync', 59144: 'linea', 534352: 'scroll',
   };
   const candidates: string[] = [];
   const folder = trustedAssets[item.id];
