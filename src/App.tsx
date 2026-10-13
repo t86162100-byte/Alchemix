@@ -496,7 +496,7 @@ function App() {
             </div>
           </div>
           <div className="market-table-panel">
-            {marketError && <div className="market-error"><span>{marketError}</span><button type="button" onClick={() => void loadMarketTokens(1, false)}>Try again</button></div>}
+            {marketError && <div className="market-error"><span>{marketError}</span><button type="button" onClick={() => marketNetworks.length === 0 ? window.location.reload() : void loadMarketTokens(1, false)}>Try again</button></div>}
             <div className="market-compact-list">
               <div className="market-sort-bar" aria-label="Sort market tokens">
                 <span className="market-sort-label">#</span>
