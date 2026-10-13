@@ -1285,3 +1285,14 @@ button:active, a:active, [role="button"]:active {
 .market-compact-asset .market-token-logos img { width:100%; height:100%; object-fit:contain; border-radius:50%; }
 .market-compact-row .market-favorite[aria-pressed="true"] { color:#fff; }
 .market-compact-metrics { flex-wrap:wrap; }
+
+
+/* Keep the market network sheet responsive on mobile: avoid a full-page blur repaint. */
+.network-modal-backdrop { -webkit-backdrop-filter:none!important; backdrop-filter:none!important; }
+.market-network-drawer { overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+.market-network-drawer-content { contain:layout style; }
+.market-network-pill-list, .market-network-symbol-list { overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+@media(max-width:560px) {
+  .network-modal-backdrop { align-items:end; }
+  .market-network-drawer { max-height:90dvh; overflow-y:auto; }
+}
