@@ -1041,3 +1041,73 @@ button:active, a:active, [role="button"]:active {
   object-fit:contain; border-radius:50%; background:#111;
 }
 .network-option-logo > span { position:relative; z-index:0; }
+
+
+/* Logo clarity and slower, readable network ticker. */
+.network-marquee-track {
+  animation-duration: 110s !important;
+  animation-timing-function: linear;
+}
+.network-marquee:hover .network-marquee-track,
+.network-marquee:focus-within .network-marquee-track {
+  animation-play-state: paused;
+}
+.network-marquee-pill {
+  min-height: 46px;
+  padding: 7px 16px 7px 10px;
+  gap: 10px;
+  color: rgba(255,255,255,.96);
+  border-color: rgba(255,255,255,.16);
+  background: linear-gradient(180deg, #171717 0%, #0a0a0a 100%);
+}
+.network-marquee-logo {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  overflow: hidden;
+  position: relative;
+  background: #fff !important;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.18);
+}
+.network-marquee-logo img {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  border-radius: 50%;
+  background: #fff;
+  image-rendering: auto;
+  filter: saturate(1.18) contrast(1.04);
+}
+.network-marquee-logo > span {
+  z-index: 1;
+  color: #111;
+  font-size: 9px;
+  font-weight: 850;
+}
+.network-option-logo {
+  background: #fff !important;
+  box-shadow: 0 0 0 1px rgba(255,255,255,.18);
+}
+.network-option-logo img {
+  background: #fff;
+  filter: saturate(1.16) contrast(1.04);
+  image-rendering: auto;
+}
+.network-option-logo > span {
+  z-index: 1;
+  color: #111;
+  font-size: 10px;
+  font-weight: 850;
+}
+@media (max-width: 560px) {
+  .network-marquee-track { animation-duration: 110s !important; }
+  .network-marquee-pill { min-height: 43px; padding: 6px 13px 6px 8px; gap: 8px; }
+  .network-marquee-logo { width: 28px; height: 28px; flex-basis: 28px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .network-marquee-track { animation: none !important; }
+}
