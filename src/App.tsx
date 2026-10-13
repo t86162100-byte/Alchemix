@@ -364,10 +364,6 @@ function App() {
     else if (marketCategory === 'Losers') result = result.filter(token => (getMarketChange(token) ?? Infinity) < 0).sort((a, b) => (getMarketChange(a) ?? 0) - (getMarketChange(b) ?? 0));
     else if (marketCategory === 'Hot') {
       result.sort((a, b) => (b.total_volume ?? 0) - (a.total_volume ?? 0));
-      if (false && trendingTokenIds.length) {
-        const rank = new Map(trendingTokenIds.map((id, index) => [id, index]));
-        result = result.filter(token => rank.has(token.id)).sort((a, b) => (rank.get(a.id) ?? 999) - (rank.get(b.id) ?? 999));
-      } else result = result.slice(0, 10);
     }
     else if (marketSort === 'volume') result.sort((a, b) => (b.total_volume ?? 0) - (a.total_volume ?? 0));
     else if (marketSort === 'price') result.sort((a, b) => (b.current_price ?? 0) - (a.current_price ?? 0));
