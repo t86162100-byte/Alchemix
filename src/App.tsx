@@ -25,8 +25,8 @@ const rpcCall = async (chain: Chain, method: string, params: unknown[] = []) => 
 const formatBalance = (hex: string) => Number(BigInt(hex)) / 1e18;
 const iconLetters: Record<string, string> = { ETH: 'Ξ', BNB: '◆', POL: '⬡' };
 const chainLogoUrls = (item: Chain) => {
-  // Prefer maintained native-chain artwork when available, then the broad DeFiLlama
-  // chain-icon registry. Try a normalized chain-name slug when Chainlist has no icon.
+  // Use the maintained DeFiLlama chain-icon service at a crisp 512px size first.
+  // Keep original Trust Wallet chain artwork and the legacy icon URL as fallbacks.
   const trustedAssets: Record<number, string> = {
     1: 'ethereum', 56: 'smartchain', 137: 'polygon', 42161: 'arbitrum', 10: 'optimism',
     43114: 'avalanchec', 100: 'xdai', 250: 'fantom', 42220: 'celo',
@@ -35,12 +35,11 @@ const chainLogoUrls = (item: Chain) => {
     122: 'fuse', 324: 'zksync', 59144: 'linea', 534352: 'scroll',
   };
   const candidates: string[] = [];
-  const folder = trustedAssets[item.id];
-  if (folder) candidates.push(\`https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/\${folder}/info/logo.png\`);
   const icon = item.icon?.trim();
-  if (icon) candidates.push(\`https://icons.llamao.fi/icons/chains/rsz_\${encodeURIComponent(icon)}.jpg\`);
-  const slug = (item.name || '').toLowerCase().normalize('NFKD').replace(/[\\u0300-\\u036f]/g, '').replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '');
-  if (slug && slug !== icon) candidates.push(\`https://icons.llamao.fi/icons/chains/rsz_\${encodeURIComponent(slug)}.jpg\`);
+  if (icon) candidates.push(`https://icons.llamao.fi/icons/chains/${encodeURIComponent(icon)}?w=512&h=512`);
+  const folder = trustedAssets[item.id];
+  if (folder) candidates.push(`https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/${folder}/info/logo.png`);
+  if (icon) candidates.push(`https://icons.llamao.fi/icons/chains/rsz_${encodeURIComponent(icon)}.jpg`);
   return [...new Set(candidates)];
 };
 const chainLogoUrl = (item: Chain) => chainLogoUrls(item)[0] || '';
