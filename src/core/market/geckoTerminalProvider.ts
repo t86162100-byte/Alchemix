@@ -50,6 +50,7 @@ export const geckoTerminalProvider: MarketDataProvider = {
       await wait(400);
     }
     const networks = [...found.values()];
+    if (!networks.length) throw new Error('Market network directory returned no networks.');
     try { sessionStorage.setItem(NETWORK_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), networks })); } catch { /* Storage can be disabled. */ }
     return networks;
   },
