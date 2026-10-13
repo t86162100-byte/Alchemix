@@ -1242,3 +1242,36 @@ button:active, a:active, [role="button"]:active {
 .market-network-pill-list .market-network-all-logo { font-size:15px; font-weight:800; background:#292929; }
 .market-network-pill-list button.active .market-network-all-logo { background:#e2e2e2; color:#111; }
 .market-network-pill-list button:focus-visible,.market-network-symbol-list button:focus-visible { outline:2px solid rgba(255,255,255,.8); outline-offset:2px; }
+
+
+/* Live LI.FI network and token logos; never replace missing data with fake assets. */
+.market-network-status {
+  display:flex; align-items:center; justify-content:space-between; gap:12px;
+  padding:10px 12px; border:1px solid rgba(255,255,255,.1); border-radius:12px;
+  color:rgba(255,255,255,.6); font-size:11px; line-height:1.5;
+}
+.market-network-status button {
+  flex:0 0 auto; padding:6px 10px; border:1px solid rgba(255,255,255,.18);
+  border-radius:999px; background:#171717; color:#fff; font:inherit; cursor:pointer;
+}
+.market-network-status button:disabled { opacity:.45; }
+.market-network-empty {
+  grid-column:1 / -1; margin:0; padding:18px 12px; border:1px dashed rgba(255,255,255,.12);
+  border-radius:13px; color:rgba(255,255,255,.48); font-size:11px; line-height:1.6; text-align:center;
+}
+.market-network-symbol-list button { min-height:57px; }
+.market-network-symbol-list button > .market-token-live-logo {
+  position:relative; grid-row:1 / span 2; display:grid; place-items:center;
+  width:34px; height:34px; overflow:hidden; border-radius:50%; background:#242424;
+  color:#fff; font-size:12px; font-weight:800;
+}
+.market-token-live-logo img {
+  position:absolute; inset:0; z-index:1; width:100%; height:100%;
+  object-fit:contain; border-radius:50%; background:#171717;
+}
+.market-token-live-logo b { position:relative; z-index:0; }
+.market-network-pill-logo img { object-fit:contain; }
+@media(max-width:560px) {
+  .market-network-symbol-list button > .market-token-live-logo { width:30px; height:30px; }
+  .market-network-status { align-items:flex-start; }
+}
