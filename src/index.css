@@ -1236,3 +1236,9 @@ button:active, a:active, [role="button"]:active {
   .market-network-symbol-list button > span { width:30px; height:30px; }
   .market-network-pill-list button { min-height:41px; padding-right:11px; }
 }
+
+
+/* Network drawer polish: make the All pill feel like a first-class filter. */
+.market-network-pill-list .market-network-all-logo { font-size:15px; font-weight:800; background:#292929; }
+.market-network-pill-list button.active .market-network-all-logo { background:#e2e2e2; color:#111; }
+.market-network-pill-list button:focus-visible,.market-network-symbol-list button:focus-visible { outline:2px solid rgba(255,255,255,.8); outline-offset:2px; }
