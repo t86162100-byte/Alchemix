@@ -183,6 +183,7 @@ function App() {
     } finally { setLoading(false); }
   }, [address, chain]);
 
+  useEffect(() => { if (address) void refreshBalance(address, chain); }, [address, chainId]);
 
   useEffect(() => {
     if (!window.ethereum) return;
