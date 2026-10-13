@@ -240,13 +240,48 @@ function App() {
         const selected = availableChains.find(item => String(item.id) === marketNetworkId);
         if (!selected) throw new Error('That network is not ready yet. Choose another chain.');
         const network = geckoTerminalNetwork(selected);
-        const response = await fetch(`https://api.geckoterminal.com/api/v2/networks/${encodeURIComponent(network)}/tokens?page=${page}`);
-        if (!response.ok) { if (response.status === 404) throw new Error(`Live token listings are not available for ${selected.name} from the public market provider yet. Try a popular network or All chains.`); if (response.status === 429) throw new Error('On-chain market data is busy. Wait a moment and retry.'); throw new Error(`Could not load ${selected.name} token listings right now.`); }
-        const payload = await response.json() as { data?: { id: string; attributes?: { address?: string; name?: string; symbol?: string; image_url?: string; price_usd?: string; fdv_usd?: string; market_cap_usd?: string; volume_usd?: { h24?: string }; price_change_percentage?: { h1?: string; h24?: string; h7d?: string } } }[] };
-        const data: MarketToken[] = (payload.data || []).map((entry, index) => {
-          const a = entry.attributes || {}; const num = (value?: string | null) => value != null && Number.isFinite(Number(value)) ? Number(value) : null; const address = a.address || entry.id.split('_').slice(1).join('_');
-          return { id: `onchain-${selected.id}-${address || index}`, address, name: a.name || 'Unknown token', symbol: a.symbol || 'TOKEN', image: a.image_url || '', current_price: num(a.price_usd), market_cap: num(a.market_cap_usd) ?? num(a.fdv_usd), total_volume: num(a.volume_usd?.h24), price_change_percentage_1h_in_currency: num(a.price_change_percentage?.h1), price_change_percentage_24h: num(a.price_change_percentage?.h24), price_change_percentage_7d_in_currency: num(a.price_change_percentage?.h7d), price_change_percentage_30d_in_currency: null, market_cap_rank: null };
-        });
+        // GeckoTerminal exposes market tokens through indexed DEX pools, not a generic /networks/{id}/tokens list.
+        const response = await fetch(`https://api.geckoterminal.com/api/v2/networks/${encodeURIComponent(network)}/pools?include=base_token,quote_token&page=${page}&sort=h24_volume_usd_desc`, { headers: { accept: 'application/json;version=20230302' } });
+        if (!response.ok) {
+          if (response.status === 404) throw new Error(`${selected.name} has no indexed DEX market data on this provider. Testnets usually have no live USD market listings; try a mainnet network or All chains.`);
+          if (response.status === 429) throw new Error('On-chain market data is busy. Wait a moment and retry.');
+          throw new Error(`Could not load ${selected.name} market listings right now.`);
+        }
+        type GeckoToken = { id: string; type?: string; attributes?: { address?: string; name?: string; symbol?: string; image_url?: string; price_usd?: string; fdv_usd?: string; market_cap_usd?: string; volume_usd?: { h24?: string }; price_change_percentage?: { h1?: string; h24?: string; h7d?: string } } };
+        type GeckoPool = { id: string; attributes?: { base_token_price_usd?: string; quote_token_price_usd?: string; volume_usd?: { h24?: string }; price_change_percentage?: { h1?: string; h24?: string; h7d?: string } }; relationships?: { base_token?: { data?: { id?: string } }; quote_token?: { data?: { id?: string } } } };
+        const payload = await response.json() as { data?: GeckoPool[]; included?: GeckoToken[] };
+        const included = new Map((payload.included || []).filter(token => token.type === 'token' || token.attributes?.address).map(token => [token.id, token]));
+        const num = (value?: string | null) => value != null && Number.isFinite(Number(value)) ? Number(value) : null;
+        const tokenMap = new Map<string, MarketToken>();
+        for (const pool of payload.data || []) {
+          const attrs = pool.attributes || {};
+          const volume = num(attrs.volume_usd?.h24);
+          for (const [side, price] of [['base_token', attrs.base_token_price_usd], ['quote_token', attrs.quote_token_price_usd]] as const) {
+            const tokenId = pool.relationships?.[side]?.data?.id;
+            if (!tokenId || tokenMap.has(tokenId)) continue;
+            const entry = included.get(tokenId);
+            if (!entry) continue;
+            const a = entry.attributes || {};
+            const address = a.address || tokenId.split('_').slice(1).join('_');
+            tokenMap.set(tokenId, {
+              id: `onchain-${selected.id}-${address || tokenId}`,
+              address,
+              name: a.name || 'Unknown token',
+              symbol: a.symbol || 'TOKEN',
+              image: a.image_url || '',
+              current_price: num(a.price_usd) ?? num(price),
+              market_cap: num(a.market_cap_usd) ?? num(a.fdv_usd),
+              total_volume: num(a.volume_usd?.h24) ?? volume,
+              price_change_percentage_1h_in_currency: num(a.price_change_percentage?.h1) ?? num(attrs.price_change_percentage?.h1),
+              price_change_percentage_24h: num(a.price_change_percentage?.h24) ?? num(attrs.price_change_percentage?.h24),
+              price_change_percentage_7d_in_currency: num(a.price_change_percentage?.h7d) ?? num(attrs.price_change_percentage?.h7d),
+              price_change_percentage_30d_in_currency: null,
+              market_cap_rank: null,
+            });
+          }
+        }
+        const data = [...tokenMap.values()];
+        if (!data.length && page === 1) throw new Error(`No token listings were returned for ${selected.name}. This may be a testnet or a network without indexed DEX pools.`);
         setMarketTokens(old => append ? [...old, ...data.filter(token => !old.some(existing => existing.id === token.id))] : data); setMarketHasMore(data.length > 0); setMarketPage(page); setTrendingTokenIds([]);
       }
     } catch (error) { setMarketError(error instanceof Error ? error.message : 'Could not load market data.'); if (!append) setMarketTokens([]); }
