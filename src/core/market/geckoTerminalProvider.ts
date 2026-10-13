@@ -40,7 +40,7 @@ export const geckoTerminalProvider: MarketDataProvider = {
       if (!payload.links?.next || entries.length === 0) break;
       await wait(180);
     }
-    return [...found.values()].sort((a, b) => a.name.localeCompare(b.name));
+    return [...found.values()];
   },
   fetchPools(networkId: string, page = 1): Promise<MarketPoolPage> {
     const url = API_BASE + '/networks/' + encodeURIComponent(networkId) + '/pools?include=base_token,quote_token&page=' + page + '&sort=h24_volume_usd_desc';
