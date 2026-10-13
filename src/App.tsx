@@ -115,7 +115,7 @@ const response = await fetch('https://li.quest/v1/tokens?chains=' + network.chai
 if (!response.ok) throw new Error('Token service unavailable');
 const payload = await response.json() as LifiTokenResponse;
 const tokens = (payload.tokens?.[String(network.chainId)] || [])
-.filter(token => token.symbol && token.address && Number.isFinite(token.decimals))
+.filter(token => token.symbol && token.address && Number.isFinite(token.decimals) && !/\b(stock|shares?|equity|pre[- ]?ipo|incorporated|corporation)\b/i.test(token.name || '') && !/^(AAPLc|AMZNc|TSLAc|NVDAc|GOOGLc|MSFTc|META c)$/i.test(token.symbol || ''))
 .map(token => ({ ...token, chainId: network.chainId }))
 .sort((a, b) => {
 const aNative = a.address.toLowerCase() === '0x0000000000000000000000000000000000000000' || a.symbol.toLowerCase() === network.symbol.toLowerCase();
