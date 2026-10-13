@@ -973,3 +973,29 @@ body { background: #000; color: #fff; }
   .bottom-navigation button svg { width:19px; height:19px; }
   .bottom-navigation button span { font-size:10px; }
 }
+
+
+/* Consistent interaction states: remove the browser's blue square tap flash. */
+:root { color-scheme: dark; }
+*, *::before, *::after { -webkit-tap-highlight-color: transparent; }
+button, a, [role="button"], input, select, textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+button, a, [role="button"] {
+  outline: none;
+}
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+[role="button"]:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid rgba(255,255,255,.72);
+  outline-offset: 3px;
+}
+button:active, a:active, [role="button"]:active {
+  -webkit-tap-highlight-color: transparent;
+}
