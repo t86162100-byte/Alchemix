@@ -219,22 +219,21 @@ function App() {
     return () => { window.ethereum?.removeListener?.('accountsChanged', onAccounts); window.ethereum?.removeListener?.('chainChanged', onChain); };
   }, []);
 
-  const geckoTerminalNetwork = (selected: Chain) => {
-    const known: Record<number, string> = { 1: 'eth', 56: 'bsc', 8453: 'base', 137: 'polygon_pos', 42161: 'arbitrum', 10: 'optimism', 43114: 'avax', 100: 'xdai', 250: 'ftm', 42220: 'celo', 25: 'cro', 324: 'zksync', 59144: 'linea', 534352: 'scroll', 81457: 'blast', 5000: 'mantle', 7777777: 'zora', 169: 'manta', 34443: 'mode', 130: 'unichain', 80094: 'berachain', 480: 'worldchain', 42170: 'arbitrum_nova', 2020: 'ronin' };
-    return known[selected.id] || selected.name.toLowerCase().replace(/\b(chain|mainnet|network|smart chain|pos)\b/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
-  };
+  const marketNetworkIds: Record<number, string> = { 1: 'eth', 56: 'bsc', 8453: 'base', 137: 'polygon_pos', 42161: 'arbitrum', 10: 'optimism', 43114: 'avax', 100: 'xdai', 250: 'ftm', 42220: 'celo', 25: 'cro', 324: 'zksync', 59144: 'linea', 534352: 'scroll', 81457: 'blast', 5000: 'mantle', 7777777: 'zora', 169: 'manta', 34443: 'mode', 130: 'unichain', 80094: 'berachain', 480: 'worldchain', 42170: 'arbitrum_nova', 2020: 'ronin', 999: 'hyperliquid', 146: 'sonic', 1329: 'sei_evm', 57073: 'ink', 9745: 'plasma', 143: 'monad', 196: 'x_layer', 204: 'op_bnb', 8217: 'kaia', 1116: 'core', 59144: 'linea', 1088: 'metis', 1284: 'moonbeam', 1285: 'moonriver', 1666600000: 'harmony', 42220: 'celo', 1313161554: 'aurora' };
+  const geckoTerminalNetwork = (selected: Chain) => marketNetworkIds[selected.id] || '';
+  const marketAvailableChains = useMemo(() => availableChains.filter(item => Boolean(marketNetworkIds[item.id])), [availableChains]);
 
   const loadAllChainMarketTokens = async (page: number): Promise<MarketToken[]> => {
     type TokenData = { id: string; type?: string; attributes?: { address?: string; name?: string; symbol?: string; image_url?: string; price_usd?: string; fdv_usd?: string; market_cap_usd?: string; volume_usd?: { h24?: string }; price_change_percentage?: { h1?: string; h24?: string; h7d?: string } } };
     type PoolData = { attributes?: { base_token_price_usd?: string; quote_token_price_usd?: string; volume_usd?: { h24?: string }; price_change_percentage?: { h1?: string; h24?: string; h7d?: string } }; relationships?: { base_token?: { data?: { id?: string } }; quote_token?: { data?: { id?: string } } } };
-    const supported = new Set([1,56,8453,137,42161,10,43114,100,250,42220,25,324,59144,534352,81457,5000,7777777,169,34443,130,80094,480,42170,2020]);
-    const networks = availableChains.filter(item => supported.has(item.id));
+    const networks = marketAvailableChains;
     const num = (value?: string | null) => value != null && Number.isFinite(Number(value)) ? Number(value) : null;
     const results: MarketToken[] = [];
-    for (let offset = 0; offset < networks.length; offset += 4) {
-      const batch = networks.slice(offset, offset + 4);
+    for (let offset = 0; offset < networks.length; offset += 3) {
+      const batch = networks.slice(offset, offset + 3);
       const settled = await Promise.allSettled(batch.map(async selected => {
         const network = geckoTerminalNetwork(selected);
+        if (!network) return [] as MarketToken[];
         const response = await fetch('https://api.geckoterminal.com/api/v2/networks/' + encodeURIComponent(network) + '/pools?include=base_token,quote_token&page=' + page + '&sort=h24_volume_usd_desc', { headers: { accept: 'application/json;version=20230302' } });
         if (!response.ok) return [] as MarketToken[];
         const payload = await response.json() as { data?: PoolData[]; included?: TokenData[] };
@@ -331,7 +330,7 @@ function App() {
       }
     } catch (error) { setMarketError(error instanceof Error ? error.message : 'Could not load market data.'); if (!append) setMarketTokens([]); }
     finally { setMarketLoading(false); }
-  }, [marketNetworkId, availableChains]);
+  }, [marketNetworkId, availableChains, marketAvailableChains]);
 
   useEffect(() => {
     void loadMarketTokens(1, false);
@@ -477,7 +476,7 @@ function App() {
             </div>
           </div>
           <div className="market-controls-row">
-            <label className="market-network-select"><Globe2 size={15}/><select aria-label="Filter tokens by network" value={marketNetworkId} onChange={event => { setMarketNetworkId(event.target.value); setMarketCategory('All tokens'); setMarketPage(1); }}><option value="all">All chains</option>{availableChains.map(item => <option key={item.id} value={String(item.id)}>{item.name} · {item.symbol}</option>)}</select><ChevronDown size={13}/></label>
+            <label className="market-network-select"><Globe2 size={15}/><select aria-label="Filter tokens by network" value={marketNetworkId} onChange={event => { setMarketNetworkId(event.target.value); setMarketCategory('All tokens'); setMarketPage(1); }}><option value="all">All chains</option>{marketAvailableChains.map(item => <option key={item.id} value={String(item.id)}>{item.name} · {item.symbol}</option>)}</select><ChevronDown size={13}/></label>
             <div className="market-range-wrap">
               <button type="button" className="market-range-select" aria-label="Select price change range" aria-expanded={marketTimeOpen} onClick={() => setMarketTimeOpen(open => !open)}><span>{marketTimeRange}</span><ChevronDown size={12}/></button>
               {marketTimeOpen && <div className="market-range-menu">{(['1h', '24h', '7d', '30d'] as const).map(range => <button type="button" key={range} className={marketTimeRange === range ? 'active' : ''} onClick={() => { setMarketTimeRange(range); setMarketTimeOpen(false); }}>{range}</button>)}</div>}
