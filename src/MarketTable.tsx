@@ -13,7 +13,7 @@ const compact=(value?:number)=>{if(!Number.isFinite(value)||!value)return '—';
 export default function MarketTable({networks,networkId,timeRange,category,search,sort,metrics,favorites,loading,error,onToggleFavorite}:Props){
   const selected=networkId==='all'?networks.filter(n=>[1,56,8453,137,42161,10,43114,5000].includes(n.chainId)):networks.filter(n=>n.id===networkId);
   const query=search.trim().toLowerCase();
-  let rows=selected.flatMap(network=>network.tokens.slice(0,100).map(token=>{
+  let rows=selected.flatMap(network=>network.tokens.map(token=>{
     const key=token.chainId+':'+token.address.toLowerCase(), data=metrics[key]||{};
     const price=data.priceUsd||undefined;
     const change=timeRange==='1h'?data.priceChange?.h1:timeRange==='24h'?data.priceChange?.h24:undefined;
