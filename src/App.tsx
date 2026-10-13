@@ -392,7 +392,7 @@ function App() {
       </div>
     </main>
 
-    <nav className={`bottom-navigation ${bottomNavVisible ? '' : 'nav-hidden'}`} aria-label="Main navigation">
+    <nav className={`bottom-navigation ${bottomNavVisible ? '' : 'nav-hidden'}`} aria-label="Main navigation" style={{ display: 'flex', position: 'fixed', left: '50%', bottom: 'calc(14px + env(safe-area-inset-bottom, 0px))', transform: bottomNavVisible ? 'translateX(-50%)' : 'translate(-50%, 160%)', zIndex: 9999, visibility: 'visible', opacity: 1, pointerEvents: bottomNavVisible ? 'auto' : 'none', width: 'min(92vw, 440px)', minHeight: 62, alignItems: 'center', justifyContent: 'space-around', borderRadius: 999, background: 'rgba(20, 20, 22, 0.96)', border: '1px solid rgba(255,255,255,0.13)', boxShadow: '0 8px 32px rgba(0,0,0,0.42), 0 1px 16px rgba(255,255,255,0.08)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)', transition: 'transform 220ms ease' }}>
       <button type="button" className={activeTab === 'Overview' ? 'active' : ''} aria-current={activeTab === 'Overview' ? 'page' : undefined} onClick={() => setActiveTab('Overview')}><Home size={20}/><span>Home</span></button>
       <button type="button" className={activeTab === 'Market' ? 'active' : ''} aria-current={activeTab === 'Market' ? 'page' : undefined} onClick={() => setActiveTab('Market')}><TrendingUp size={20}/><span>Market</span></button>
       <button type="button" className={activeTab === 'Activity' ? 'active' : ''} aria-current={activeTab === 'Activity' ? 'page' : undefined} onClick={() => setActiveTab('Activity')}><Activity size={20}/><span>History</span></button>
