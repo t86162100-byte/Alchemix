@@ -1168,3 +1168,9 @@ button:active, a:active, [role="button"]:active {
 .wallet-error { margin:10px 0 0; color:#ffb0b0; font-size:11px; line-height:1.5; }
 .primary-button:disabled { opacity:.6; cursor:wait; }
 @media(max-width:560px) { .wallet-choice-grid { grid-template-columns:1fr; } .wallet-recovery-phrase { grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; } .wallet-recovery-phrase span { padding:8px 5px; font-size:10px; } .market-page { padding-bottom:90px; } }
+
+/* Visibility safeguard: keep the floating navigation fixed above all mobile content. */
+.bottom-navigation { position:fixed!important; z-index:10000!important; display:flex!important; align-items:center; justify-content:space-between; box-sizing:border-box; visibility:visible; }
+.bottom-navigation.nav-hidden { visibility:hidden; }
+.bottom-navigation button { appearance:none; -webkit-appearance:none; outline:none; -webkit-tap-highlight-color:transparent; }
+.bottom-navigation button:focus,.bottom-navigation button:focus-visible { outline:none; box-shadow:none; }
