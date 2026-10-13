@@ -115,7 +115,7 @@ const response = await fetch('https://li.quest/v1/tokens?chains=' + network.chai
 if (!response.ok) throw new Error('Token service unavailable');
 const payload = await response.json() as LifiTokenResponse;
 const tokens = (payload.tokens?.[String(network.chainId)] || [])
-.filter(token => token.symbol && token.address && Number.isFinite(token.decimals) && !/\b(stock|shares?|equity|tokenized stock|pre[- ]?ipo|inc\.?|incorporated|corporation|common stock|class [a-c] shares?)\b/i.test(token.name || '') && !/^(AAPLc|AMZNc|GOOGLc|GOOGc|METAc|MSFTc|MSTRc|NVDAc|TSLAc|SPCXc|SNDKc|COINc|CRCLc|INTCc|BRK[.-]?Bc|ORCLc|NFLXc|AMDc|QCOMc|AVGOc|DISc|JPMc|VTIc|SPYc|QQQc)$/i.test(token.symbol || ''))
+.filter(token => token.symbol && token.address && Number.isFinite(token.decimals) && !/\b(stock|shares?|equity|tokenized stock|xstock|pre[- ]?ipo|incorporated|corporation|common stock|class [a-z] shares?)\b|\b(?:inc|corp|ltd|limited)\.?\s*$/i.test(token.name || '') && !/^(AAPLc|AMZNc|GOOGLc|GOOGc|METAc|MSFTc|MSTRc|NVDAc|TSLAc|SPCXc|SNDKc|COINc|CRCLc|INTCc|BRK[.-]?Bc|ORCLc|NFLXc|AMDc|QCOMc|AVGOc|DISc|JPMc|VTIc|SPYc|QQQc)$/i.test(token.symbol || ''))
 .map(token => ({ ...token, chainId: network.chainId }))
 .sort((a, b) => {
 const aNative = a.address.toLowerCase() === '0x0000000000000000000000000000000000000000' || a.symbol.toLowerCase() === network.symbol.toLowerCase();
