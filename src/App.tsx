@@ -219,7 +219,7 @@ function App() {
     return () => { window.ethereum?.removeListener?.('accountsChanged', onAccounts); window.ethereum?.removeListener?.('chainChanged', onChain); };
   }, []);
 
-  const marketNetworkIds: Record<number, string> = { 1: 'eth', 56: 'bsc', 8453: 'base', 137: 'polygon_pos', 42161: 'arbitrum', 10: 'optimism', 43114: 'avax', 100: 'xdai', 250: 'ftm', 42220: 'celo', 25: 'cro', 324: 'zksync', 59144: 'linea', 534352: 'scroll', 81457: 'blast', 5000: 'mantle', 7777777: 'zora-network', 169: 'manta-pacific', 34443: 'mode', 80094: 'berachain', 480: 'worldchain', 42170: 'arbitrum_nova', 2020: 'ronin', 999: 'hyperevm', 146: 'sonic', 1329: 'sei-network', 57073: 'ink', 9745: 'plasma', 143: 'monad', 196: 'x-layer', 204: 'opbnb', 8217: 'kaia', 1116: 'core', 1088: 'metis', 1284: 'glmr', 1285: 'movr', 1666600000: 'one', 1313161554: 'aurora', 42220: 'celo' }
+  const marketNetworkIds: Record<number, string> = { 1: 'eth', 56: 'bsc', 8453: 'base', 137: 'polygon_pos', 42161: 'arbitrum', 10: 'optimism', 43114: 'avax', 100: 'xdai', 250: 'ftm', 42220: 'celo', 25: 'cro', 324: 'zksync', 59144: 'linea', 534352: 'scroll', 81457: 'blast', 5000: 'mantle', 7777777: 'zora-network', 169: 'manta-pacific', 34443: 'mode', 80094: 'berachain', 480: 'worldchain', 42170: 'arbitrum_nova', 2020: 'ronin', 999: 'hyperevm', 146: 'sonic', 1329: 'sei-network', 57073: 'ink', 9745: 'plasma', 143: 'monad', 196: 'x-layer', 204: 'opbnb', 8217: 'kaia', 1116: 'core', 1088: 'metis', 1284: 'glmr', 1285: 'movr', 1666600000: 'one', 1313161554: 'aurora' };
   const geckoTerminalNetwork = (selected: Chain) => marketNetworkIds[selected.id] || '';
   const marketAvailableChains = useMemo(() => availableChains.filter(item => Boolean(marketNetworkIds[item.id])), [availableChains]);
 
