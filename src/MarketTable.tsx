@@ -1,0 +1,33 @@
+import { Star } from 'lucide-react';
+import type { MarketMetrics } from './marketData';
+
+type Token = { chainId:number; address:string; symbol:string; name:string; decimals:number; logoURI?:string; priceUSD?:string };
+type Network = { id:string; chainId:number; name:string; symbol:string; logoURI?:string; tokens:Token[] };
+type Props = {
+  networks:Network[]; networkId:string; timeRange:'1h'|'24h'|'7d'|'30d'; category:string; search:string; sort:string;
+  metrics:Record<string,MarketMetrics>; favorites:string[]; loading:boolean; error:string;
+  onToggleFavorite:(key:string)=>void;
+};
+const money=(value?:number|string)=>{const n=Number(value);if(!Number.isFinite(n)||n<=0)return '—';return n>=1000?'$'+n.toLocaleString('en-US',{maximumFractionDigits:2}):n>=1?'$'+n.toLocaleString('en-US',{maximumFractionDigits:4}):'$'+n.toLocaleString('en-US',{maximumFractionDigits:8});};
+const compact=(value?:number)=>{if(!Number.isFinite(value)||!value)return '—';const n=Math.abs(value);return n>=1e12?'$'+(value/1e12).toFixed(2)+'T':n>=1e9?'$'+(value/1e9).toFixed(2)+'B':n>=1e6?'$'+(value/1e6).toFixed(2)+'M':n>=1e3?'$'+(value/1e3).toFixed(2)+'K':'$'+value.toFixed(2);};
+export default function MarketTable({networks,networkId,timeRange,category,search,sort,metrics,favorites,loading,error,onToggleFavorite}:Props){
+  const selected=networkId==='all'?networks.filter(n=>[1,56,8453,137,42161,10,43114,5000].includes(n.chainId)):networks.filter(n=>n.id===networkId);
+  const query=search.trim().toLowerCase();
+  let rows=selected.flatMap(network=>network.tokens.slice(0,100).map(token=>{
+    const key=token.chainId+':'+token.address.toLowerCase(), data=metrics[key]||{};
+    const price=data.priceUsd||Number(token.priceUSD)||undefined;
+    const change=timeRange==='1h'?data.priceChange?.h1:timeRange==='24h'?data.priceChange?.h24:undefined;
+    return {...token,key,networkName:network.name,data,price,change};
+  }));
+  if(query) rows=rows.filter(t=>t.name.toLowerCase().includes(query)||t.symbol.toLowerCase().includes(query)||t.address.toLowerCase().includes(query)||t.networkName.toLowerCase().includes(query));
+  if(category==='Favorites') rows=rows.filter(t=>favorites.includes(t.key));
+  if(category==='Gainers') rows=rows.filter(t=>typeof t.change==='number'&&t.change>0);
+  if(category==='Losers') rows=rows.filter(t=>typeof t.change==='number'&&t.change<0);
+  if(category==='Volume') rows=rows.filter(t=>Number(t.data.volume?.h24)>0);
+  rows.sort((a,b)=>sort==='price'?Number(b.price||0)-Number(a.price||0):sort==='change'?Number(b.change??-Infinity)-Number(a.change??-Infinity):sort==='volume'?Number(b.data.volume?.h24||0)-Number(a.data.volume?.h24||0):Number(b.data.marketCap||b.data.fdv||0)-Number(a.data.marketCap||a.data.fdv||0));
+  return <div className="market-table-panel"><div className="market-compact-list">
+    <div className="market-sort-bar" aria-label="Sort market instruments"><span className="market-sort-label">#</span><div className="market-sort-asset"><span>MC / VOL</span></div><div className="market-sort-values"><span>Price / {timeRange}</span></div><span className="market-sort-star"><Star size={12}/></span></div>
+    {rows.slice(0,100).map((token,index)=><article className="market-compact-row" key={token.key}><span className="market-compact-rank">{index+1}</span><div className="market-compact-asset"><div className="market-token"><span className="market-token-logos"><img src={token.logoURI||''} alt="" loading="lazy" onError={e=>{e.currentTarget.style.display='none';}}/></span><div className="market-token-copy"><strong>{token.name||token.symbol}</strong><span>{token.symbol} · {token.networkName}</span></div></div><div className="market-compact-metrics"><span><b>MC</b> {compact(token.data.marketCap||token.data.fdv)}</span><span><b>VOL</b> {compact(token.data.volume?.h24)}</span><span><b>LIQ</b> {compact(token.data.liquidity?.usd)}</span></div></div><div className="market-compact-price"><strong>{money(token.price)}</strong><span className={typeof token.change!=='number'?'neutral':token.change>0?'positive':token.change<0?'negative':'neutral'}>{typeof token.change==='number'?(token.change>0?'+':'')+token.change.toFixed(2)+'%':'—'}</span></div><button type="button" className="market-favorite" onClick={()=>onToggleFavorite(token.key)} aria-label={favorites.includes(token.key)?'Remove from favorites':'Add to favorites'} aria-pressed={favorites.includes(token.key)}><Star size={15} fill={favorites.includes(token.key)?'currentColor':'none'}/></button></article>)}
+    {!rows.length&&<div className="market-empty">{loading?'Loading token prices and market metrics…':error|| (category==='Favorites'?'No favorites saved yet. Tap a star beside a token to save it.':'No tokens match these filters. Try another network or search.')}</div>}
+  </div><div className="market-table-footer"><span>Token directory and spot prices: LI.FI. DEX market metrics: DexScreener where a matching pair is available. This feed does not provide 7d/30d change values.</span></div></div>;
+}
