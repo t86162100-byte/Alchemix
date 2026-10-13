@@ -1296,3 +1296,8 @@ button:active, a:active, [role="button"]:active {
   .network-modal-backdrop { align-items:end; }
   .market-network-drawer { max-height:90dvh; overflow-y:auto; }
 }
+
+
+/* Incremental market rendering keeps large multi-chain token lists responsive. */
+.market-load-more { display:flex; align-items:center; justify-content:center; gap:8px; width:calc(100% - 24px); margin:12px; padding:13px 16px; border:1px solid rgba(255,255,255,.12); border-radius:999px; background:rgba(255,255,255,.045); color:inherit; font:inherit; font-size:12px; cursor:pointer; }
+.market-load-more:active { transform:scale(.99); }
