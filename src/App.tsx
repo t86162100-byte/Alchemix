@@ -125,7 +125,7 @@ function App() {
             if (aNative !== bNative) return aNative ? -1 : 1;
             return Number(b.priceUSD || 0) - Number(a.priceUSD || 0);
           });
-        return { id: network.id, tokens };
+        return { id: network.id, chainId: network.chainId, tokens };
       }));
       results.forEach(item => marketTokenLoaded.current.add(item.chainId));
       setMarketNetworks(previous => previous.map(network => {
