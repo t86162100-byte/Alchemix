@@ -22,6 +22,8 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
   }));
   // Show the full crypto token directory, not just tokens that pass liquidity/volume thresholds.
   // Tokens without a verified DEX market remain visible with unavailable market fields shown as dashes.
+  // Exclude tokenized equities even if the upstream directory includes them.
+  rows=rows.filter(t=>!isStockLike(t.name||'',t.symbol||''));
   if(query) rows=rows.filter(t=>t.name.toLowerCase().includes(query)||t.symbol.toLowerCase().includes(query)||t.address.toLowerCase().includes(query)||t.networkName.toLowerCase().includes(query));
   if(category==='Favorites') rows=rows.filter(t=>favorites.includes(t.key));
   if(category==='Gainers') rows=rows.filter(t=>typeof t.change==='number'&&t.change>0);
