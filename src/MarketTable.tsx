@@ -23,14 +23,8 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
     const change=timeRange==='1h'?data.priceChange?.h1:timeRange==='24h'?data.priceChange?.h24:undefined;
     return {...token,key,networkName:network.name,data,price,change};
   }));
-  // LI.FI's per-chain token directory is the source of truth for assets supported by the swap
-  // router. Keep eligible crypto assets visible even when market data is missing; metrics are
-  // supplemental and must never determine whether a token appears in the Market tab.
-  rows=rows.filter(t=>{
-    const positionName=/(?:\\bLP token\\b|\\bliquidity provider\\b|\\bliquidity pool token\\b|\\bpool token\\b|\\buni[- ]?v[23]\\b|\\bslp\\b|\\baamm\\b|\\bvault (?:share|token|receipt)\\b|\\b(?:vault|strategy) shares?\\b|\\breceipt token\\b|\\bdeposit token\\b)/i.test(t.name||'');
-    const positionSymbol=/^(?:UNI-V[23]|SLP|BPT|CAKE-LP|AAMM.*)$/i.test(t.symbol||'');
-    return !isStockLike(t.name||'',t.symbol||'')&&!positionName&&!positionSymbol;
-  });
+  // Display the LI.FI token directory as supplied. Market metrics and token categories do not
+  // decide eligibility here; actual swap routes are verified by LI.FI when a swap is requested.
   if(query) rows=rows.filter(t=>t.name.toLowerCase().includes(query)||t.symbol.toLowerCase().includes(query)||t.address.toLowerCase().includes(query)||t.networkName.toLowerCase().includes(query));
   if(category==='Favorites') rows=rows.filter(t=>favorites.includes(t.key));
   if(category==='Gainers') rows=rows.filter(t=>typeof t.change==='number'&&t.change>0);
@@ -42,5 +36,5 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
     {rows.slice(0, visibleCount).map((token,index)=><article className="market-compact-row" key={token.key}><span className="market-compact-rank">{index+1}</span><div className="market-compact-asset"><div className="market-token"><span className="market-token-logos"><img src={token.logoURI||''} alt="" loading="lazy" onError={e=>{e.currentTarget.style.display='none';}}/><span className="market-token-fallback">{(token.symbol||'?').slice(0,3).toUpperCase()}</span></span><div className="market-token-copy"><strong>{token.name||token.symbol}</strong><span>{token.symbol} · {token.networkName}</span></div></div><div className="market-compact-metrics"><span><b>{token.data.marketCap ? "MC" : token.data.fdv ? "FDV" : "MC"}</b> {compact(token.data.marketCap||token.data.fdv)}</span><span><b>VOL</b> {compact(token.data.volume?.h24)}</span><span><b>LIQ</b> {compact(token.data.liquidity?.usd)}</span></div></div><div className="market-compact-price"><strong>{money(token.price)}</strong><span className={typeof token.change!=='number'?'neutral':token.change>0?'positive':token.change<0?'negative':'neutral'}>{typeof token.change==='number'?(token.change>0?'+':'')+token.change.toFixed(2)+'%':'—'}</span></div><button type="button" className="market-favorite" onClick={()=>onToggleFavorite(token.key)} aria-label={favorites.includes(token.key)?'Remove from favorites':'Add to favorites'} aria-pressed={favorites.includes(token.key)}><Star size={15} fill={favorites.includes(token.key)?'currentColor':'none'}/></button></article>)}
     {rows.length > visibleCount && <button type="button" className="market-load-more" onClick={() => setVisibleCount(count => Math.min(count + 100, rows.length))}>Show more tokens ({Math.min(100, rows.length - visibleCount)} more) <ChevronDown size={15}/></button>}
     {!rows.length&&<div className="market-empty">{loading?'Loading token prices and market metrics…':error|| (category==='Favorites'?'No favorites saved yet. Tap a star beside a token to save it.':'No tokens match these filters. Try another network or search.')}</div>}
-  </div><div className="market-table-footer"><span>Curated list of common crypto assets for the selected networks. Price and DEX metrics appear when a matching market is available; unavailable values are shown as dashes. 7d/30d changes are not available yet.</span></div></div>;
+  </div><div className="market-table-footer"><span>Tokens listed by LI.FI for the selected networks. Price and DEX metrics appear when a matching market is available; unavailable values are shown as dashes. 7d/30d changes are not available yet.</span></div></div>;
 }
