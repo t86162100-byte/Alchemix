@@ -230,7 +230,7 @@ function App() {
     let cancelled = false;
     setMarketNetworksLoading(true);
     setMarketError('');
-    const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const normalize = (value: string) => value.toLowerCase().replace(/main\s*net|main\s*network|smart|chain|network|pos|one/g, '').replace(/[^a-z0-9]/g, '');
     // The selector is populated from the EVM chain registry independently of any market provider.
     fetch('https://chainid.network/chains.json')
       .then(response => {
