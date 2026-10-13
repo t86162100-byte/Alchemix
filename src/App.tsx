@@ -1,21 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { getMarketDataProvider } from './core/market/providers';
+import type { MarketNetwork } from './core/market/types';
 import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, ChevronsUpDown, CircleHelp, CircleUserRound, Copy, ExternalLink, Eye, EyeOff, Flame, Globe2, Home, LayoutGrid, LockKeyhole, Menu, MoreHorizontal, QrCode, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Star, TrendingDown, TrendingUp, Wallet, X, Zap } from 'lucide-react';
 
 type Chain = { id: number; name: string; symbol: string; label: string; rpc: string; explorer: string; color: string; priceId: string; icon?: string };
-type MarketNetwork = { id: string; name: string };
-const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-const fetchMarketResponse = async (url: string, attempts = 3): Promise<Response> => {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < attempts; attempt += 1) {
-    try {
-      const response = await fetch(url, { headers: { accept: 'application/json;version=20230302' } });
-      if (response.ok || (response.status !== 429 && response.status < 500)) return response;
-      lastError = new Error('Market provider temporarily unavailable');
-    } catch (error) { lastError = error; }
-    if (attempt + 1 < attempts) await wait(700 * (attempt + 1));
-  }
-  throw lastError instanceof Error ? lastError : new Error('Market provider could not be reached');
-};
+const marketProvider = getMarketDataProvider();
 type MarketToken = { id: string; symbol: string; name: string; image: string; address?: string; chainName?: string; chainIcon?: string; current_price: number | null; market_cap: number | null; total_volume: number | null; price_change_percentage_1h_in_currency?: number | null; price_change_percentage_24h: number | null; price_change_percentage_7d_in_currency?: number | null; price_change_percentage_30d_in_currency?: number | null; market_cap_rank: number | null };
 type EthereumProvider = { request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>; on?: (event: string, cb: (...args: unknown[]) => void) => void; removeListener?: (event: string, cb: (...args: unknown[]) => void) => void };
 declare global { interface Window { ethereum?: EthereumProvider } }
@@ -239,30 +228,12 @@ function App() {
 
   useEffect(() => {
     let cancelled = false;
-    const loadProviderNetworks = async () => {
-      setMarketNetworksLoading(true);
-      try {
-        const found = new Map<string, MarketNetwork>();
-        let page = 1;
-        // Discover network names and identifiers from the provider directory, not a hand-maintained mapping.
-        while (page <= 3) {
-          const response = await fetch(`https://api.geckoterminal.com/api/v2/networks?page=${page}`, { headers: { accept: 'application/json;version=20230302' } });
-          if (!response.ok) break;
-          const payload = await response.json() as { data?: Array<{ id?: string; attributes?: { name?: string; identifier?: string } }>; links?: { next?: string | null } };
-          const entries = payload.data || [];
-          for (const entry of entries) {
-            const id = entry.attributes?.identifier || entry.id?.replace(/^network_/, '');
-            const name = entry.attributes?.name || id;
-            if (id && name) found.set(id, { id, name });
-          }
-          if (!payload.links?.next || entries.length === 0) break;
-          page += 1;
-        }
-        if (!cancelled && found.size) setMarketNetworks([...found.values()].sort((a, b) => a.name.localeCompare(b.name)));
-      } catch { /* Keep the picker usable if the provider directory is temporarily unavailable. */ }
-      finally { if (!cancelled) setMarketNetworksLoading(false); }
-    };
-    void loadProviderNetworks();
+    setMarketNetworksLoading(true);
+    setMarketError('');
+    marketProvider.discoverNetworks()
+      .then(found => { if (!cancelled) setMarketNetworks(found); })
+      .catch(() => { if (!cancelled) setMarketError('Could not load the market network directory. Check your connection and retry.'); })
+      .finally(() => { if (!cancelled) setMarketNetworksLoading(false); });
     return () => { cancelled = true; };
   }, []);
 
@@ -281,9 +252,7 @@ function App() {
       const batch = networks.slice(offset, offset + 3);
       const settled = await Promise.allSettled(batch.map(async selected => {
         const network = selected.id;
-        const response = await fetch('https://api.geckoterminal.com/api/v2/networks/' + encodeURIComponent(network) + '/pools?include=base_token,quote_token&page=' + page + '&sort=h24_volume_usd_desc', { headers: { accept: 'application/json;version=20230302' } });
-        if (!response.ok) return [] as MarketToken[];
-        const payload = await response.json() as { data?: PoolData[]; included?: TokenData[] };
+        const payload = await marketProvider.fetchPools(network, page) as { data?: PoolData[]; included?: TokenData[] };
         const included = new Map((payload.included || []).filter(token => token.type === 'token' || token.attributes?.address).map(token => [token.id, token]));
         const tokenMap = new Map<string, MarketToken>();
         for (const pool of payload.data || []) {
@@ -332,15 +301,10 @@ function App() {
         if (!selected) throw new Error('That market network is not ready yet. Refresh the provider directory or choose All chains.');
         const network = selected.id;
         // GeckoTerminal exposes market tokens through indexed DEX pools, not a generic /networks/{id}/tokens list.
-        const response = await fetch(`https://api.geckoterminal.com/api/v2/networks/${encodeURIComponent(network)}/pools?include=base_token,quote_token&page=${page}&sort=h24_volume_usd_desc`, { headers: { accept: 'application/json;version=20230302' } });
-        if (!response.ok) {
-          if (response.status === 404) throw new Error(`${selected.name} has no indexed DEX market data on this provider. Testnets usually have no live USD market listings; try a mainnet network or All chains.`);
-          if (response.status === 429) throw new Error('On-chain market data is busy. Wait a moment and retry.');
-          throw new Error(`Could not load ${selected.name} market listings right now.`);
-        }
+        
         type GeckoToken = { id: string; type?: string; attributes?: { address?: string; name?: string; symbol?: string; image_url?: string; price_usd?: string; fdv_usd?: string; market_cap_usd?: string; volume_usd?: { h24?: string }; price_change_percentage?: { h1?: string; h24?: string; h7d?: string } } };
         type GeckoPool = { id: string; attributes?: { base_token_price_usd?: string; quote_token_price_usd?: string; volume_usd?: { h24?: string }; price_change_percentage?: { h1?: string; h24?: string; h7d?: string } }; relationships?: { base_token?: { data?: { id?: string } }; quote_token?: { data?: { id?: string } } } };
-        const payload = await response.json() as { data?: GeckoPool[]; included?: GeckoToken[] };
+        const payload = await marketProvider.fetchPools(network, page) as { data?: GeckoPool[]; included?: GeckoToken[] };
         const included = new Map((payload.included || []).filter(token => token.type === 'token' || token.attributes?.address).map(token => [token.id, token]));
         const num = (value?: string | null) => value != null && Number.isFinite(Number(value)) ? Number(value) : null;
         const tokenMap = new Map<string, MarketToken>();
@@ -380,8 +344,9 @@ function App() {
   }, [marketNetworkId, availableChains, marketNetworks]);
 
   useEffect(() => {
+    if (marketNetworksLoading || marketNetworks.length === 0) return;
     void loadMarketTokens(1, false);
-  }, [loadMarketTokens]);
+  }, [loadMarketTokens, marketNetworksLoading, marketNetworks.length]);
 
   useEffect(() => {
     try { localStorage.setItem('nova-market-favorites', JSON.stringify(favoriteTokens)); } catch { /* Storage may be disabled. */ }
