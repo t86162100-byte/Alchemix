@@ -42,6 +42,9 @@ function App() {
   const [favoriteTokens, setFavoriteTokens] = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('nova-market-favorites') || '[]') as string[]; } catch { return []; } });
   const [address, setAddress] = useState('');
   const [chainId, setChainId] = useState(1);
+  const [availableChains, setAvailableChains] = useState<Chain[]>(CHAINS);
+  const [networkSearch, setNetworkSearch] = useState('');
+  const [networkListLoading, setNetworkListLoading] = useState(false);
   const [balance, setBalance] = useState<number | null>(null);
   const [prices, setPrices] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
@@ -104,7 +107,46 @@ function App() {
     };
   }, [bottomNavVisible, navRevealDirection]);
 
-  const chain = CHAINS.find(c => c.id === chainId) ?? CHAINS[0];
+  useEffect(() => {
+    let cancelled = false;
+    setNetworkListLoading(true);
+    fetch('https://chainid.network/chains.json')
+      .then(response => { if (!response.ok) throw new Error('Could not load chain registry'); return response.json(); })
+      .then((items: Array<{ chainId: number; name: string; title?: string; nativeCurrency?: { symbol?: string }; rpc?: string[]; explorers?: { url?: string }[]; network?: string }>) => {
+        const curated = new Map(CHAINS.map(item => [item.id, item]));
+        const discovered: Chain[] = items
+          .filter(item => Number.isFinite(item.chainId) && item.chainId > 0 && item.network !== 'testnet')
+          .map(item => {
+            const known = curated.get(item.chainId);
+            const rpc = (item.rpc || []).find(url => /^https:\/\//.test(url) && !/\$\{|\{[^}]+\}|YOUR_API_KEY|INFURA_API_KEY|ALCHEMY_API_KEY|<api[-_ ]?key>/i.test(url));
+            const explorer = (item.explorers || []).find(entry => entry.url?.startsWith('https://'))?.url;
+            if (known) return known;
+            return {
+              id: item.chainId,
+              name: item.name || item.title || `Chain ${item.chainId}`,
+              symbol: item.nativeCurrency?.symbol || 'ETH',
+              label: item.title || item.name || `EVM network ${item.chainId}`,
+              rpc: rpc || '',
+              explorer: explorer || '',
+              color: '#777777',
+              priceId: ''
+            };
+          })
+          .filter(item => item.name && item.name.trim().length > 0)
+          .sort((a, b) => a.name.localeCompare(b.name));
+        const merged = [...curated.values(), ...discovered.filter(item => !curated.has(item.id))];
+        if (!cancelled && merged.length > CHAINS.length) setAvailableChains(merged);
+      })
+      .catch(() => { /* Keep the built-in network list if the registry is unavailable. */ })
+      .finally(() => { if (!cancelled) setNetworkListLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const chain = availableChains.find(c => c.id === chainId) ?? CHAINS[0];
+  const visibleNetworkOptions = useMemo(() => {
+    const query = networkSearch.trim().toLowerCase();
+    return availableChains.filter(item => !query || item.name.toLowerCase().includes(query) || item.label.toLowerCase().includes(query) || item.symbol.toLowerCase().includes(query) || String(item.id).includes(query));
+  }, [availableChains, networkSearch]);
   const usdBalance = balance === null ? null : balance * (prices[chain.priceId] || 0);
 
   const refreshBalance = useCallback(async (wallet = address, selected = chain) => {
@@ -218,8 +260,17 @@ function App() {
       setChainId(target.id); setModal(null); setNotice(`Network switched to ${target.name}.`);
     } catch (err) {
       const e = err as { code?: number };
-      if (e.code === 4902) setNotice('This network is not configured in your wallet yet. Add it using your wallet settings.');
-      else setNotice('Network switch was cancelled or rejected.');
+      if (e.code === 4902) {
+        if (!target.rpc || !target.rpc.startsWith('https://')) {
+          setNotice(`${target.name} is listed, but no public RPC was found. Add a trusted RPC in your wallet to use this network.`);
+          return;
+        }
+        try {
+          await window.ethereum.request({ method: 'wallet_addEthereumChain', params: [{ chainId: `0x${target.id.toString(16)}`, chainName: target.name, nativeCurrency: { name: target.symbol, symbol: target.symbol, decimals: 18 }, rpcUrls: [target.rpc], ...(target.explorer ? { blockExplorerUrls: [target.explorer] } : {}) }] });
+          await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: `0x${target.id.toString(16)}` }] });
+          setChainId(target.id); setModal(null); setNetworkSearch(''); setNotice(`Network added and switched to ${target.name}.`);
+        } catch { setNotice(`Your wallet could not add ${target.name}. Check its RPC details or add it manually in your wallet.`); }
+      } else setNotice('Network switch was cancelled or rejected.');
     }
   };
   const send = async () => {
@@ -356,17 +407,10 @@ function App() {
         <section className="network-marquee" aria-label="Supported blockchain networks">
           <div className="network-marquee-track">
             {[0, 1].map(copy => <div className="network-marquee-group" key={copy} aria-hidden={copy === 1 ? true : undefined}>
-              {[
-                { name: 'Ethereum', mark: '◆', className: 'ethereum' },
-                { name: 'BNB Chain', mark: '◆', className: 'bnb' },
-                { name: 'Base', mark: '●', className: 'base' },
-                { name: 'Polygon', mark: '⬡', className: 'polygon' },
-                { name: 'Arbitrum', mark: 'A', className: 'arbitrum' },
-                { name: 'Optimism', mark: 'OP', className: 'optimism' },
-              ].map(network => <div className="network-marquee-pill" key={network.name}>
-                <span className={`network-marquee-logo ${network.className}`}>{network.mark}</span>
+              {availableChains.map(network => <button type="button" className="network-marquee-pill" key={network.id} onClick={() => { setNetworkSearch(''); setModal('network'); }} title={`Select ${network.name}`}>
+                <span className={`network-marquee-logo ${network.id === 1 ? 'ethereum' : network.id === 56 ? 'bnb' : network.id === 8453 ? 'base' : network.id === 137 ? 'polygon' : network.id === 42161 ? 'arbitrum' : network.id === 10 ? 'optimism' : ''}`}>{network.symbol.slice(0, 3)}</span>
                 <span>{network.name}</span>
-              </div>)}
+              </button>)}
             </div>)}
           </div>
         </section>
@@ -407,7 +451,7 @@ function App() {
 
     {modal && <div className="modal-backdrop" onClick={() => setModal(null)}><section className="modal-card" onClick={e => e.stopPropagation()}>
       <div className="modal-head"><div><span className="modal-eyebrow">NOVA WALLET</span><h2>{modal === 'network' ? 'Choose a network' : modal === 'send' ? 'Send crypto' : modal === 'receive' ? 'Receive crypto' : 'Your security matters'}</h2></div><button className="icon-button" onClick={() => setModal(null)} aria-label="Close dialog"><X size={19}/></button></div>
-      {modal === 'network' && <><p className="modal-description">Select a network. Your connected wallet will ask you to approve any network change.</p><div className="network-list">{CHAINS.map(c => <button className={`network-option ${chainId === c.id ? 'selected' : ''}`} key={c.id} onClick={() => void switchNetwork(c)}><span className="asset-icon" style={{ background: c.color }}>{iconLetters[c.symbol] || '◈'}</span><span className="network-option-text"><strong>{c.name}</strong><small>{c.label}</small></span>{chainId === c.id ? <span className="current-tag">CURRENT</span> : <ArrowUpRight size={16}/>}</button>)}</div></>}
+      {modal === 'network' && <><p className="modal-description">Browse 100+ EVM networks. Switching or adding a network requires approval in your connected wallet.</p><div className="network-search-wrap"><Search size={16}/><input value={networkSearch} onChange={event => setNetworkSearch(event.target.value)} placeholder="Search networks or chain ID…" aria-label="Search networks" /></div>{networkListLoading && <p className="network-loading">Loading network directory…</p>}<div className="network-count">{visibleNetworkOptions.length} networks{networkSearch ? ' found' : ' available'}</div><div className="network-list">{visibleNetworkOptions.map(c => <button className={`network-option ${chainId === c.id ? 'selected' : ''}`} key={c.id} onClick={() => void switchNetwork(c)}><span className="asset-icon" style={{ background: c.color }}>{iconLetters[c.symbol] || '◈'}</span><span className="network-option-text"><strong>{c.name}</strong><small>{c.label}</small></span>{chainId === c.id ? <span className="current-tag">CURRENT</span> : <ArrowUpRight size={16}/>}</button>)}{visibleNetworkOptions.length === 0 && <p className="network-loading">No networks match that search.</p>}</div></>}
       {modal === 'send' && <><p className="modal-description">Send native {chain.symbol} on {chain.name}. Check the address and network carefully before confirming in your wallet.</p><label className="form-label">Recipient address</label><input className="form-input" placeholder="0x…" value={sendTo} onChange={e => setSendTo(e.target.value)} autoComplete="off"/><label className="form-label">Amount ({chain.symbol})</label><input className="form-input" type="number" min="0" step="any" placeholder="0.00" value={sendAmount} onChange={e => setSendAmount(e.target.value)}/><div className="form-warning"><ShieldCheck size={16}/><span>Nova will never ask for your seed phrase. Your wallet provider will display the final transaction for approval.</span></div><button className="primary-button full-button" onClick={() => void send()}>Continue to wallet <ArrowUpRight size={16}/></button></>}
       {modal === 'receive' && <><p className="modal-description">Share your public wallet address to receive assets on the selected network.</p><div className="receive-card"><div className="receive-chain"><span className="chain-dot" style={{ background: chain.color }}/>{chain.name} <span className="receive-symbol">{chain.symbol}</span></div><div className="receive-address">{address}</div><button className="primary-button full-button" onClick={() => void copyAddress()}><Copy size={16}/> Copy address</button></div><div className="form-warning"><CircleHelp size={16}/><span>Only send assets compatible with this network to this address. Sending on the wrong network can result in permanent loss.</span></div></>}
       {modal === 'help' && <><p className="modal-description">Nova is an early web-wallet interface. Your safety comes first.</p><div className="security-list"><div><ShieldCheck size={18}/><span><strong>Your keys stay with your wallet</strong><small>This version connects to an existing browser wallet and does not collect private keys or recovery phrases.</small></span></div><div><LockKeyhole size={18}/><span><strong>Review every transaction</strong><small>Always check the network, destination, amount and fee in your wallet confirmation window.</small></span></div><div><Globe2 size={18}/><span><strong>Public blockchain data</strong><small>Balances are fetched from public RPC endpoints. Market prices are third-party estimates.</small></span></div></div><button className="primary-button full-button" onClick={() => setModal(null)}>Got it</button></>}
