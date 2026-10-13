@@ -27,7 +27,7 @@ export async function fetchDexMarketMetrics(results: Array<{ chainId:number; tok
     const dexChain = dexChains[result.chainId];
     if (!dexChain) return [];
     return result.tokens.filter(token => /^0x[a-fA-F0-9]{40}$/.test(token.address) && token.address.toLowerCase() !== '0x0000000000000000000000000000000000000000')
-      .slice(0,300).map(token => ({ token, chainId:result.chainId, dexChain }));
+      .map(token => ({ token, chainId:result.chainId, dexChain }));
   });
   const chunks: Array<typeof targets> = [];
   for (const target of targets) {
