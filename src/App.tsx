@@ -276,7 +276,7 @@ function App() {
               {!marketLoading && filteredMarketTokens.length === 0 && <div className="market-empty">{marketError ? 'Market data could not be loaded.' : marketCategory === 'Favorites' ? 'No favorites yet. Tap the star beside a token to save it here.' : 'No tokens match this category.'}</div>}
               {marketLoading && marketTokens.length === 0 && <div className="market-loading"><span className="market-loader"/><span>Loading live market catalogue…</span></div>}
             </div>
-            <div className="market-table-footer"><span>Prices, volume and market caps from CoinGecko. Market data may be delayed.</span>{marketHasMore && marketCategory !== 'Hot' && marketCategory !== 'Favorites' && <button type="button" onClick={() => void loadMarketTokens(marketPage + 1, true)} disabled={marketLoading}>{marketLoading ? 'Loading…' : 'Load more tokens'} <ArrowDownLeft size={14}/></button>}</div>
+            <div className="market-table-footer">{marketHasMore && marketCategory !== 'Hot' && marketCategory !== 'Favorites' && <button type="button" onClick={() => void loadMarketTokens(marketPage + 1, true)} disabled={marketLoading}>{marketLoading ? 'Loading…' : 'Load more tokens'} <ArrowDownLeft size={14}/></button>}</div>
           </div>
         </section> : <>
         <section className="sire-home-value-card" aria-label="Total account value">
@@ -341,7 +341,7 @@ function App() {
         <section className="panel activity-panel"><div className="panel-heading"><div><h2>Recent activity</h2><p>Your latest transactions submitted through Nova</p></div><button className="panel-action" onClick={() => setActiveTab('Activity')}>View all <ArrowUpRight size={14}/></button></div>{activity.length ? <div className="activity-list">{activity.slice(0, 3).map((item, i) => <div className="activity-row" key={item.hash + i}><div className="activity-icon"><ArrowUpRight size={17}/></div><div className="activity-info"><strong>Sent {item.chain.symbol}</strong><span>{item.time}</span></div><div className="activity-right"><span className="pending-pill">Submitted</span><a href={`${item.chain.explorer}/tx/${item.hash}`} target="_blank" rel="noreferrer" className="explorer-link">View transaction <ExternalLink size={12}/></a></div></div>)}</div> : <div className="activity-empty"><div className="activity-empty-icon"><Activity size={20}/></div><div><strong>No activity yet</strong><p>{address ? 'Transactions you submit from this session will appear here.' : 'Connect your wallet to get started with your onchain activity.'}</p></div><button className="text-button" onClick={() => address ? setModal('send') : void connect()}>{address ? 'Send crypto' : 'Connect'} <ArrowUpRight size={14}/></button></div>}</section>
 
         </>}
-        <footer className="footer"><div><span className="footer-logo"><Sparkles size={14}/> nova wallet</span><span>Built for clarity. Designed for you.</span></div><div className="footer-right"><span><span className="status-dot"/> Networks operational</span><button onClick={() => setModal('help')}>Security first <ShieldCheck size={13}/></button></div></footer>
+        {activeTab !== 'Market' && <footer className="footer"><div><span className="footer-logo"><Sparkles size={14}/> nova wallet</span><span>Built for clarity. Designed for you.</span></div><div className="footer-right"><span><span className="status-dot"/> Networks operational</span><button onClick={() => setModal('help')}>Security first <ShieldCheck size={13}/></button></div></footer>}
       </div>
     </main>
 
