@@ -19,7 +19,7 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
     const change=timeRange==='1h'?data.priceChange?.h1:timeRange==='24h'?data.priceChange?.h24:undefined;
     return {...token,key,networkName:network.name,data,price,change};
   }));
-  rows=rows.filter(t=>Boolean(t.price) && Number(t.data.liquidity?.usd||0)>=10000 && Number(t.data.volume?.h24||0)>=1000 && !/^(AAPLc|AMZNc|GOOGLc|METAc|MSFTc|MSTRc|NVDAc|TSLAc|SPCXc|SNDKc|COINc|CRCLc|INTCc)$/i.test(t.symbol));
+  rows=rows.filter(t=>Boolean(t.price) && Number(t.data.liquidity?.usd||0)>=10000 && Number(t.data.volume?.h24||0)>=1000 && !/(?:\\bstock\\b|\\bshares?\\b|\\bequity\\b|\\btokenized\\b|\\bpre[- ]?ipo\\b|\\bincorporated\\b|\\binc\\.?(?=\\s|$)|\\bcorporation\\b|\\bcommon stock\\b|\\bclass [a-c]\\b)/i.test(t.name || '') && !/^(AAPLc|AMZNc|GOOGLc|GOOGc|METAc|MSFTc|MSTRc|NVDAc|TSLAc|SPCXc|SNDKc|COINc|CRCLc|INTCc|ORCLc|NFLXc|AMDc|QCOMc|AVGOc|DISc|JPMc|IBM c|PLTRc|BAc|COSTc|WMTc|XOMc|PFEc|KOc|PEPc|LLYc|UNHc|BACc|CVXc|MCDc|NKEc|ADBEc|UBERc|ABNBc|HOODc|ARMc|SMCIc|CSCOc|TXNc|MRKc|PYPLc|SHOPc)$/i.test(t.symbol));
   if(query) rows=rows.filter(t=>t.name.toLowerCase().includes(query)||t.symbol.toLowerCase().includes(query)||t.address.toLowerCase().includes(query)||t.networkName.toLowerCase().includes(query));
   if(category==='Favorites') rows=rows.filter(t=>favorites.includes(t.key));
   if(category==='Gainers') rows=rows.filter(t=>typeof t.change==='number'&&t.change>0);
