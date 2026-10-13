@@ -231,32 +231,43 @@ function App() {
     setMarketNetworksLoading(true);
     setMarketError('');
     const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
-    Promise.all([
-      fetch('https://chainid.network/chains.json').then(response => {
+    // The selector is populated from the EVM chain registry independently of any market provider.
+    fetch('https://chainid.network/chains.json')
+      .then(response => {
         if (!response.ok) throw new Error('EVM chain registry request failed');
         return response.json() as Promise<Array<{ chainId: number; name: string; title?: string; rpc?: string[]; explorers?: Array<{ url?: string }>; network?: string }>>;
-      }),
-      marketProvider.discoverNetworks().catch(() => [] as MarketNetwork[]),
-    ]).then(([chains, marketDirectory]) => {
-      if (cancelled) return;
-      const marketByName = new Map(marketDirectory.map(item => [normalize(item.name), item.id]));
-      const discovered: MarketNetwork[] = chains
-        .filter(item => Number.isSafeInteger(item.chainId) && item.chainId > 0 && item.network !== 'testnet' && Boolean(item.name))
-        .map(item => {
-          const publicRpc = (item.rpc || []).find(url => /^https:\/\//.test(url) && !/\$\{|\{[^}]+\}|YOUR_API_KEY|INFURA_API_KEY|ALCHEMY_API_KEY|<api[-_ ]?key>/i.test(url));
-          const explorerUrl = item.explorers?.find(explorer => /^https:\/\//.test(explorer.url || ''))?.url;
-          const marketId = marketByName.get(normalize(item.name)) || (item.title ? marketByName.get(normalize(item.title)) : undefined);
-          return { id: String(item.chainId), chainId: item.chainId, name: item.title || item.name, marketId, rpcUrl: publicRpc, explorerUrl };
-        })
-        .sort((a, b) => a.name.localeCompare(b.name));
-      const unique = discovered.filter((item, index) => discovered.findIndex(other => other.chainId === item.chainId) === index);
-      setMarketNetworks(unique);
-      if (!unique.length) setMarketError('The EVM chain directory returned no usable networks. Retry in a moment.');
-    }).catch(() => {
-      if (!cancelled) setMarketError('Could not load the EVM network directory. Check your connection and retry.');
-    }).finally(() => {
-      if (!cancelled) setMarketNetworksLoading(false);
-    });
+      })
+      .then(chains => {
+        if (cancelled) return;
+        const discovered: MarketNetwork[] = chains
+          .filter(item => Number.isSafeInteger(item.chainId) && item.chainId > 0 && item.network !== 'testnet' && Boolean(item.name))
+          .map(item => {
+            const publicRpc = (item.rpc || []).find(url => /^https:\/\//.test(url) && !/\$\{|\{[^}]+\}|YOUR_API_KEY|INFURA_API_KEY|ALCHEMY_API_KEY|<api[-_ ]?key>/i.test(url));
+            const explorerUrl = item.explorers?.find(explorer => /^https:\/\//.test(explorer.url || ''))?.url;
+            return { id: String(item.chainId), chainId: item.chainId, name: item.title || item.name, rpcUrl: publicRpc, explorerUrl };
+          })
+          .sort((a, b) => a.name.localeCompare(b.name));
+        const unique = discovered.filter((item, index) => discovered.findIndex(other => other.chainId === item.chainId) === index);
+        setMarketNetworks(unique);
+        if (!unique.length) setMarketError('The EVM chain directory returned no usable networks. Retry in a moment.');
+        setMarketNetworksLoading(false);
+
+        // Market support is optional enrichment. Failure here must never prevent EVM networks showing.
+        void marketProvider.discoverNetworks().then(marketDirectory => {
+          if (cancelled) return;
+          const marketByName = new Map(marketDirectory.map(item => [normalize(item.name), item.id]));
+          setMarketNetworks(current => current.map(item => {
+            const marketId = marketByName.get(normalize(item.name));
+            return marketId ? { ...item, marketId } : item;
+          }));
+        }).catch(() => { /* EVM networks remain visible even when market indexing is unavailable. */ });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setMarketError('Could not load the EVM network directory. Check your connection and retry.');
+          setMarketNetworksLoading(false);
+        }
+      });
     return () => { cancelled = true; };
   }, []);
 
