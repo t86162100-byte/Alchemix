@@ -1126,3 +1126,17 @@ button:active, a:active, [role="button"]:active {
 @media (max-width: 560px) {
   .network-marquee-track { animation-duration: 68s !important; }
 }
+
+
+/* Search and network filtering for the expanded multi-chain token catalogue. */
+.market-search-wrap { display:flex; align-items:center; gap:9px; width:min(100%,360px); min-height:39px; padding:0 12px; border:1px solid rgba(255,255,255,.13); border-radius:999px; background:#080808; color:rgba(255,255,255,.68); }
+.market-search-wrap:focus-within { border-color:rgba(255,255,255,.38); }
+.market-search-wrap input { width:100%; min-width:0; border:0; outline:none; background:transparent; color:#f5f5f5; font-size:11px; }
+.market-search-wrap input::placeholder { color:rgba(255,255,255,.35); }
+.market-network-select select { max-width:min(60vw,260px); min-width:0; border:0; outline:none; appearance:none; background:transparent; color:inherit; font:inherit; cursor:pointer; }
+.market-network-select select option { background:#111; color:#eee; }
+@media(max-width:560px) {
+  .market-search-wrap { width:100%; min-height:36px; }
+  .market-network-select { max-width:calc(100vw - 110px); }
+  .market-network-select select { max-width:calc(100vw - 165px); font-size:9px; }
+}
