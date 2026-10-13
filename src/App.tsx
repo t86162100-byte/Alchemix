@@ -172,7 +172,7 @@ function App() {
           })
           .filter(item => item.name && item.name.trim().length > 0)
           .sort((a, b) => a.name.localeCompare(b.name));
-        const merged = [...curated.values(), ...discovered.filter(item => !curated.has(item.id))];
+        const merged = discovered.map(item => curated.get(item.id) || item);
         if (!cancelled && merged.length > CHAINS.length) setAvailableChains(merged);
       })
       .catch(() => { /* Keep the built-in network list if the registry is unavailable. */ })
@@ -191,7 +191,7 @@ function App() {
     const query = networkSearch.trim().toLowerCase();
     return availableChains.filter(item => !query || item.name.toLowerCase().includes(query) || item.label.toLowerCase().includes(query) || item.symbol.toLowerCase().includes(query) || String(item.id).includes(query));
   }, [availableChains, networkSearch]);
-  const popularNetworkOptions = useMemo(() => [1, 56, 8453, 137, 33139, 42161, 10, 43114].map(id => availableChains.find(item => item.id === id)).filter((item): item is Chain => Boolean(item)), [availableChains]);
+  const popularNetworkOptions = useMemo(() => [...availableChains].sort((a, b) => a.name.localeCompare(b.name)).slice(0, 8), [availableChains]);
   const usdBalance = balance === null ? null : balance * (prices[chain.priceId] || 0);
 
   const refreshBalance = useCallback(async (wallet = address, selected = chain) => {
