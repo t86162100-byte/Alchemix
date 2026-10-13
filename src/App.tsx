@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, CircleHelp, CircleUserRound, Copy, ExternalLink, Eye, EyeOff, Globe2, Home, LayoutGrid, LockKeyhole, Menu, MoreHorizontal, QrCode, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Wallet, X, Zap, Flame, Star, TrendingUp } from 'lucide-react';
 import { JsonRpcProvider, Wallet as EthersWallet, parseEther } from 'ethers';
 
@@ -15,54 +15,11 @@ const CHAINS: Chain[] = [
   { id: 10, name: 'Optimism', symbol: 'ETH', label: 'Optimism', rpc: 'https://mainnet.optimism.io', explorer: 'https://optimistic.etherscan.io', color: '#ff5364', icon: 'optimism' },
   { id: 33139, name: 'ApeChain', symbol: 'APE', label: 'ApeChain Mainnet', rpc: 'https://rpc.apechain.com', explorer: 'https://apescan.io', color: '#a98bff', icon: 'apechain' },
 ];
-type MarketNetwork = { id: string; name: string; symbol: string; icon: string; tokens: string[] };
-const MARKET_NETWORKS: MarketNetwork[] = [
-  // Curated production networks with established on-chain ecosystems. Testnets,
-  // devnets, speculative launch networks, and chains without a dependable token
-  // ecosystem are intentionally not shown in this market picker.
-  { id: '1', name: 'Ethereum', symbol: 'ETH', icon: 'ethereum', tokens: ['ETH', 'USDC', 'USDT', 'WBTC', 'DAI', 'LINK', 'UNI', 'AAVE'] },
-  { id: 'robinhood', name: 'Robinhood', symbol: 'ETH', icon: 'robinhood', tokens: ['ETH', 'USDC', 'LINK', 'UNI'] },
-  { id: 'arc', name: 'Arc', symbol: 'USDC', icon: 'arc', tokens: ['USDC', 'EURC'] },
-  { id: '56', name: 'BNB Chain', symbol: 'BNB', icon: 'bsc', tokens: ['BNB', 'USDT', 'USDC', 'CAKE', 'XRP', 'BTCB', 'ETH'] },
-  { id: 'solana', name: 'Solana', symbol: 'SOL', icon: 'solana', tokens: ['SOL', 'USDC', 'USDT', 'JUP', 'JTO', 'RAY', 'BONK'] },
-  { id: 'tron', name: 'Tron', symbol: 'TRX', icon: 'tron', tokens: ['TRX', 'USDT', 'USDD', 'JST', 'SUN'] },
-  { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', icon: 'bitcoin', tokens: ['BTC', 'ORDI', 'SATS', 'RUNE'] },
-  { id: '8453', name: 'Base', symbol: 'ETH', icon: 'base', tokens: ['ETH', 'USDC', 'cbBTC', 'AERO', 'DAI', 'WETH', 'VIRTUAL'] },
-  { id: '137', name: 'Polygon (Matic)', symbol: 'POL', icon: 'polygon', tokens: ['POL', 'USDC', 'USDT', 'WETH', 'DAI', 'QUICK'] },
-  { id: 'ton', name: 'TON', symbol: 'TON', icon: 'ton', tokens: ['TON', 'USDT', 'NOT', 'DOGS', 'STON'] },
-  { id: '42161', name: 'Arbitrum', symbol: 'ETH', icon: 'arbitrum', tokens: ['ETH', 'USDC', 'USDT', 'ARB', 'GMX', 'LINK'] },
-  { id: '10', name: 'Optimism', symbol: 'ETH', icon: 'optimism', tokens: ['ETH', 'USDC', 'USDT', 'OP', 'DAI', 'VELO'] },
-  { id: '43114', name: 'Avalanche-C', symbol: 'AVAX', icon: 'avax', tokens: ['AVAX', 'USDC', 'USDT', 'JOE', 'sAVAX'] },
-  { id: '5000', name: 'Mantle', symbol: 'MNT', icon: 'mantle', tokens: ['MNT', 'USDT', 'USDC', 'mETH', 'COOK'] },
-  { id: 'aptos', name: 'Aptos', symbol: 'APT', icon: 'aptos', tokens: ['APT', 'USDC', 'USDT', 'GUI', 'THL'] },
-  { id: 'sui', name: 'Sui', symbol: 'SUI', icon: 'sui', tokens: ['SUI', 'USDC', 'USDT', 'CETUS', 'DEEP'] },
-  { id: 'hyperEVM', name: 'HyperEVM', symbol: 'HYPE', icon: 'hyperevm', tokens: ['HYPE', 'USDC', 'WHYPE', 'PURR'] },
-  { id: 'hyperliquid', name: 'HyperLiquid L1', symbol: 'HYPE', icon: 'hyperliquid', tokens: ['HYPE', 'PURR', 'HFUN'] },
-  { id: 'stellar', name: 'Stellar', symbol: 'XLM', icon: 'stellar', tokens: ['XLM', 'USDC', 'EURC'] },
-  { id: '59144', name: 'Linea', symbol: 'ETH', icon: 'linea', tokens: ['ETH', 'USDC', 'USDT', 'WBTC', 'LYNX'] },
-  { id: '80094', name: 'Berachain', symbol: 'BERA', icon: 'berachain', tokens: ['BERA', 'HONEY', 'WBERA', 'BGT'] },
-  { id: 'monad', name: 'Monad', symbol: 'MON', icon: 'monad', tokens: ['MON', 'USDC'] },
-  { id: '324', name: 'zkSync Era', symbol: 'ETH', icon: 'zksync', tokens: ['ETH', 'USDC', 'USDT', 'ZK', 'WETH'] },
-  { id: 'cosmos', name: 'Cosmos', symbol: 'ATOM', icon: 'cosmos', tokens: ['ATOM', 'USDC', 'OSMO', 'TIA', 'INJ'] },
-  { id: '204', name: 'opBNB', symbol: 'BNB', icon: 'opbnb', tokens: ['BNB', 'USDT', 'USDC', 'CAKE'] },
-  { id: '8217', name: 'Kaia', symbol: 'KAIA', icon: 'kaia', tokens: ['KAIA', 'USDT', 'USDC', 'WKAIA'] },
-  { id: '1116', name: 'Core', symbol: 'CORE', icon: 'core', tokens: ['CORE', 'USDT', 'USDC', 'WBTC'] },
-  { id: '42220', name: 'Celo', symbol: 'CELO', icon: 'celo', tokens: ['CELO', 'cUSD', 'USDC', 'USDT'] },
-  { id: '534352', name: 'Scroll', symbol: 'ETH', icon: 'scroll', tokens: ['ETH', 'USDC', 'USDT', 'SCR'] },
-  { id: '2818', name: 'Morph', symbol: 'ETH', icon: 'morph', tokens: ['ETH', 'USDT', 'USDC'] },
-  { id: 'xrpl', name: 'XRPL', symbol: 'XRP', icon: 'xrp', tokens: ['XRP', 'RLUSD', 'SOLO'] },
-  { id: '57073', name: 'Ink', symbol: 'ETH', icon: 'ink', tokens: ['ETH', 'USDC', 'USDT', 'INK'] },
-  { id: '146', name: 'Sonic', symbol: 'S', icon: 'sonic', tokens: ['S', 'USDC', 'USDT', 'wS', 'BEETS'] },
-  { id: '196', name: 'X Layer', symbol: 'OKB', icon: 'xlayer', tokens: ['OKB', 'USDT', 'USDC', 'WOKB'] },
-  { id: '1329', name: 'Sei EVM', symbol: 'SEI', icon: 'sei', tokens: ['SEI', 'USDC', 'USDT', 'WETH'] },
-  { id: 'megaeth', name: 'MegaETH', symbol: 'ETH', icon: 'megaeth', tokens: ['ETH', 'USDC'] },
-  { id: 'mova', name: 'Mova', symbol: 'MOVE', icon: 'mova', tokens: ['MOVE', 'USDC'] },
-  { id: 'plasma', name: 'Plasma', symbol: 'XPL', icon: 'plasma', tokens: ['XPL', 'USDT', 'USDC'] },
-  { id: '61', name: 'Ethereum Classic', symbol: 'ETC', icon: 'ethereumclassic', tokens: ['ETC', 'USDT'] },
-  { id: 'doge', name: 'Dogecoin', symbol: 'DOGE', icon: 'dogecoin', tokens: ['DOGE', 'WDOGE'] },
-  { id: 'smartbch', name: 'smartBCH', symbol: 'BCH', icon: 'smartbch', tokens: ['BCH', 'WBCH', 'LAW'] },
-];
-const MARKET_ALL_TOKENS = ['BTC', 'ETH', 'BNB', 'SOL', 'USDC', 'USDT', 'XRP', 'TON', 'TRX', 'POL', 'AVAX', 'SUI', 'APT', 'HYPE', 'MNT', 'XLM', 'ATOM', 'ARB', 'OP', 'ETC', 'SEI', 'KAIA', 'CORE', 'S', 'OKB', 'BERA', 'ZK', 'APE'];
+type MarketToken = { chainId: number; address: string; symbol: string; name: string; decimals: number; logoURI?: string; priceUSD?: string; coinKey?: string };
+type MarketNetwork = { id: string; chainId: number; name: string; symbol: string; logoURI?: string; tokens: MarketToken[]; nativeToken?: MarketToken };
+type LifiChain = { id: number; key?: string; name: string; chainType?: string; logoURI?: string; nativeToken?: { address: string; symbol: string; name: string; decimals: number; logoURI?: string; priceUSD?: string; coinKey?: string } };
+type LifiTokenResponse = { tokens?: Record<string, Array<MarketToken>> };
+const MARKET_FEATURED_CHAIN_IDS = [1, 56, 8453, 137, 42161, 10, 43114, 5000];
 const shortAddress = (s: string) => s ? `${s.slice(0, 6)}…${s.slice(-4)}` : '';
 const rpcCall = async (chain: Chain, method: string, params: unknown[] = []) => {
   const response = await fetch(chain.rpc, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
@@ -120,6 +77,11 @@ function App() {
   const [totalValueVisible, setTotalValueVisible] = useState(true);
   const [modal, setModal] = useState<'send' | 'receive' | 'network' | 'market-network' | 'help' | 'wallet' | 'create' | 'import' | 'unlock' | null>(null);
   const [marketNetworkSearch, setMarketNetworkSearch] = useState('');
+  const [marketNetworks, setMarketNetworks] = useState<MarketNetwork[]>([]);
+  const [marketNetworksLoading, setMarketNetworksLoading] = useState(false);
+  const [marketTokensLoading, setMarketTokensLoading] = useState(false);
+  const [marketNetworkError, setMarketNetworkError] = useState('');
+  const marketTokenRequests = useRef(new Set<number>());
   const [sendTo, setSendTo] = useState('');
   const [sendAmount, setSendAmount] = useState('');
   const [notice, setNotice] = useState('');
@@ -140,6 +102,77 @@ function App() {
   const [walletBusy, setWalletBusy] = useState(false);
   const [walletError, setWalletError] = useState('');
   const [hasStoredWallet, setHasStoredWallet] = useState(() => Boolean(localStorage.getItem('nova-wallet-keystore')));
+  const loadMarketTokens = useCallback(async (networkId: string, currentNetworks = marketNetworks) => {
+    const targets = networkId === 'all'
+      ? currentNetworks.filter(item => MARKET_FEATURED_CHAIN_IDS.includes(item.chainId)).slice(0, 8)
+      : currentNetworks.filter(item => item.id === networkId);
+    const missing = targets.filter(item => item.tokens.length === 0 && !marketTokenRequests.current.has(item.chainId));
+    if (!missing.length) return;
+    missing.forEach(item => marketTokenRequests.current.add(item.chainId));
+    setMarketTokensLoading(true);
+    try {
+      const results = await Promise.all(missing.map(async network => {
+        const response = await fetch('https://li.quest/v1/tokens?chains=' + network.chainId);
+        if (!response.ok) throw new Error('Token service unavailable');
+        const payload = await response.json() as LifiTokenResponse;
+        const tokens = (payload.tokens?.[String(network.chainId)] || [])
+          .filter(token => token.symbol && token.address && Number.isFinite(token.decimals))
+          .map(token => ({ ...token, chainId: network.chainId }))
+          .sort((a, b) => {
+            const aNative = a.address.toLowerCase() === '0x0000000000000000000000000000000000000000' || a.symbol.toLowerCase() === network.symbol.toLowerCase();
+            const bNative = b.address.toLowerCase() === '0x0000000000000000000000000000000000000000' || b.symbol.toLowerCase() === network.symbol.toLowerCase();
+            if (aNative !== bNative) return aNative ? -1 : 1;
+            return Number(b.priceUSD || 0) - Number(a.priceUSD || 0);
+          });
+        return { id: network.id, tokens };
+      }));
+      setMarketNetworks(previous => previous.map(network => {
+        const result = results.find(item => item.id === network.id);
+        return result ? { ...network, tokens: result.tokens } : network;
+      }));
+    } catch {
+      setMarketNetworkError('Live token data is temporarily unavailable. Try selecting the network again.');
+    } finally {
+      missing.forEach(item => marketTokenRequests.current.delete(item.chainId));
+      setMarketTokensLoading(false);
+    }
+  }, [marketNetworks]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setMarketNetworksLoading(true);
+    fetch('https://li.quest/v1/chains?chainTypes=EVM')
+      .then(response => { if (!response.ok) throw new Error('Supported-chain service unavailable'); return response.json(); })
+      .then((payload: { chains?: LifiChain[] }) => {
+        const chains = (payload.chains || [])
+          .filter(item => Number.isInteger(item.id) && item.id > 0 && item.chainType === 'EVM' && item.name && item.nativeToken?.symbol)
+          .map(item => ({
+            id: String(item.id),
+            chainId: item.id,
+            name: item.name,
+            symbol: item.nativeToken!.symbol,
+            logoURI: item.logoURI || item.nativeToken?.logoURI,
+            nativeToken: item.nativeToken ? { ...item.nativeToken, chainId: item.id } : undefined,
+            tokens: []
+          }))
+          .sort((a, b) => {
+            const ai = MARKET_FEATURED_CHAIN_IDS.indexOf(a.chainId);
+            const bi = MARKET_FEATURED_CHAIN_IDS.indexOf(b.chainId);
+            if (ai >= 0 || bi >= 0) return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
+            return a.name.localeCompare(b.name);
+          });
+        if (!cancelled && chains.length) setMarketNetworks(chains);
+        else if (!cancelled) setMarketNetworkError('No supported EVM networks were returned by the swap network directory.');
+      })
+      .catch(() => { if (!cancelled) setMarketNetworkError('Could not load supported EVM networks. Check your connection and retry.'); })
+      .finally(() => { if (!cancelled) setMarketNetworksLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (marketNetworks.length) void loadMarketTokens(marketNetworkId);
+  }, [marketNetworks.length, marketNetworkId, loadMarketTokens]);
+
   useEffect(() => {
     const savedAddress = localStorage.getItem('nova-wallet-address');
     const savedChain = Number(localStorage.getItem('nova-wallet-chain-id') || '1');
