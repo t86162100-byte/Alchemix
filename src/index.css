@@ -1111,3 +1111,18 @@ button:active, a:active, [role="button"]:active {
 @media (prefers-reduced-motion: reduce) {
   .network-marquee-track { animation: none !important; }
 }
+
+
+/* Home ticker: fewer featured networks means the speed stays readable on every screen. */
+.network-marquee-track {
+  animation-duration: 68s !important;
+  animation-timing-function: linear;
+}
+.network-marquee-pill { will-change: auto; }
+.network-marquee-logo img,
+.network-option-logo img { image-rendering: auto; }
+.network-marquee-logo > span[hidden],
+.network-option-logo > span[hidden] { display: none !important; }
+@media (max-width: 560px) {
+  .network-marquee-track { animation-duration: 68s !important; }
+}
