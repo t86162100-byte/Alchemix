@@ -12,7 +12,7 @@ async function requestJson<T>(url: string, attempts = 3): Promise<T> {
       const response = await fetch(url, { headers: { accept: 'application/json;version=20230302' } });
       if (response.ok) return await response.json() as T;
       if (response.status !== 429 && response.status < 500) {
-        if (response.status === 404) throw new Error('This network has no indexed market data in this source.');
+        if (response.status === 404) throw new Error('This source has no indexed market data for the selected chain.');
         throw new Error('Market source returned HTTP ' + response.status + '.');
       }
       lastError = new Error('Market source is temporarily unavailable (HTTP ' + response.status + ').');
