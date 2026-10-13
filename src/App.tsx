@@ -25,7 +25,18 @@ const rpcCall = async (chain: Chain, method: string, params: unknown[] = []) => 
 const formatBalance = (hex: string) => Number(BigInt(hex)) / 1e18;
 const iconLetters: Record<string, string> = { ETH: 'Ξ', BNB: '◆', POL: '⬡' };
 const chainLogoUrl = (item: Chain) => {
-  const icon = item.icon || ({ 1: 'ethereum', 56: 'bsc', 8453: 'base', 137: 'polygon', 42161: 'arbitrum', 10: 'optimism' } as Record<number, string>)[item.id];
+  // Prefer Trust Wallet's maintained native-coin artwork for major networks.
+  // Other EVM networks fall back to the icon identifier supplied by Chainlist.
+  const trustedAssets: Record<number, string> = {
+    1: 'ethereum',
+    56: 'smartchain',
+    137: 'polygon',
+    42161: 'arbitrum',
+    10: 'optimism',
+  };
+  const assetFolder = trustedAssets[item.id];
+  if (assetFolder) return `https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/${assetFolder}/info/logo.png`;
+  const icon = item.icon || ({ 8453: 'base' } as Record<number, string>)[item.id];
   return icon ? `https://icons.llamao.fi/icons/chains/rsz_${encodeURIComponent(icon)}.jpg` : '';
 };
 
@@ -147,6 +158,12 @@ function App() {
     return () => { cancelled = true; };
   }, []);
 
+  const marqueeChains = useMemo(() => {
+    // Keep the home ticker intentionally short; the full 100+ chain directory stays in the picker.
+    const featuredIds = [1, 56, 8453, 137, 42161, 10, 43114, 59144, 534352, 324, 250, 100];
+    const featured = featuredIds.map(id => availableChains.find(item => item.id === id)).filter((item): item is Chain => Boolean(item));
+    return featured.length ? featured : availableChains.slice(0, 12);
+  }, [availableChains]);
   const chain = availableChains.find(c => c.id === chainId) ?? CHAINS[0];
   const visibleNetworkOptions = useMemo(() => {
     const query = networkSearch.trim().toLowerCase();
@@ -412,8 +429,8 @@ function App() {
         <section className="network-marquee" aria-label="Supported blockchain networks">
           <div className="network-marquee-track">
             {[0, 1].map(copy => <div className="network-marquee-group" key={copy} aria-hidden={copy === 1 ? true : undefined}>
-              {availableChains.map(network => <button type="button" className="network-marquee-pill" key={network.id} onClick={() => { setNetworkSearch(''); setModal('network'); }} title={`Select ${network.name}`}>
-                <span className={`network-marquee-logo ${network.id === 1 ? 'ethereum' : network.id === 56 ? 'bnb' : network.id === 8453 ? 'base' : network.id === 137 ? 'polygon' : network.id === 42161 ? 'arbitrum' : network.id === 10 ? 'optimism' : ''}`}>{chainLogoUrl(network) && <img src={chainLogoUrl(network)} alt="" loading={copy === 0 ? 'eager' : 'lazy'} decoding="async" onError={event => { event.currentTarget.remove(); }} />}<span>{network.symbol.slice(0, 3)}</span></span>
+              {marqueeChains.map(network => <button type="button" className="network-marquee-pill" key={network.id} onClick={() => { setNetworkSearch(''); setModal('network'); }} title={`Select ${network.name}`}>
+                <span className={`network-marquee-logo ${network.id === 1 ? 'ethereum' : network.id === 56 ? 'bnb' : network.id === 8453 ? 'base' : network.id === 137 ? 'polygon' : network.id === 42161 ? 'arbitrum' : network.id === 10 ? 'optimism' : ''}`}>{chainLogoUrl(network) && <img src={chainLogoUrl(network)} alt="" loading={copy === 0 ? 'eager' : 'lazy'} decoding="async" onLoad={event => { const fallback = event.currentTarget.nextElementSibling as HTMLElement | null; if (fallback) fallback.hidden = true; }} onError={event => { event.currentTarget.remove(); }} />}<span>{network.symbol.slice(0, 3)}</span></span>
                 <span>{network.name}</span>
               </button>)}
             </div>)}
@@ -456,7 +473,7 @@ function App() {
 
     {modal && <div className="modal-backdrop" onClick={() => setModal(null)}><section className="modal-card" onClick={e => e.stopPropagation()}>
       <div className="modal-head"><div><span className="modal-eyebrow">NOVA WALLET</span><h2>{modal === 'network' ? 'Choose a network' : modal === 'send' ? 'Send crypto' : modal === 'receive' ? 'Receive crypto' : 'Your security matters'}</h2></div><button className="icon-button" onClick={() => setModal(null)} aria-label="Close dialog"><X size={19}/></button></div>
-      {modal === 'network' && <><p className="modal-description">Browse 100+ EVM networks. Switching or adding a network requires approval in your connected wallet.</p><div className="network-search-wrap"><Search size={16}/><input value={networkSearch} onChange={event => setNetworkSearch(event.target.value)} placeholder="Search networks or chain ID…" aria-label="Search networks" /></div>{networkListLoading && <p className="network-loading">Loading network directory…</p>}<div className="network-count">{visibleNetworkOptions.length} networks{networkSearch ? ' found' : ' available'}</div><div className="network-list">{visibleNetworkOptions.map(c => <button className={`network-option ${chainId === c.id ? 'selected' : ''}`} key={c.id} onClick={() => void switchNetwork(c)}><span className="asset-icon network-option-logo" style={{ background: c.color }}>{chainLogoUrl(c) && <img src={chainLogoUrl(c)} alt="" decoding="async" onError={event => { event.currentTarget.remove(); }} />}<span>{iconLetters[c.symbol] || c.symbol.slice(0, 3)}</span></span><span className="network-option-text"><strong>{c.name}</strong><small>{c.label}</small></span>{chainId === c.id ? <span className="current-tag">CURRENT</span> : <ArrowUpRight size={16}/>}</button>)}{visibleNetworkOptions.length === 0 && <p className="network-loading">No networks match that search.</p>}</div></>}
+      {modal === 'network' && <><p className="modal-description">Browse 100+ EVM networks. Switching or adding a network requires approval in your connected wallet.</p><div className="network-search-wrap"><Search size={16}/><input value={networkSearch} onChange={event => setNetworkSearch(event.target.value)} placeholder="Search networks or chain ID…" aria-label="Search networks" /></div>{networkListLoading && <p className="network-loading">Loading network directory…</p>}<div className="network-count">{visibleNetworkOptions.length} networks{networkSearch ? ' found' : ' available'}</div><div className="network-list">{visibleNetworkOptions.map(c => <button className={`network-option ${chainId === c.id ? 'selected' : ''}`} key={c.id} onClick={() => void switchNetwork(c)}><span className="asset-icon network-option-logo" style={{ background: c.color }}>{chainLogoUrl(c) && <img src={chainLogoUrl(c)} alt="" decoding="async" onLoad={event => { const fallback = event.currentTarget.nextElementSibling as HTMLElement | null; if (fallback) fallback.hidden = true; }} onError={event => { event.currentTarget.remove(); }} />}<span>{iconLetters[c.symbol] || c.symbol.slice(0, 3)}</span></span><span className="network-option-text"><strong>{c.name}</strong><small>{c.label}</small></span>{chainId === c.id ? <span className="current-tag">CURRENT</span> : <ArrowUpRight size={16}/>}</button>)}{visibleNetworkOptions.length === 0 && <p className="network-loading">No networks match that search.</p>}</div></>}
       {modal === 'send' && <><p className="modal-description">Send native {chain.symbol} on {chain.name}. Check the address and network carefully before confirming in your wallet.</p><label className="form-label">Recipient address</label><input className="form-input" placeholder="0x…" value={sendTo} onChange={e => setSendTo(e.target.value)} autoComplete="off"/><label className="form-label">Amount ({chain.symbol})</label><input className="form-input" type="number" min="0" step="any" placeholder="0.00" value={sendAmount} onChange={e => setSendAmount(e.target.value)}/><div className="form-warning"><ShieldCheck size={16}/><span>Nova will never ask for your seed phrase. Your wallet provider will display the final transaction for approval.</span></div><button className="primary-button full-button" onClick={() => void send()}>Continue to wallet <ArrowUpRight size={16}/></button></>}
       {modal === 'receive' && <><p className="modal-description">Share your public wallet address to receive assets on the selected network.</p><div className="receive-card"><div className="receive-chain"><span className="chain-dot" style={{ background: chain.color }}/>{chain.name} <span className="receive-symbol">{chain.symbol}</span></div><div className="receive-address">{address}</div><button className="primary-button full-button" onClick={() => void copyAddress()}><Copy size={16}/> Copy address</button></div><div className="form-warning"><CircleHelp size={16}/><span>Only send assets compatible with this network to this address. Sending on the wrong network can result in permanent loss.</span></div></>}
       {modal === 'help' && <><p className="modal-description">Nova is an early web-wallet interface. Your safety comes first.</p><div className="security-list"><div><ShieldCheck size={18}/><span><strong>Your keys stay with your wallet</strong><small>This version connects to an existing browser wallet and does not collect private keys or recovery phrases.</small></span></div><div><LockKeyhole size={18}/><span><strong>Review every transaction</strong><small>Always check the network, destination, amount and fee in your wallet confirmation window.</small></span></div><div><Globe2 size={18}/><span><strong>Public blockchain data</strong><small>Balances are fetched from public RPC endpoints. Market prices are third-party estimates.</small></span></div></div><button className="primary-button full-button" onClick={() => setModal(null)}>Got it</button></>}
