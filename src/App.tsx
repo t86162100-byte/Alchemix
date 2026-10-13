@@ -122,7 +122,7 @@ const name = String(token.name || '').trim();
 if (!symbol || !token.address || !Number.isFinite(token.decimals)) return false;
 // Hide common DeFi position/receipt tokens, not ordinary coins. LI.FI remains the source
 // of truth for the supported EVM networks and each network's token contracts.
-const positionName = /(?:\\bLP token\\b|\\bliquidity provider\\b|\\bliquidity pool token\\b|\\bpool token\\b|\\buni[- ]?v[23]\\b|\\bslp\\b|\\baamm\\b|\\bvault (?:share|token|receipt)\\b|\\b(?:vault|strategy) shares?\\b|\\breceipt token\\b|\\bdeposit token\\b)/i.test(name);
+const positionName = /(?:\bLP token\b|\bliquidity provider\b|\bliquidity pool token\b|\bpool token\b|\buni[- ]?v[23]\b|\bslp\b|\baamm\b|\bvault (?:share|token|receipt)\b|\b(?:vault|strategy) shares?\b|\breceipt token\b|\bdeposit token\b)/i.test(name);
 const positionSymbol = /^(?:UNI-V[23]|SLP|BPT|CAKE-LP|AAMM.*)$/i.test(symbol);
 return !positionName && !positionSymbol;
 })
