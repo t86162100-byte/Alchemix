@@ -1140,3 +1140,19 @@ button:active, a:active, [role="button"]:active {
   .market-network-select { max-width:calc(100vw - 110px); }
   .market-network-select select { max-width:calc(100vw - 165px); font-size:9px; }
 }
+
+
+/* Exchange-style chain identity shown alongside each market token. */
+.market-token-logos { position:relative; display:inline-flex; align-items:center; flex:0 0 38px; width:38px; height:32px; }
+.market-token-logos .market-token-logo { position:absolute; left:0; top:1px; z-index:1; width:29px; height:29px; flex:0 0 29px; object-fit:contain; border-radius:50%; background:#101010; }
+.market-token-logos .market-chain-logo { position:absolute; right:0; bottom:0; z-index:2; width:15px; height:15px; object-fit:contain; border:1px solid #080808; border-radius:50%; background:#fff; }
+.market-token-copy { min-width:0; display:flex; flex-direction:column; gap:3px; }
+.market-token-copy .market-chain-name { color:rgba(255,255,255,.48) !important; font-size:9px !important; font-weight:600 !important; line-height:1.1; }
+.market-compact-asset .market-token { align-items:center; gap:9px; }
+.market-compact-asset .market-token > div { min-width:0; }
+@media(max-width:560px) {
+ .market-token-logos { flex-basis:35px; width:35px; height:30px; }
+ .market-token-logos .market-token-logo { width:27px; height:27px; }
+ .market-token-logos .market-chain-logo { width:14px; height:14px; }
+ .market-token-copy .market-chain-name { font-size:8px !important; }
+}
