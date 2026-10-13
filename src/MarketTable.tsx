@@ -23,9 +23,18 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
     const change=timeRange==='1h'?data.priceChange?.h1:timeRange==='24h'?data.priceChange?.h24:undefined;
     return {...token,key,networkName:network.name,data,price,change};
   }));
-  // App.tsx supplies a curated, per-network allowlist of familiar crypto assets.
-  // Keep the stock-like guard as a secondary safeguard against upstream metadata mistakes.
-  rows=rows.filter(t=>!isStockLike(t.name||'',t.symbol||''));
+  // Bitget-style market lists surface assets with usable market activity, rather than every
+  // token contract in a routing directory. Keep LI.FI's full EVM network coverage, but hide
+  // unpriced/no-market entries and obvious stock-like or DeFi receipt/LP positions.
+  rows=rows.filter(t=>{
+    const metric=t.data;
+    const price=Number(metric.priceUsd||0);
+    const liquidity=Number(metric.liquidity?.usd||0);
+    const volume=Number(metric.volume?.h24||0);
+    const positionName=/(?:\\bLP token\\b|\\bliquidity provider\\b|\\bliquidity pool token\\b|\\bpool token\\b|\\buni[- ]?v[23]\\b|\\bslp\\b|\\baamm\\b|\\bvault (?:share|token|receipt)\\b|\\b(?:vault|strategy) shares?\\b|\\breceipt token\\b|\\bdeposit token\\b)/i.test(t.name||'');
+    const positionSymbol=/^(?:UNI-V[23]|SLP|BPT|CAKE-LP|AAMM.*)$/i.test(t.symbol||'');
+    return !isStockLike(t.name||'',t.symbol||'')&&!positionName&&!positionSymbol&&price>0&&liquidity>=10000&&volume>=1000;
+  });
   if(query) rows=rows.filter(t=>t.name.toLowerCase().includes(query)||t.symbol.toLowerCase().includes(query)||t.address.toLowerCase().includes(query)||t.networkName.toLowerCase().includes(query));
   if(category==='Favorites') rows=rows.filter(t=>favorites.includes(t.key));
   if(category==='Gainers') rows=rows.filter(t=>typeof t.change==='number'&&t.change>0);
