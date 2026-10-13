@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, ChevronsUpDown, CircleHelp, CircleUserRound, Copy, ExternalLink, Eye, EyeOff, Flame, Globe2, Home, LayoutGrid, LockKeyhole, Menu, MoreHorizontal, QrCode, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Star, TrendingDown, TrendingUp, Wallet, X, Zap } from 'lucide-react';
 
-type Chain = { id: number; name: string; symbol: string; label: string; rpc: string; explorer: string; color: string; priceId: string };
+type Chain = { id: number; name: string; symbol: string; label: string; rpc: string; explorer: string; color: string; priceId: string; icon?: string };
 type MarketToken = { id: string; symbol: string; name: string; image: string; current_price: number | null; market_cap: number | null; total_volume: number | null; price_change_percentage_1h_in_currency?: number | null; price_change_percentage_24h: number | null; price_change_percentage_7d_in_currency?: number | null; price_change_percentage_30d_in_currency?: number | null; market_cap_rank: number | null };
 type EthereumProvider = { request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>; on?: (event: string, cb: (...args: unknown[]) => void) => void; removeListener?: (event: string, cb: (...args: unknown[]) => void) => void };
 declare global { interface Window { ethereum?: EthereumProvider } }
 
 const CHAINS: Chain[] = [
-  { id: 1, name: 'Ethereum', symbol: 'ETH', label: 'Ethereum Mainnet', rpc: 'https://ethereum-rpc.publicnode.com', explorer: 'https://etherscan.io', color: '#7895ff', priceId: 'ethereum' },
-  { id: 56, name: 'BNB Chain', symbol: 'BNB', label: 'BNB Smart Chain', rpc: 'https://bsc-rpc.publicnode.com', explorer: 'https://bscscan.com', color: '#f0b90b', priceId: 'binancecoin' },
-  { id: 8453, name: 'Base', symbol: 'ETH', label: 'Base Mainnet', rpc: 'https://mainnet.base.org', explorer: 'https://basescan.org', color: '#4c7df0', priceId: 'ethereum' },
-  { id: 137, name: 'Polygon', symbol: 'POL', label: 'Polygon PoS', rpc: 'https://polygon-bor-rpc.publicnode.com', explorer: 'https://polygonscan.com', color: '#9b7bf7', priceId: 'matic-network' },
-  { id: 42161, name: 'Arbitrum', symbol: 'ETH', label: 'Arbitrum One', rpc: 'https://arb1.arbitrum.io/rpc', explorer: 'https://arbiscan.io', color: '#2d9cdb', priceId: 'ethereum' },
-  { id: 10, name: 'Optimism', symbol: 'ETH', label: 'Optimism', rpc: 'https://mainnet.optimism.io', explorer: 'https://optimistic.etherscan.io', color: '#ff5364', priceId: 'ethereum' },
+  { id: 1, name: 'Ethereum', symbol: 'ETH', label: 'Ethereum Mainnet', rpc: 'https://ethereum-rpc.publicnode.com', explorer: 'https://etherscan.io', color: '#7895ff', priceId: 'ethereum', icon: 'ethereum' },
+  { id: 56, name: 'BNB Chain', symbol: 'BNB', label: 'BNB Smart Chain', rpc: 'https://bsc-rpc.publicnode.com', explorer: 'https://bscscan.com', color: '#f0b90b', priceId: 'binancecoin', icon: 'bsc' },
+  { id: 8453, name: 'Base', symbol: 'ETH', label: 'Base Mainnet', rpc: 'https://mainnet.base.org', explorer: 'https://basescan.org', color: '#4c7df0', priceId: 'ethereum', icon: 'base' },
+  { id: 137, name: 'Polygon', symbol: 'POL', label: 'Polygon PoS', rpc: 'https://polygon-bor-rpc.publicnode.com', explorer: 'https://polygonscan.com', color: '#9b7bf7', priceId: 'matic-network', icon: 'polygon' },
+  { id: 42161, name: 'Arbitrum', symbol: 'ETH', label: 'Arbitrum One', rpc: 'https://arb1.arbitrum.io/rpc', explorer: 'https://arbiscan.io', color: '#2d9cdb', priceId: 'ethereum', icon: 'arbitrum' },
+  { id: 10, name: 'Optimism', symbol: 'ETH', label: 'Optimism', rpc: 'https://mainnet.optimism.io', explorer: 'https://optimistic.etherscan.io', color: '#ff5364', priceId: 'ethereum', icon: 'optimism' },
 ];
 const money = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(n);
 const shortAddress = (s: string) => s ? `${s.slice(0, 6)}…${s.slice(-4)}` : '';
@@ -24,6 +24,10 @@ const rpcCall = async (chain: Chain, method: string, params: unknown[] = []) => 
 };
 const formatBalance = (hex: string) => Number(BigInt(hex)) / 1e18;
 const iconLetters: Record<string, string> = { ETH: 'Ξ', BNB: '◆', POL: '⬡' };
+const chainLogoUrl = (item: Chain) => {
+  const icon = item.icon || ({ 1: 'ethereum', 56: 'bsc', 8453: 'base', 137: 'polygon', 42161: 'arbitrum', 10: 'optimism' } as Record<number, string>)[item.id];
+  return icon ? `https://icons.llamao.fi/icons/chains/rsz_${encodeURIComponent(icon)}.jpg` : '';
+};
 
 function App() {
   const [activeTab, setActiveTab] = useState('Overview');
@@ -112,7 +116,7 @@ function App() {
     setNetworkListLoading(true);
     fetch('https://chainid.network/chains.json')
       .then(response => { if (!response.ok) throw new Error('Could not load chain registry'); return response.json(); })
-      .then((items: Array<{ chainId: number; name: string; title?: string; nativeCurrency?: { symbol?: string }; rpc?: string[]; explorers?: { url?: string }[]; network?: string }>) => {
+      .then((items: Array<{ chainId: number; name: string; title?: string; icon?: string; nativeCurrency?: { symbol?: string }; rpc?: string[]; explorers?: { url?: string }[]; network?: string }>) => {
         const curated = new Map(CHAINS.map(item => [item.id, item]));
         const discovered: Chain[] = items
           .filter(item => Number.isFinite(item.chainId) && item.chainId > 0 && item.network !== 'testnet')
@@ -129,7 +133,8 @@ function App() {
               rpc: rpc || '',
               explorer: explorer || '',
               color: '#777777',
-              priceId: ''
+              priceId: '',
+              icon: item.icon || undefined
             };
           })
           .filter(item => item.name && item.name.trim().length > 0)
@@ -408,7 +413,7 @@ function App() {
           <div className="network-marquee-track">
             {[0, 1].map(copy => <div className="network-marquee-group" key={copy} aria-hidden={copy === 1 ? true : undefined}>
               {availableChains.map(network => <button type="button" className="network-marquee-pill" key={network.id} onClick={() => { setNetworkSearch(''); setModal('network'); }} title={`Select ${network.name}`}>
-                <span className={`network-marquee-logo ${network.id === 1 ? 'ethereum' : network.id === 56 ? 'bnb' : network.id === 8453 ? 'base' : network.id === 137 ? 'polygon' : network.id === 42161 ? 'arbitrum' : network.id === 10 ? 'optimism' : ''}`}>{network.symbol.slice(0, 3)}</span>
+                <span className={`network-marquee-logo ${network.id === 1 ? 'ethereum' : network.id === 56 ? 'bnb' : network.id === 8453 ? 'base' : network.id === 137 ? 'polygon' : network.id === 42161 ? 'arbitrum' : network.id === 10 ? 'optimism' : ''}`}>{chainLogoUrl(network) && <img src={chainLogoUrl(network)} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} />}<span>{network.symbol.slice(0, 3)}</span></span>
                 <span>{network.name}</span>
               </button>)}
             </div>)}
@@ -451,7 +456,7 @@ function App() {
 
     {modal && <div className="modal-backdrop" onClick={() => setModal(null)}><section className="modal-card" onClick={e => e.stopPropagation()}>
       <div className="modal-head"><div><span className="modal-eyebrow">NOVA WALLET</span><h2>{modal === 'network' ? 'Choose a network' : modal === 'send' ? 'Send crypto' : modal === 'receive' ? 'Receive crypto' : 'Your security matters'}</h2></div><button className="icon-button" onClick={() => setModal(null)} aria-label="Close dialog"><X size={19}/></button></div>
-      {modal === 'network' && <><p className="modal-description">Browse 100+ EVM networks. Switching or adding a network requires approval in your connected wallet.</p><div className="network-search-wrap"><Search size={16}/><input value={networkSearch} onChange={event => setNetworkSearch(event.target.value)} placeholder="Search networks or chain ID…" aria-label="Search networks" /></div>{networkListLoading && <p className="network-loading">Loading network directory…</p>}<div className="network-count">{visibleNetworkOptions.length} networks{networkSearch ? ' found' : ' available'}</div><div className="network-list">{visibleNetworkOptions.map(c => <button className={`network-option ${chainId === c.id ? 'selected' : ''}`} key={c.id} onClick={() => void switchNetwork(c)}><span className="asset-icon" style={{ background: c.color }}>{iconLetters[c.symbol] || '◈'}</span><span className="network-option-text"><strong>{c.name}</strong><small>{c.label}</small></span>{chainId === c.id ? <span className="current-tag">CURRENT</span> : <ArrowUpRight size={16}/>}</button>)}{visibleNetworkOptions.length === 0 && <p className="network-loading">No networks match that search.</p>}</div></>}
+      {modal === 'network' && <><p className="modal-description">Browse 100+ EVM networks. Switching or adding a network requires approval in your connected wallet.</p><div className="network-search-wrap"><Search size={16}/><input value={networkSearch} onChange={event => setNetworkSearch(event.target.value)} placeholder="Search networks or chain ID…" aria-label="Search networks" /></div>{networkListLoading && <p className="network-loading">Loading network directory…</p>}<div className="network-count">{visibleNetworkOptions.length} networks{networkSearch ? ' found' : ' available'}</div><div className="network-list">{visibleNetworkOptions.map(c => <button className={`network-option ${chainId === c.id ? 'selected' : ''}`} key={c.id} onClick={() => void switchNetwork(c)}><span className="asset-icon network-option-logo" style={{ background: c.color }}>{chainLogoUrl(c) && <img src={chainLogoUrl(c)} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }} />}<span>{iconLetters[c.symbol] || '◈'}</span></span><span className="network-option-text"><strong>{c.name}</strong><small>{c.label}</small></span>{chainId === c.id ? <span className="current-tag">CURRENT</span> : <ArrowUpRight size={16}/>}</button>)}{visibleNetworkOptions.length === 0 && <p className="network-loading">No networks match that search.</p>}</div></>}
       {modal === 'send' && <><p className="modal-description">Send native {chain.symbol} on {chain.name}. Check the address and network carefully before confirming in your wallet.</p><label className="form-label">Recipient address</label><input className="form-input" placeholder="0x…" value={sendTo} onChange={e => setSendTo(e.target.value)} autoComplete="off"/><label className="form-label">Amount ({chain.symbol})</label><input className="form-input" type="number" min="0" step="any" placeholder="0.00" value={sendAmount} onChange={e => setSendAmount(e.target.value)}/><div className="form-warning"><ShieldCheck size={16}/><span>Nova will never ask for your seed phrase. Your wallet provider will display the final transaction for approval.</span></div><button className="primary-button full-button" onClick={() => void send()}>Continue to wallet <ArrowUpRight size={16}/></button></>}
       {modal === 'receive' && <><p className="modal-description">Share your public wallet address to receive assets on the selected network.</p><div className="receive-card"><div className="receive-chain"><span className="chain-dot" style={{ background: chain.color }}/>{chain.name} <span className="receive-symbol">{chain.symbol}</span></div><div className="receive-address">{address}</div><button className="primary-button full-button" onClick={() => void copyAddress()}><Copy size={16}/> Copy address</button></div><div className="form-warning"><CircleHelp size={16}/><span>Only send assets compatible with this network to this address. Sending on the wrong network can result in permanent loss.</span></div></>}
       {modal === 'help' && <><p className="modal-description">Nova is an early web-wallet interface. Your safety comes first.</p><div className="security-list"><div><ShieldCheck size={18}/><span><strong>Your keys stay with your wallet</strong><small>This version connects to an existing browser wallet and does not collect private keys or recovery phrases.</small></span></div><div><LockKeyhole size={18}/><span><strong>Review every transaction</strong><small>Always check the network, destination, amount and fee in your wallet confirmation window.</small></span></div><div><Globe2 size={18}/><span><strong>Public blockchain data</strong><small>Balances are fetched from public RPC endpoints. Market prices are third-party estimates.</small></span></div></div><button className="primary-button full-button" onClick={() => setModal(null)}>Got it</button></>}
