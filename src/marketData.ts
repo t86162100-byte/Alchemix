@@ -37,7 +37,7 @@ export async function fetchDexMarketMetrics(results: Array<{ chainId:number; tok
   }
   const responses = await Promise.all(chunks.map(async chunk => {
     try {
-      const response = await fetch('https://api.dexscreener.com/latest/dex/tokens/' + chunk.map(item => item.token.address).join(','));
+      const response = await fetch('https://api.dexscreener.com/tokens/v1/' + chunk[0].dexChain + '/' + chunk.map(item => item.token.address).join(','));
       if (!response.ok) return [] as Array<[string,MarketMetrics]>;
       const payload = await response.json() as { pairs?: Pair[] };
       const best = new Map<string,Pair>();
