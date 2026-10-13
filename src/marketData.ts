@@ -60,3 +60,4 @@ export async function fetchDexMarketMetrics(results: Array<{ chainId:number; tok
   }));
   return Object.fromEntries(responses.flat());
 }
+
