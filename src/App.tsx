@@ -245,7 +245,7 @@ function App() {
         const found = new Map<string, MarketNetwork>();
         let page = 1;
         // Discover network names and identifiers from the provider directory, not a hand-maintained mapping.
-        while (page <= 12) {
+        while (page <= 3) {
           const response = await fetch(`https://api.geckoterminal.com/api/v2/networks?page=${page}`, { headers: { accept: 'application/json;version=20230302' } });
           if (!response.ok) break;
           const payload = await response.json() as { data?: Array<{ id?: string; attributes?: { name?: string; identifier?: string } }>; links?: { next?: string | null } };
