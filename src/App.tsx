@@ -230,10 +230,33 @@ function App() {
     let cancelled = false;
     setMarketNetworksLoading(true);
     setMarketError('');
-    marketProvider.discoverNetworks()
-      .then(found => { if (!cancelled) setMarketNetworks(found); })
-      .catch(() => { if (!cancelled) setMarketError('Could not load the market network directory. Check your connection and retry.'); })
-      .finally(() => { if (!cancelled) setMarketNetworksLoading(false); });
+    const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '');
+    Promise.all([
+      fetch('https://chainid.network/chains.json').then(response => {
+        if (!response.ok) throw new Error('EVM chain registry request failed');
+        return response.json() as Promise<Array<{ chainId: number; name: string; title?: string; rpc?: string[]; explorers?: Array<{ url?: string }>; network?: string }>>;
+      }),
+      marketProvider.discoverNetworks().catch(() => [] as MarketNetwork[]),
+    ]).then(([chains, marketDirectory]) => {
+      if (cancelled) return;
+      const marketByName = new Map(marketDirectory.map(item => [normalize(item.name), item.id]));
+      const discovered: MarketNetwork[] = chains
+        .filter(item => Number.isSafeInteger(item.chainId) && item.chainId > 0 && item.network !== 'testnet' && Boolean(item.name))
+        .map(item => {
+          const publicRpc = (item.rpc || []).find(url => /^https:\/\//.test(url) && !/\$\{|\{[^}]+\}|YOUR_API_KEY|INFURA_API_KEY|ALCHEMY_API_KEY|<api[-_ ]?key>/i.test(url));
+          const explorerUrl = item.explorers?.find(explorer => /^https:\/\//.test(explorer.url || ''))?.url;
+          const marketId = marketByName.get(normalize(item.name)) || (item.title ? marketByName.get(normalize(item.title)) : undefined);
+          return { id: String(item.chainId), chainId: item.chainId, name: item.title || item.name, marketId, rpcUrl: publicRpc, explorerUrl };
+        })
+        .sort((a, b) => a.name.localeCompare(b.name));
+      const unique = discovered.filter((item, index) => discovered.findIndex(other => other.chainId === item.chainId) === index);
+      setMarketNetworks(unique);
+      if (!unique.length) setMarketError('The EVM chain directory returned no usable networks. Retry in a moment.');
+    }).catch(() => {
+      if (!cancelled) setMarketError('Could not load the EVM network directory. Check your connection and retry.');
+    }).finally(() => {
+      if (!cancelled) setMarketNetworksLoading(false);
+    });
     return () => { cancelled = true; };
   }, []);
 
@@ -245,14 +268,15 @@ function App() {
   const loadAllChainMarketTokens = async (page: number): Promise<MarketToken[]> => {
     type TokenData = { id: string; type?: string; attributes?: { address?: string; name?: string; symbol?: string; image_url?: string; price_usd?: string; fdv_usd?: string; market_cap_usd?: string; volume_usd?: { h24?: string }; price_change_percentage?: { h1?: string; h24?: string; h7d?: string } } };
     type PoolData = { attributes?: { base_token_price_usd?: string; quote_token_price_usd?: string; volume_usd?: { h24?: string }; price_change_percentage?: { h1?: string; h24?: string; h7d?: string } }; relationships?: { base_token?: { data?: { id?: string } }; quote_token?: { data?: { id?: string } } } };
-    const networks = marketNetworks.slice(0, 12);
+    const networks = marketNetworks.filter(item => item.marketId).slice(0, 12);
     const num = (value?: string | null) => value != null && Number.isFinite(Number(value)) ? Number(value) : null;
     const results: MarketToken[] = [];
     for (let offset = 0; offset < networks.length; offset += 2) {
       if (offset > 0) await new Promise(resolve => setTimeout(resolve, 450));
       const batch = networks.slice(offset, offset + 2);
       const settled = await Promise.allSettled(batch.map(async selected => {
-        const network = selected.id;
+        const network = selected.marketId;
+        if (!network) return [] as MarketToken[];
         const payload = await marketProvider.fetchPools(network, page) as { data?: PoolData[]; included?: TokenData[] };
         const included = new Map((payload.included || []).filter(token => token.type === 'token' || token.attributes?.address).map(token => [token.id, token]));
         const tokenMap = new Map<string, MarketToken>();
@@ -299,8 +323,9 @@ function App() {
         setMarketHasMore(data.length > 0); setMarketPage(page); setTrendingTokenIds([]);
       } else {
         const selected = marketNetworks.find(item => item.id === marketNetworkId);
-        if (!selected) throw new Error('That market network is not ready yet. Refresh the provider directory or choose All chains.');
-        const network = selected.id;
+        if (!selected) throw new Error('That EVM network is not ready yet. Retry loading the network directory.');
+        const network = selected.marketId;
+        if (!network) throw new Error(`${selected.name} is listed in the EVM directory, but the configured market indexer does not currently expose indexed pools for this network.`);
         // GeckoTerminal exposes market tokens through indexed DEX pools, not a generic /networks/{id}/tokens list.
         
         type GeckoToken = { id: string; type?: string; attributes?: { address?: string; name?: string; symbol?: string; image_url?: string; price_usd?: string; fdv_usd?: string; market_cap_usd?: string; volume_usd?: { h24?: string }; price_change_percentage?: { h1?: string; h24?: string; h7d?: string } } };
