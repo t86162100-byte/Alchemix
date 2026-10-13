@@ -103,7 +103,7 @@ const [walletError, setWalletError] = useState('');
 const [hasStoredWallet, setHasStoredWallet] = useState(() => Boolean(localStorage.getItem('nova-wallet-keystore')));
 const loadMarketTokens = useCallback(async (networkId: string, currentNetworks = marketNetworks) => {
 const targets = networkId === 'all'
-? currentNetworks.filter(item => MARKET_FEATURED_CHAIN_IDS.includes(item.chainId))
+? currentNetworks
 : currentNetworks.filter(item => item.id === networkId);
 const missing = targets.filter(item => !marketTokenLoaded.current.has(item.chainId) && !marketTokenRequests.current.has(item.chainId));
 if (!missing.length) return;
