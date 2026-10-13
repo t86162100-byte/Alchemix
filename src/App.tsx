@@ -82,6 +82,7 @@ function App() {
   const [marketTokensLoading, setMarketTokensLoading] = useState(false);
   const [marketNetworkError, setMarketNetworkError] = useState('');
   const marketTokenRequests = useRef(new Set<number>());
+  const marketTokenLoaded = useRef(new Set<number>());
   const [sendTo, setSendTo] = useState('');
   const [sendAmount, setSendAmount] = useState('');
   const [notice, setNotice] = useState('');
@@ -106,7 +107,7 @@ function App() {
     const targets = networkId === 'all'
       ? currentNetworks.filter(item => MARKET_FEATURED_CHAIN_IDS.includes(item.chainId)).slice(0, 8)
       : currentNetworks.filter(item => item.id === networkId);
-    const missing = targets.filter(item => item.tokens.length === 0 && !marketTokenRequests.current.has(item.chainId));
+    const missing = targets.filter(item => !marketTokenLoaded.current.has(item.chainId) && !marketTokenRequests.current.has(item.chainId));
     if (!missing.length) return;
     missing.forEach(item => marketTokenRequests.current.add(item.chainId));
     setMarketTokensLoading(true);
@@ -126,6 +127,7 @@ function App() {
           });
         return { id: network.id, tokens };
       }));
+      results.forEach(item => marketTokenLoaded.current.add(item.chainId));
       setMarketNetworks(previous => previous.map(network => {
         const result = results.find(item => item.id === network.id);
         return result ? { ...network, tokens: result.tokens } : network;
