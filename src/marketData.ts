@@ -21,7 +21,7 @@ type Pair = {
   pairAddress?: string;
   dexId?: string;
 };
-const dexChains: Record<number, string> = { 1:'ethereum', 56:'bsc', 8453:'base', 137:'polygon', 42161:'arbitrum', 10:'optimism', 43114:'avalanche', 5000:'mantle' };
+const dexChains: Record<number, string> = { 1:'ethereum', 56:'bsc', 8453:'base', 137:'polygon', 42161:'arbitrum', 10:'optimism', 43114:'avalanche', 5000:'mantle', 250:'fantom', 100:'gnosis', 42220:'celo', 59144:'linea', 534352:'scroll', 324:'zksync', 81457:'blast', 34443:'mode', 7777777:'zora', 130:'unichain', 146:'sonic', 80094:'berachain' };
 export async function fetchDexMarketMetrics(results: Array<{ chainId:number; tokens:Array<{address:string}> }>): Promise<Record<string,MarketMetrics>> {
   const targets = results.flatMap(result => {
     const dexChain = dexChains[result.chainId];
