@@ -1,4 +1,4 @@
-export type MarketNetwork = { id: string; name: string };
+export type MarketNetwork = { id: string; name: string; marketId?: string; chainId?: number; rpcUrl?: string; explorerUrl?: string };
 
 export type MarketTokenRecord = {
   id: string;
