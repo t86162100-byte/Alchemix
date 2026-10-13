@@ -3,6 +3,19 @@ import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell
 
 type Chain = { id: number; name: string; symbol: string; label: string; rpc: string; explorer: string; color: string; priceId: string; icon?: string };
 type MarketNetwork = { id: string; name: string };
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+const fetchMarketResponse = async (url: string, attempts = 3): Promise<Response> => {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch(url, { headers: { accept: 'application/json;version=20230302' } });
+      if (response.ok || (response.status !== 429 && response.status < 500)) return response;
+      lastError = new Error('Market provider temporarily unavailable');
+    } catch (error) { lastError = error; }
+    if (attempt + 1 < attempts) await wait(700 * (attempt + 1));
+  }
+  throw lastError instanceof Error ? lastError : new Error('Market provider could not be reached');
+};
 type MarketToken = { id: string; symbol: string; name: string; image: string; address?: string; chainName?: string; chainIcon?: string; current_price: number | null; market_cap: number | null; total_volume: number | null; price_change_percentage_1h_in_currency?: number | null; price_change_percentage_24h: number | null; price_change_percentage_7d_in_currency?: number | null; price_change_percentage_30d_in_currency?: number | null; market_cap_rank: number | null };
 type EthereumProvider = { request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>; on?: (event: string, cb: (...args: unknown[]) => void) => void; removeListener?: (event: string, cb: (...args: unknown[]) => void) => void };
 declare global { interface Window { ethereum?: EthereumProvider } }
