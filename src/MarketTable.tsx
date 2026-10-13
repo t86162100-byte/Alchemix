@@ -23,9 +23,8 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
     const change=timeRange==='1h'?data.priceChange?.h1:timeRange==='24h'?data.priceChange?.h24:undefined;
     return {...token,key,networkName:network.name,data,price,change};
   }));
-  // Show the full crypto token directory, not just tokens that pass liquidity/volume thresholds.
-  // Tokens without a verified DEX market remain visible with unavailable market fields shown as dashes.
-  // Exclude tokenized equities even if the upstream directory includes them.
+  // App.tsx supplies a curated, per-network allowlist of familiar crypto assets.
+  // Keep the stock-like guard as a secondary safeguard against upstream metadata mistakes.
   rows=rows.filter(t=>!isStockLike(t.name||'',t.symbol||''));
   if(query) rows=rows.filter(t=>t.name.toLowerCase().includes(query)||t.symbol.toLowerCase().includes(query)||t.address.toLowerCase().includes(query)||t.networkName.toLowerCase().includes(query));
   if(category==='Favorites') rows=rows.filter(t=>favorites.includes(t.key));
@@ -38,5 +37,5 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
     {rows.slice(0, visibleCount).map((token,index)=><article className="market-compact-row" key={token.key}><span className="market-compact-rank">{index+1}</span><div className="market-compact-asset"><div className="market-token"><span className="market-token-logos"><img src={token.logoURI||''} alt="" loading="lazy" onError={e=>{e.currentTarget.style.display='none';}}/></span><div className="market-token-copy"><strong>{token.name||token.symbol}</strong><span>{token.symbol} · {token.networkName}</span></div></div><div className="market-compact-metrics"><span><b>{token.data.marketCap ? "MC" : token.data.fdv ? "FDV" : "MC"}</b> {compact(token.data.marketCap||token.data.fdv)}</span><span><b>VOL</b> {compact(token.data.volume?.h24)}</span><span><b>LIQ</b> {compact(token.data.liquidity?.usd)}</span></div></div><div className="market-compact-price"><strong>{money(token.price)}</strong><span className={typeof token.change!=='number'?'neutral':token.change>0?'positive':token.change<0?'negative':'neutral'}>{typeof token.change==='number'?(token.change>0?'+':'')+token.change.toFixed(2)+'%':'—'}</span></div><button type="button" className="market-favorite" onClick={()=>onToggleFavorite(token.key)} aria-label={favorites.includes(token.key)?'Remove from favorites':'Add to favorites'} aria-pressed={favorites.includes(token.key)}><Star size={15} fill={favorites.includes(token.key)?'currentColor':'none'}/></button></article>)}
     {rows.length > visibleCount && <button type="button" className="market-load-more" onClick={() => setVisibleCount(count => Math.min(count + 100, rows.length))}>Show more tokens ({Math.min(100, rows.length - visibleCount)} more) <ChevronDown size={15}/></button>}
     {!rows.length&&<div className="market-empty">{loading?'Loading token prices and market metrics…':error|| (category==='Favorites'?'No favorites saved yet. Tap a star beside a token to save it.':'No tokens match these filters. Try another network or search.')}</div>}
-  </div><div className="market-table-footer"><span>All discovered crypto tokens from the selected networks are listed. Price and DEX metrics appear when a matching market is available; unavailable values are shown as dashes. Tokenized stocks are excluded. 7d/30d changes are not available yet.</span></div></div>;
+  </div><div className="market-table-footer"><span>Curated list of common crypto assets for the selected networks. Price and DEX metrics appear when a matching market is available; unavailable values are shown as dashes. 7d/30d changes are not available yet.</span></div></div>;
 }
