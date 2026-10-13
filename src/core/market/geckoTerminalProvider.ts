@@ -1,6 +1,8 @@
 import type { MarketDataProvider, MarketNetwork, MarketPoolPage } from './types';
 
 const API_BASE = 'https://api.geckoterminal.com/api/v2';
+const NETWORK_CACHE_KEY = 'nova-market-network-directory-v1';
+const NETWORK_CACHE_TTL = 15 * 60 * 1000;
 const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 async function requestJson<T>(url: string, attempts = 3): Promise<T> {
@@ -27,9 +29,16 @@ export const geckoTerminalProvider: MarketDataProvider = {
   id: 'geckoterminal',
   displayName: 'GeckoTerminal',
   async discoverNetworks(): Promise<MarketNetwork[]> {
+    try {
+      const cached = sessionStorage.getItem(NETWORK_CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached) as { savedAt?: number; networks?: MarketNetwork[] };
+        if (parsed.savedAt && Date.now() - parsed.savedAt < NETWORK_CACHE_TTL && Array.isArray(parsed.networks) && parsed.networks.length) return parsed.networks;
+      }
+    } catch { /* Storage can be disabled; fetch the live directory instead. */ }
     const found = new Map<string, MarketNetwork>();
-    // Follow pagination sequentially to reduce throttling, with a safety ceiling.
-    for (let page = 1; page <= 12; page += 1) {
+    // Load a useful live directory slice sequentially to reduce rate limiting.
+    for (let page = 1; page <= 3; page += 1) {
       const payload = await requestJson<{ data?: Array<{ id?: string; attributes?: { name?: string; identifier?: string } }>; links?: { next?: string | null } }>(API_BASE + '/networks?page=' + page);
       const entries = payload.data || [];
       for (const entry of entries) {
@@ -38,9 +47,11 @@ export const geckoTerminalProvider: MarketDataProvider = {
         if (id && name) found.set(id, { id, name });
       }
       if (!payload.links?.next || entries.length === 0) break;
-      await wait(180);
+      await wait(400);
     }
-    return [...found.values()];
+    const networks = [...found.values()];
+    try { sessionStorage.setItem(NETWORK_CACHE_KEY, JSON.stringify({ savedAt: Date.now(), networks })); } catch { /* Storage can be disabled. */ }
+    return networks;
   },
   fetchPools(networkId: string, page = 1): Promise<MarketPoolPage> {
     const url = API_BASE + '/networks/' + encodeURIComponent(networkId) + '/pools?include=base_token,quote_token&page=' + page + '&sort=h24_volume_usd_desc';
