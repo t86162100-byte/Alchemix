@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, CircleHelp, CircleUserRound, Copy, ExternalLink, Eye, EyeOff, Globe2, Home, LayoutGrid, LockKeyhole, Menu, MoreHorizontal, QrCode, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Wallet, X, Zap, Flame, Star, TrendingUp } from 'lucide-react';
-simport { JsonRpcProvider, Wallet as EthersWallet, parseEther } from 'ethers';
+import { JsonRpcProvider, Wallet as EthersWallet, parseEther } from 'ethers';
 
 type Chain = { id: number; name: string; symbol: string; label: string; rpc: string; explorer: string; color: string; icon?: string };
 type EthereumProvider = { request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>; on?: (event: string, cb: (...args: unknown[]) => void) => void; removeListener?: (event: string, cb: (...args: unknown[]) => void) => void };
