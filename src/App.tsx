@@ -245,11 +245,12 @@ function App() {
   const loadAllChainMarketTokens = async (page: number): Promise<MarketToken[]> => {
     type TokenData = { id: string; type?: string; attributes?: { address?: string; name?: string; symbol?: string; image_url?: string; price_usd?: string; fdv_usd?: string; market_cap_usd?: string; volume_usd?: { h24?: string }; price_change_percentage?: { h1?: string; h24?: string; h7d?: string } } };
     type PoolData = { attributes?: { base_token_price_usd?: string; quote_token_price_usd?: string; volume_usd?: { h24?: string }; price_change_percentage?: { h1?: string; h24?: string; h7d?: string } }; relationships?: { base_token?: { data?: { id?: string } }; quote_token?: { data?: { id?: string } } } };
-    const networks = marketNetworks;
+    const networks = marketNetworks.slice(0, 12);
     const num = (value?: string | null) => value != null && Number.isFinite(Number(value)) ? Number(value) : null;
     const results: MarketToken[] = [];
-    for (let offset = 0; offset < networks.length; offset += 3) {
-      const batch = networks.slice(offset, offset + 3);
+    for (let offset = 0; offset < networks.length; offset += 2) {
+      if (offset > 0) await new Promise(resolve => setTimeout(resolve, 450));
+      const batch = networks.slice(offset, offset + 2);
       const settled = await Promise.allSettled(batch.map(async selected => {
         const network = selected.id;
         const payload = await marketProvider.fetchPools(network, page) as { data?: PoolData[]; included?: TokenData[] };
@@ -488,7 +489,7 @@ function App() {
             </div>
           </div>
           <div className="market-controls-row">
-            <label className="market-network-select"><Globe2 size={15}/><select aria-label="Filter tokens by network" value={marketNetworkId} onChange={event => { setMarketNetworkId(event.target.value); setMarketCategory('All tokens'); setMarketPage(1); }}><option value="all">All chains</option>{marketNetworks.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><ChevronDown size={13}/></label>
+            <label className="market-network-select"><Globe2 size={15}/><select aria-label="Filter tokens by network" value={marketNetworkId} onChange={event => { setMarketNetworkId(event.target.value); setMarketCategory('All tokens'); setMarketPage(1); }}><option value="all">Cross-chain sample</option>{marketNetworks.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><ChevronDown size={13}/></label>
             <div className="market-range-wrap">
               <button type="button" className="market-range-select" aria-label="Select price change range" aria-expanded={marketTimeOpen} onClick={() => setMarketTimeOpen(open => !open)}><span>{marketTimeRange}</span><ChevronDown size={12}/></button>
               {marketTimeOpen && <div className="market-range-menu">{(['1h', '24h', '7d', '30d'] as const).map(range => <button type="button" key={range} className={marketTimeRange === range ? 'active' : ''} onClick={() => { setMarketTimeRange(range); setMarketTimeOpen(false); }}>{range}</button>)}</div>}
