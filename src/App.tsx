@@ -183,7 +183,6 @@ function App() {
     } finally { setLoading(false); }
   }, [address, chain]);
 
- // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!window.ethereum) return;
@@ -194,7 +193,7 @@ function App() {
     return () => { window.ethereum?.removeListener?.('accountsChanged', onAccounts); window.ethereum?.removeListener?.('chainChanged', onChain); };
   }, []);
 
-
+  const connect = async () => {
     if (!window.ethereum) { setNotice('No compatible browser wallet detected. Install a wallet extension, then reload this page.'); return; }
     try {
       const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' }) as string[];
