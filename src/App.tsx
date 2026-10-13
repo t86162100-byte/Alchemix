@@ -20,6 +20,21 @@ type MarketNetwork = { id: string; chainId: number; name: string; symbol: string
 type LifiChain = { id: number; key?: string; name: string; chainType?: string; logoURI?: string; nativeToken?: { address: string; symbol: string; name: string; decimals: number; logoURI?: string; priceUSD?: string; coinKey?: string } };
 type LifiTokenResponse = { tokens?: Record<string, Array<MarketToken>> };
 const MARKET_FEATURED_CHAIN_IDS = [1, 56, 8453, 137, 42161, 10, 43114, 5000];
+// Deliberately small default market list: familiar, ordinary crypto assets only.
+// LI.FI supplies the chain-specific addresses and metadata; native gas tokens are always retained.
+const MARKET_TOKEN_SYMBOLS_BY_CHAIN: Record<number, string[]> = {
+  1: ['ETH', 'WETH', 'USDT', 'USDC', 'DAI', 'WBTC', 'LINK', 'UNI', 'AAVE', 'BGB'],
+  56: ['BNB', 'WBNB', 'USDT', 'USDC', 'BTCB', 'CAKE', 'ETH'],
+  8453: ['ETH', 'WETH', 'USDC', 'USDT', 'AERO', 'DAI'],
+  137: ['POL', 'MATIC', 'WPOL', 'USDT', 'USDC', 'DAI', 'WETH', 'WBTC'],
+  42161: ['ETH', 'WETH', 'USDT', 'USDC', 'DAI', 'ARB', 'WBTC', 'LINK'],
+  10: ['ETH', 'WETH', 'USDT', 'USDC', 'DAI', 'OP', 'WBTC'],
+  43114: ['AVAX', 'WAVAX', 'USDT', 'USDC', 'WETH', 'WBTC'],
+  5000: ['MNT', 'WMNT', 'USDT', 'USDC', 'WETH']
+};
+const isMarketNativeToken = (token: MarketToken, network: MarketNetwork) =>
+  token.address.toLowerCase() === '0x0000000000000000000000000000000000000000' ||
+  token.symbol.toLowerCase() === network.symbol.toLowerCase();
 const shortAddress = (s: string) => s ? `${s.slice(0, 6)}…${s.slice(-4)}` : '';
 const rpcCall = async (chain: Chain, method: string, params: unknown[] = []) => {
 const response = await fetch(chain.rpc, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
@@ -114,16 +129,13 @@ const results = await Promise.all(missing.map(async network => {
 const response = await fetch('https://li.quest/v1/tokens?chains=' + network.chainId);
 if (!response.ok) throw new Error('Token service unavailable');
 const payload = await response.json() as LifiTokenResponse;
+const allowedSymbols = new Set(MARKET_TOKEN_SYMBOLS_BY_CHAIN[network.chainId] || []);
 const tokens = (payload.tokens?.[String(network.chainId)] || [])
 .filter(token => {
-const symbol = String(token.symbol || '').trim();
-const name = String(token.name || '').trim();
+const symbol = String(token.symbol || '').trim().toUpperCase();
 if (!symbol || !token.address || !Number.isFinite(token.decimals)) return false;
-// The market is crypto-only: exclude tokenized equities and stock-like instruments.
-const stockName = /(?:\bstock\b|\bshares?\b|\bequity\b|\bequities\b|\btokeni[sz]ed\b|\bpre[- ]?ipo\b|\bincorporated\b|\bcorporation\b|\bcommon stock\b|\bclass [a-c] shares?\b|\bETF\b)/i.test(name);
-const companySuffix = /(?:\binc\.?|\bcorp\.?|\bltd\.?|\blimited|\bplc\.?|\bcompany|\bco\.?|\bholdings?)\s*$/i.test(name);
-const stockSymbol = /^(?:[A-Z]{1,5}c|[A-Z]{1,5}\.?(?:A|B))$/.test(symbol) && /(?:inc\.?|corp\.?|stock|shares?|holdings?|company|class [A-Z])/i.test(name);
-return !stockName && !companySuffix && !stockSymbol;
+// Only allow familiar assets for this chain, plus its native gas token.
+return isMarketNativeToken(token, network) || allowedSymbols.has(symbol);
 })
 .map(token => ({ ...token, chainId: network.chainId }))
 .sort((a, b) => {
@@ -154,7 +166,7 @@ fetch('https://li.quest/v1/chains?chainTypes=EVM')
 .then(response => { if (!response.ok) throw new Error('Supported-chain service unavailable'); return response.json(); })
 .then((payload: { chains?: LifiChain[] }) => {
 const chains = (payload.chains || [])
-.filter(item => Number.isInteger(item.id) && item.id > 0 && item.chainType === 'EVM' && item.name && item.nativeToken?.symbol)
+.filter(item => MARKET_FEATURED_CHAIN_IDS.includes(item.id) && Number.isInteger(item.id) && item.id > 0 && item.chainType === 'EVM' && item.name && item.nativeToken?.symbol)
 .map(item => ({
 id: String(item.id),
 chainId: item.id,
