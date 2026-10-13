@@ -32,9 +32,8 @@ const MARKET_TOKEN_SYMBOLS_BY_CHAIN: Record<number, string[]> = {
   43114: ['AVAX', 'WAVAX', 'USDT', 'USDC', 'WETH', 'WBTC'],
   5000: ['MNT', 'WMNT', 'USDT', 'USDC', 'WETH']
 };
-const isMarketNativeToken = (token: MarketToken, network: MarketNetwork) =>
-  token.address.toLowerCase() === '0x0000000000000000000000000000000000000000' ||
-  token.symbol.toLowerCase() === network.symbol.toLowerCase();
+const isMarketNativeToken = (token: MarketToken, _network: MarketNetwork) =>
+  token.address.toLowerCase() === '0x0000000000000000000000000000000000000000';
 const shortAddress = (s: string) => s ? `${s.slice(0, 6)}…${s.slice(-4)}` : '';
 const rpcCall = async (chain: Chain, method: string, params: unknown[] = []) => {
 const response = await fetch(chain.rpc, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
