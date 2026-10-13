@@ -321,7 +321,7 @@ function App() {
             const address = a.address || tokenId.split('_').slice(1).join('_');
             tokenMap.set(tokenId, {
               id: `onchain-${selected.id}-${address || tokenId}`,
-              address, chainName: selected.name, chainIcon: chainLogoUrl(selected),
+              address, chainName: selected.name, chainIcon: marketChainLogo(selected.name),
               name: a.name || 'Unknown token',
               symbol: a.symbol || 'TOKEN',
               image: a.image_url || '',
