@@ -1019,3 +1019,25 @@ button:active, a:active, [role="button"]:active {
 .network-list::-webkit-scrollbar-thumb { background:rgba(255,255,255,.2); border-radius:99px; }
 .network-marquee-pill { flex-shrink:0; cursor:pointer; font:inherit; }
 .network-marquee-pill:focus-visible { outline:2px solid rgba(255,255,255,.7); outline-offset:3px; }
+
+
+/* Prefer real chain artwork over text/placeholder marks. */
+.network-marquee-logo {
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  overflow:hidden; flex:0 0 26px; width:26px; height:26px; border-radius:50%;
+  background:rgba(255,255,255,.08); color:#fff;
+}
+.network-marquee-logo img {
+  display:block; width:100%; height:100%; object-fit:contain; border-radius:50%;
+  position:absolute; inset:0; z-index:1; background:#111;
+}
+.network-marquee-logo > span { position:relative; z-index:0; font-size:9px; font-weight:800; }
+.network-option-logo {
+  position:relative; display:inline-flex; align-items:center; justify-content:center;
+  overflow:hidden; flex:0 0 38px; width:38px; height:38px; border-radius:50%;
+}
+.network-option-logo img {
+  position:absolute; inset:0; z-index:1; display:block; width:100%; height:100%;
+  object-fit:contain; border-radius:50%; background:#111;
+}
+.network-option-logo > span { position:relative; z-index:0; }
