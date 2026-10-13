@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { getMarketDataProvider } from './core/market/providers';
+import { getPriceDataProvider } from './core/prices/providers';
 import type { MarketNetwork } from './core/market/types';
 import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, ChevronsUpDown, CircleHelp, CircleUserRound, Copy, ExternalLink, Eye, EyeOff, Flame, Globe2, Home, LayoutGrid, LockKeyhole, Menu, MoreHorizontal, QrCode, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Star, TrendingDown, TrendingUp, Wallet, X, Zap } from 'lucide-react';
 
@@ -208,9 +209,8 @@ function App() {
   }, [address, chain]);
 
   useEffect(() => {
-    fetch('https://api.coingecko.com/api/v3/simple/price?ids=ethereum,binancecoin,matic-network&vs_currencies=usd')
-      .then(r => { if (!r.ok) throw new Error('Price request failed'); return r.json(); })
-      .then(d => setPrices({ ethereum: d.ethereum?.usd || 0, binancecoin: d.binancecoin?.usd || 0, 'matic-network': d['matic-network']?.usd || 0 }))
+    getPriceDataProvider().fetchNativePrices(['ethereum', 'binancecoin', 'matic-network'], 'usd')
+      .then(setPrices)
       .catch(() => setPrices({ ethereum: 0, binancecoin: 0, 'matic-network': 0 }))
       .finally(() => setPriceLoading(false));
   }, []);
@@ -489,7 +489,7 @@ function App() {
             </div>
           </div>
           <div className="market-controls-row">
-            <label className="market-network-select"><Globe2 size={15}/><select aria-label="Filter tokens by network" value={marketNetworkId} onChange={event => { setMarketNetworkId(event.target.value); setMarketCategory('All tokens'); setMarketPage(1); }}><option value="all">Cross-chain sample</option>{marketNetworks.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><ChevronDown size={13}/></label>
+            <label className="market-network-select"><Globe2 size={15}/><select aria-label="Filter tokens by network" value={marketNetworkId} onChange={event => { setMarketNetworkId(event.target.value); setMarketCategory('All tokens'); setMarketPage(1); }}><option value="all">Cross-chain sample</option>{[...marketNetworks].sort((a, b) => a.name.localeCompare(b.name)).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select><ChevronDown size={13}/></label>
             <div className="market-range-wrap">
               <button type="button" className="market-range-select" aria-label="Select price change range" aria-expanded={marketTimeOpen} onClick={() => setMarketTimeOpen(open => !open)}><span>{marketTimeRange}</span><ChevronDown size={12}/></button>
               {marketTimeOpen && <div className="market-range-menu">{(['1h', '24h', '7d', '30d'] as const).map(range => <button type="button" key={range} className={marketTimeRange === range ? 'active' : ''} onClick={() => { setMarketTimeRange(range); setMarketTimeOpen(false); }}>{range}</button>)}</div>}
