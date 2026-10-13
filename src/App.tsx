@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, CircleHelp, CircleUserRound, Copy, ExternalLink, Eye, EyeOff, Globe2, Home, LayoutGrid, LockKeyhole, Menu, MoreHorizontal, QrCode, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Wallet, X, Zap } from 'lucide-react';
+import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, CircleHelp, CircleUserRound, Copy, ExternalLink, Eye, EyeOff, Globe2, Home, LayoutGrid, LockKeyhole, Menu, MoreHorizontal, QrCode, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Wallet, X, Zap, Flame, Star, TrendingUp } from 'lucide-react';
+simport { JsonRpcProvider, Wallet as EthersWallet, parseEther } from 'ethers';
 
 type Chain = { id: number; name: string; symbol: string; label: string; rpc: string; explorer: string; color: string; icon?: string };
 type EthereumProvider = { request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>; on?: (event: string, cb: (...args: unknown[]) => void) => void; removeListener?: (event: string, cb: (...args: unknown[]) => void) => void };
@@ -69,12 +70,26 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [hideBalance, setHideBalance] = useState(false);
   const [totalValueVisible, setTotalValueVisible] = useState(true);
-  const [modal, setModal] = useState<'send' | 'receive' | 'network' | 'help' | null>(null);
+  const [modal, setModal] = useState<'send' | 'receive' | 'network' | 'help' | 'wallet' | 'create' | 'import' | 'unlock' | null>(null);
   const [sendTo, setSendTo] = useState('');
   const [sendAmount, setSendAmount] = useState('');
   const [notice, setNotice] = useState('');
   const [mobileNav, setMobileNav] = useState(false);
   const [activity, setActivity] = useState<{ hash: string; chain: Chain; time: string }[]>([]);
+  const [marketSearch, setMarketSearch] = useState('');
+  const [marketSearchOpen, setMarketSearchOpen] = useState(false);
+  const [marketCategory, setMarketCategory] = useState('Hot');
+  const [marketNetworkId, setMarketNetworkId] = useState('all');
+  const [marketTimeRange, setMarketTimeRange] = useState<'1h' | '24h' | '7d' | '30d'>('24h');
+  const [marketTimeOpen, setMarketTimeOpen] = useState(false);
+  const [marketSort, setMarketSort] = useState('market_cap');
+  const [privateKey, setPrivateKey] = useState('');
+  const [walletPassword, setWalletPassword] = useState('');
+  const [walletPhrase, setWalletPhrase] = useState('');
+  const [walletImportPhrase, setWalletImportPhrase] = useState('');
+  const [walletBusy, setWalletBusy] = useState(false);
+  const [walletError, setWalletError] = useState('');
+  const [hasStoredWallet, setHasStoredWallet] = useState(() => Boolean(localStorage.getItem('nova-wallet-keystore')));
 
   useEffect(() => {
     let hideTimer: ReturnType<typeof setTimeout>;
@@ -205,9 +220,9 @@ function App() {
       setNotice(accounts[0] ? 'Wallet connected. Your keys remain with your wallet provider.' : '');
     } catch { setNotice('Wallet connection was cancelled or rejected.'); }
   };
-  const disconnect = () => { setAddress(''); setBalance(null); setNotice('Disconnected from this page. To revoke site access, use your wallet settings.'); };
+  const disconnect = () => { setAddress(''); setPrivateKey(''); setBalance(null); setNotice('Wallet locked for this session. Your encrypted wallet remains saved on this device.'); };
   const switchNetwork = async (target: Chain) => {
-    if (!window.ethereum) { setNotice('Connect a compatible wallet first.'); return; }
+    if (!window.ethereum) { if (privateKey) { setChainId(target.id); setModal(null); setNotice(`Selected ${target.name} for your local wallet.`); return; } setNotice('Create/import a wallet or connect a compatible wallet first.'); return; }
     try {
       await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: `0x${target.id.toString(16)}` }] });
       setChainId(target.id); setModal(null); setNotice(`Network switched to ${target.name}.`);
@@ -227,13 +242,22 @@ function App() {
     }
   };
   const send = async () => {
-    if (!window.ethereum || !address) { setNotice('Connect your wallet before sending.'); return; }
+    if (!address || (!window.ethereum && !privateKey)) { setNotice('Create/import a wallet or connect a wallet before sending.'); return; }
     if (!/^0x[a-fA-F0-9]{40}$/.test(sendTo)) { setNotice('Enter a valid EVM destination address.'); return; }
     const amount = Number(sendAmount);
     if (!Number.isFinite(amount) || amount <= 0) { setNotice('Enter an amount greater than zero.'); return; }
     try {
-      const value = `0x${BigInt(Math.floor(amount * 1e18)).toString(16)}`;
-      const hash = await window.ethereum.request({ method: 'eth_sendTransaction', params: [{ from: address, to: sendTo, value }] }) as string;
+      let hash: string;
+      if (privateKey) {
+        if (!chain.rpc) throw new Error('No public RPC is available for this network.');
+        const provider = new JsonRpcProvider(chain.rpc, chain.id);
+        const signer = new EthersWallet(privateKey, provider);
+        const transaction = await signer.sendTransaction({ to: sendTo, value: parseEther(sendAmount) });
+        hash = transaction.hash;
+      } else {
+        const value = `0x${BigInt(Math.floor(amount * 1e18)).toString(16)}`;
+        hash = await window.ethereum!.request({ method: 'eth_sendTransaction', params: [{ from: address, to: sendTo, value }] }) as string;
+      }
       setActivity(old => [{ hash, chain, time: new Date().toLocaleString() }, ...old]);
       setModal(null); setSendTo(''); setSendAmount('');
       setNotice('Transaction submitted. Confirm its status in the block explorer.');
@@ -241,7 +265,7 @@ function App() {
     } catch { setNotice('Transaction was rejected or could not be submitted.'); }
   };
   const copyAddress = async () => { try { await navigator.clipboard.writeText(address); setNotice('Wallet address copied.'); } catch { setNotice(address); } };
-  const navItems = [{ name: 'Overview', label: 'Home', icon: Home }, { name: 'Activity', label: 'Activity', icon: Activity }, { name: 'Swap', label: 'Swap', icon: ArrowLeftRight }, { name: 'Explore', label: 'Explore', icon: Globe2 }];
+  const navItems = [{ name: 'Overview', label: 'Home', icon: Home }, { name: 'Market', label: 'Market', icon: Search }, { name: 'Activity', label: 'History', icon: Activity }];
   const accountUser = Boolean(address);
 
   return <div className="app-shell">
@@ -254,7 +278,7 @@ function App() {
     {mobileNav && <button className="mobile-overlay" onClick={() => setMobileNav(false)} aria-label="Close navigation"/>}
     <main className="main-content">
       {activeTab === 'Overview' && (<header className="sire-home-header">
-        <button type="button" className="sire-home-icon sire-home-profile-button" aria-label="Profile" onClick={() => address ? setNotice(`Connected wallet: ${shortAddress(address)}. Use the wallet controls below to disconnect.`) : setModal('help')}>
+        <button type="button" className="sire-home-icon sire-home-profile-button" aria-label="Profile" onClick={() => address ? setNotice(`Connected wallet: ${shortAddress(address)}. Use the wallet controls below to disconnect.`) : setModal('wallet')}>
           <CircleUserRound size={23} />
         </button>
         <div className="sire-home-header-actions">
@@ -263,21 +287,51 @@ function App() {
           <button type="button" className="sire-home-icon" aria-label="Help" onClick={() => setModal('help')}><CircleHelp size={22} /></button>
         </div>
       </header>)}
-{activeTab !== 'Overview' && activeTab !== 'Activity' && (
+{activeTab !== 'Overview' && activeTab !== 'Activity' && activeTab !== 'Market' && (
       <div className="home-wallet-controls">
         <div className="breadcrumb">Wallet <span>/</span> <strong>{activeTab}</strong></div>
         <div className="topbar-actions">
           <button className="network-picker" onClick={() => setModal('network')}><span className="chain-dot" style={{ background: chain.color }}/><span>{chain.name}</span><ChevronDown size={15}/></button>
-          {address ? <button className="connect-button connected" onClick={disconnect}><span className="connected-dot"/>{shortAddress(address)}<ChevronDown size={15}/></button> : <button className="connect-button" onClick={connect}><Wallet size={16}/> Connect wallet</button>}
+          {address ? <button className="connect-button connected" onClick={disconnect}><span className="connected-dot"/>{shortAddress(address)}<ChevronDown size={15}/></button> : <button className="connect-button" onClick={() => setModal(hasStoredWallet ? 'unlock' : 'wallet')}><Wallet size={16}/> {hasStoredWallet ? 'Unlock wallet' : 'Create / import'}</button>}
         </div>
       </div>
       )}
       <div className={`page-wrap ${activeTab === 'Overview' ? 'overview-page-wrap' : ''}`}>
+
+{activeTab === 'Market' ? <section className="market-page">
+  <div className="market-topline">
+    {marketSearchOpen && <label className="market-search-wrap"><Search size={17}/><input autoFocus value={marketSearch} onChange={event => setMarketSearch(event.target.value)} placeholder="Search tokens or contract address…" aria-label="Search market tokens"/><button type="button" onClick={() => { setMarketSearch(''); setMarketSearchOpen(false); }} aria-label="Close search"><X size={15}/></button></label>}
+    <button type="button" className="market-search-icon-button" aria-label={marketSearchOpen ? 'Close market search' : 'Search market'} onClick={() => setMarketSearchOpen(open => !open)}><Search size={18}/></button>
+  </div>
+  <div className="market-ticker-viewport" aria-label="Market highlights">
+    <div className="market-ticker-track">{[0,1].map(copy => <div className="market-ticker-group" key={copy} aria-hidden={copy === 1 ? true : undefined}>
+      <article className="market-ticker-card"><span className="market-ticker-symbol btc">₿</span><span className="market-ticker-copy"><strong>Bitcoin <small>BTC</small></strong><b>—</b></span><span className="market-ticker-change neutral">—</span></article>
+      <article className="market-ticker-card"><span className="market-ticker-symbol eth">Ξ</span><span className="market-ticker-copy"><strong>Ethereum <small>ETH</small></strong><b>—</b></span><span className="market-ticker-change neutral">—</span></article>
+      <article className="market-ticker-card"><span className="market-ticker-symbol sol">◎</span><span className="market-ticker-copy"><strong>Solana <small>SOL</small></strong><b>—</b></span><span className="market-ticker-change neutral">—</span></article>
+      <article className="market-ticker-card market-ticker-stat"><span className="market-ticker-stat-label">TOTAL MARKET CAP</span><strong>—</strong><span className="market-ticker-muted">Awaiting data</span></article>
+      <article className="market-ticker-card market-ticker-stat"><span className="market-ticker-stat-label">24H VOLUME</span><strong>—</strong><span className="market-ticker-muted">Awaiting data</span></article>
+    </div>)}</div>
+  </div>
+  <div className="market-toolbar"><div className="market-category-list" role="tablist" aria-label="Market categories">
+    {['Hot','All tokens','Favorites','Gainers','Losers','Volume'].map(category => <button type="button" role="tab" aria-selected={marketCategory === category} className={marketCategory === category ? 'active' : ''} key={category} onClick={() => { setMarketCategory(category); if (category === 'Volume') setMarketSort('volume'); else if (category === 'Gainers' || category === 'Losers') setMarketSort('change'); else setMarketSort('market_cap'); }}>{category === 'Hot' && <Zap size={14}/>} {category === 'Favorites' && <Sparkles size={14}/>} {category === 'Gainers' && <ArrowUpRight size={14}/>} {category === 'Losers' && <ArrowDownLeft size={14}/>} {category}</button>)}
+  </div></div>
+  <div className="market-controls-row">
+    <label className="market-network-select"><Globe2 size={15}/><select aria-label="Filter market by EVM network" value={marketNetworkId} onChange={event => setMarketNetworkId(event.target.value)}><option value="all">All networks</option>{availableChains.map(item => <option key={item.id} value={String(item.id)}>{item.name}</option>)}</select><ChevronDown size={13}/></label>
+    <div className="market-range-wrap"><button type="button" className="market-range-select" aria-label="Select price change range" aria-expanded={marketTimeOpen} onClick={() => setMarketTimeOpen(open => !open)}><span>{marketTimeRange}</span><ChevronDown size={12}/></button>{marketTimeOpen && <div className="market-range-menu">{(['1h','24h','7d','30d'] as const).map(range => <button type="button" key={range} className={marketTimeRange === range ? 'active' : ''} onClick={() => { setMarketTimeRange(range); setMarketTimeOpen(false); }}>{range}</button>)}</div>}</div>
+  </div>
+  <div className="market-table-panel">
+    <div className="market-compact-list">
+      <div className="market-sort-bar" aria-label="Sort market instruments"><span className="market-sort-label">#</span><div className="market-sort-asset"><button type="button" onClick={() => setMarketSort('market_cap')}>MC <ChevronDown size={12}/></button><button type="button" onClick={() => setMarketSort('volume')}>VOL <ChevronDown size={12}/></button></div><div className="market-sort-values"><button type="button" onClick={() => setMarketSort('price')}>Price <ChevronDown size={12}/></button><button type="button" onClick={() => setMarketSort('change')}>{marketTimeRange} <ChevronDown size={12}/></button></div><span className="market-sort-star"><Sparkles size={12}/></span></div>
+      {[1,2,3,4,5].map(index => <article className="market-compact-row market-placeholder-row" key={index} aria-label="Empty market instrument placeholder"><span className="market-compact-rank">—</span><div className="market-compact-asset"><div className="market-token"><span className="market-token-logos"><span className="market-placeholder-logo"/></span><div className="market-token-copy"><strong>—</strong><span>—</span></div></div><div className="market-compact-metrics"><span><b>MC</b> —</span><span><b>VOL</b> —</span></div></div><div className="market-compact-price"><strong>—</strong><span className="neutral">—</span></div><button type="button" className="market-favorite" disabled aria-label="Favorites will be available when market data is connected"><Sparkles size={15}/></button></article>)}
+      <div className="market-empty">{marketSearch ? 'No indexed instruments match this search yet.' : 'Market instruments will appear here when token data is connected.'}</div>
+    </div>
+    <div className="market-table-footer"><span>Network directory is independent of market instruments. Values are placeholders.</span></div>
+  </div>
+</section> : activeTab === 'Activity' ? <section className="panel activity-panel activity-page"><div className="panel-heading"><div><h2>History</h2><p>Transactions submitted from this session</p></div><span className="market-placeholder-tag">ACTIVITY</span></div>{activity.length ? <div className="activity-list">{activity.map((item,i) => <div className="activity-row" key={item.hash+i}><div className="activity-icon"><ArrowUpRight size={17}/></div><div className="activity-info"><strong>Sent {item.chain.symbol}</strong><span>{item.time}</span></div><div className="activity-right"><span className="pending-pill">Submitted</span><a href={`${item.chain.explorer}/tx/${item.hash}`} target="_blank" rel="noreferrer" className="explorer-link">View transaction <ExternalLink size={12}/></a></div></div>)}</div> : <div className="market-empty">No activity yet. Submitted transactions will appear here.</div>}</section> : <>
 {activeTab !== 'Overview' && activeTab !== 'Activity' && (
         <div className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-line"/> YOUR WEB3 HOME</div><h1>{activeTab === 'Overview' ? 'Your crypto, clearly.' : activeTab}</h1><p className="page-subtitle">{activeTab === 'Overview' ? 'One calm place to see and manage your digital assets.' : activeTab === 'Activity' ? 'Keep track of transactions submitted from this session.' : activeTab === 'Swap' ? 'Token swaps will be available in a future release.' : 'Discover onchain tools and apps in a future release.'}</p></div><button className="refresh-button" onClick={() => address ? void refreshBalance() : void connect()}><RefreshCw size={15} className={loading ? 'spin' : ''}/><span>{address ? 'Refresh' : 'Get started'}</span></button></div>
         )}
 
-        <>
         <section className="sire-home-value-card" aria-label="Total account value">
           <div className="sire-home-value-main">
             <div className="sire-home-value-copy">
@@ -318,7 +372,7 @@ function App() {
           <button type="button" className="wallet-quick-more" aria-label="More options" onClick={() => setModal('network')}><MoreHorizontal size={23} /></button>
         </nav>
 
-        {!address && <div className="connect-banner"><div className="banner-art"><div className="banner-orbit orbit-one"/><div className="banner-orbit orbit-two"/><div className="banner-coin"><Sparkles size={28}/></div></div><div className="banner-copy"><div className="banner-kicker">WELCOME TO NOVA</div><h2>Your assets. Your rules.</h2><p>Connect a browser wallet to see your onchain balance and get started. Nova never asks for your recovery phrase.</p><div className="banner-buttons"><button className="primary-button" onClick={connect}>Connect wallet <ArrowUpRight size={16}/></button><button className="text-button" onClick={() => setModal('help')}>How it works <ExternalLink size={14}/></button></div></div><div className="banner-decoration">N<span>.</span></div></div>}
+        {!address && <div className="connect-banner"><div className="banner-art"><div className="banner-orbit orbit-one"/><div className="banner-orbit orbit-two"/><div className="banner-coin"><Sparkles size={28}/></div></div><div className="banner-copy"><div className="banner-kicker">WELCOME TO NOVA</div><h2>Your assets. Your rules.</h2><p>Connect a browser wallet to see your onchain balance and get started. Nova never asks for your recovery phrase.</p><div className="banner-buttons"><button className="primary-button" onClick={() => setModal(hasStoredWallet ? 'unlock' : 'wallet')}>Create / import wallet <ArrowUpRight size={16}/></button><button className="text-button" onClick={() => setModal('help')}>How it works <ExternalLink size={14}/></button></div></div><div className="banner-decoration">N<span>.</span></div></div>}
 
         <section className="stats-grid">
           <article className="stat-card"><div className="stat-top"><span>Active network</span><span className="stat-icon purple"><Globe2 size={17}/></span></div><div className="stat-main">{chain.name}</div><div className="stat-description"><span className="status-dot"/>{address ? 'Wallet connected to network' : 'Ready when you are'}</div><button className="card-link" onClick={() => setModal('network')}>Change network <ArrowUpRight size={14}/></button></article>
@@ -332,7 +386,7 @@ function App() {
 
         <section className="panel activity-panel"><div className="panel-heading"><div><h2>Recent activity</h2><p>Your latest transactions submitted through Nova</p></div><button className="panel-action" onClick={() => setActiveTab('Activity')}>View all <ArrowUpRight size={14}/></button></div>{activity.length ? <div className="activity-list">{activity.slice(0, 3).map((item, i) => <div className="activity-row" key={item.hash + i}><div className="activity-icon"><ArrowUpRight size={17}/></div><div className="activity-info"><strong>Sent {item.chain.symbol}</strong><span>{item.time}</span></div><div className="activity-right"><span className="pending-pill">Submitted</span><a href={`${item.chain.explorer}/tx/${item.hash}`} target="_blank" rel="noreferrer" className="explorer-link">View transaction <ExternalLink size={12}/></a></div></div>)}</div> : <div className="activity-empty"><div className="activity-empty-icon"><Activity size={20}/></div><div><strong>No activity yet</strong><p>{address ? 'Transactions you submit from this session will appear here.' : 'Connect your wallet to get started with your onchain activity.'}</p></div><button className="text-button" onClick={() => address ? setModal('send') : void connect()}>{address ? 'Send crypto' : 'Connect'} <ArrowUpRight size={14}/></button></div>}</section>
 
-        </>
+        </>}
         <footer className="footer"><div><span className="footer-logo"><Sparkles size={14}/> nova wallet</span><span>Built for clarity. Designed for you.</span></div><div className="footer-right"><span><span className="status-dot"/> Networks operational</span><button onClick={() => setModal('help')}>Security first <ShieldCheck size={13}/></button></div></footer>
       </div>
     </main>
@@ -340,16 +394,20 @@ function App() {
     <nav className={`bottom-navigation ${bottomNavVisible ? '' : 'nav-hidden'}`} aria-label="Main navigation">
       <button type="button" className={activeTab === 'Overview' ? 'active' : ''} aria-current={activeTab === 'Overview' ? 'page' : undefined} onClick={() => setActiveTab('Overview')}><Home size={20}/><span>Home</span></button>
       <button type="button" className={activeTab === 'Activity' ? 'active' : ''} aria-current={activeTab === 'Activity' ? 'page' : undefined} onClick={() => setActiveTab('Activity')}><Activity size={20}/><span>History</span></button>
-      <button type="button" onClick={() => address ? setNotice(`Connected wallet: ${shortAddress(address)}`) : void connect()}><Wallet size={20}/><span>Wallet</span></button>
+      <button type="button" onClick={() => setModal(hasStoredWallet ? 'unlock' : 'wallet')}><Wallet size={20}/><span>Wallet</span></button>
     </nav>
     {notice && <div className="toast" role="status"><span className="toast-dot"/><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss notification"><X size={16}/></button></div>}
 
     {modal && <div className={`modal-backdrop ${modal === 'network' ? 'network-modal-backdrop' : ''}`} onClick={() => setModal(null)}><section className={`modal-card ${modal === 'network' ? 'network-modal-card' : ''}`} onClick={e => e.stopPropagation()}>
-      <div className="modal-head"><div><span className="modal-eyebrow">NOVA WALLET</span><h2>{modal === 'network' ? 'Choose a network' : modal === 'send' ? 'Send crypto' : modal === 'receive' ? 'Receive crypto' : 'Your security matters'}</h2></div><button className="icon-button" onClick={() => setModal(null)} aria-label="Close dialog"><X size={19}/></button></div>
+      <div className="modal-head"><div><span className="modal-eyebrow">NOVA WALLET</span><h2>{modal === 'network' ? 'Choose a network' : modal === 'send' ? 'Send crypto' : modal === 'receive' ? 'Receive crypto' : modal === 'wallet' ? 'Your wallet' : modal === 'create' ? 'Create a wallet' : modal === 'import' ? 'Import a wallet' : modal === 'unlock' ? 'Unlock your wallet' : 'Your security matters'}</h2></div><button className="icon-button" onClick={() => setModal(null)} aria-label="Close dialog"><X size={19}/></button></div>
       {modal === 'network' && <><p className="modal-description">Choose a network for your wallet. Popular chains are ready below, and the searchable directory includes additional EVM networks. Your wallet will ask you to approve any network change.</p><div className="network-search-wrap"><Search size={16}/><input value={networkSearch} onChange={event => setNetworkSearch(event.target.value)} placeholder="Search by network, token, or chain ID…" aria-label="Search networks" /><span className="network-search-shortcut">⌕</span></div>{!networkSearch && <><div className="network-section-heading"><span>POPULAR NETWORKS</span><small>Quick switch</small></div><div className="network-quick-grid">{popularNetworkOptions.map(c => <button type="button" key={c.id} className={`network-quick-option ${chainId === c.id ? 'selected' : ''}`} onClick={() => void switchNetwork(c)}><span className="network-quick-logo" style={{ background: c.color }}>{chainLogoUrl(c) && <img src={chainLogoUrl(c)} data-logo-candidates={JSON.stringify(chainLogoUrls(c))} data-logo-index="0" alt="" decoding="async" onLoad={event => { const fallback = event.currentTarget.nextElementSibling as HTMLElement | null; if (fallback) fallback.hidden = true; }} onError={handleChainLogoError} />}<span>{iconLetters[c.symbol] || c.symbol.slice(0, 3)}</span></span><span>{c.name}</span>{chainId === c.id && <span className="network-quick-check">✓</span>}</button>)}</div></>}{networkListLoading && <p className="network-loading">Refreshing network directory…</p>}<div className="network-section-heading network-directory-heading"><span>{networkSearch ? 'SEARCH RESULTS' : 'ALL NETWORKS'}</span><small>{visibleNetworkOptions.length}{networkSearch ? ' matches' : ' available'}</small></div><div className="network-list">{visibleNetworkOptions.map(c => <button className={`network-option ${chainId === c.id ? 'selected' : ''}`} key={c.id} onClick={() => void switchNetwork(c)}><span className="asset-icon network-option-logo" style={{ background: c.color }}>{chainLogoUrl(c) && <img src={chainLogoUrl(c)} data-logo-candidates={JSON.stringify(chainLogoUrls(c))} data-logo-index="0" alt="" decoding="async" onLoad={event => { const fallback = event.currentTarget.nextElementSibling as HTMLElement | null; if (fallback) fallback.hidden = true; }} onError={handleChainLogoError} />}<span>{iconLetters[c.symbol] || c.symbol.slice(0, 3)}</span></span><span className="network-option-text"><strong>{c.name}</strong><small>{c.label} · Chain ID {c.id}</small></span>{chainId === c.id ? <span className="current-tag">CURRENT</span> : <ArrowUpRight size={16}/>}</button>)}{visibleNetworkOptions.length === 0 && <p className="network-loading">No networks match that search. Try a symbol such as APE or a numeric chain ID.</p>}</div></>}
       {modal === 'send' && <><p className="modal-description">Send native {chain.symbol} on {chain.name}. Check the address and network carefully before confirming in your wallet.</p><label className="form-label">Recipient address</label><input className="form-input" placeholder="0x…" value={sendTo} onChange={e => setSendTo(e.target.value)} autoComplete="off"/><label className="form-label">Amount ({chain.symbol})</label><input className="form-input" type="number" min="0" step="any" placeholder="0.00" value={sendAmount} onChange={e => setSendAmount(e.target.value)}/><div className="form-warning"><ShieldCheck size={16}/><span>Nova will never ask for your seed phrase. Your wallet provider will display the final transaction for approval.</span></div><button className="primary-button full-button" onClick={() => void send()}>Continue to wallet <ArrowUpRight size={16}/></button></>}
       {modal === 'receive' && <><p className="modal-description">Share your public wallet address to receive assets on the selected network.</p><div className="receive-card"><div className="receive-chain"><span className="chain-dot" style={{ background: chain.color }}/>{chain.name} <span className="receive-symbol">{chain.symbol}</span></div><div className="receive-address">{address}</div><button className="primary-button full-button" onClick={() => void copyAddress()}><Copy size={16}/> Copy address</button></div><div className="form-warning"><CircleHelp size={16}/><span>Only send assets compatible with this network to this address. Sending on the wrong network can result in permanent loss.</span></div></>}
-      {modal === 'help' && <><p className="modal-description">Nova is an early web-wallet interface. Your safety comes first.</p><div className="security-list"><div><ShieldCheck size={18}/><span><strong>Your keys stay with your wallet</strong><small>This version connects to an existing browser wallet and does not collect private keys or recovery phrases.</small></span></div><div><LockKeyhole size={18}/><span><strong>Review every transaction</strong><small>Always check the network, destination, amount and fee in your wallet confirmation window.</small></span></div><div><Globe2 size={18}/><span><strong>Public blockchain data</strong><small>Balances are fetched from public RPC endpoints. </small></span></div></div><button className="primary-button full-button" onClick={() => setModal(null)}>Got it</button></>}
+      {modal === 'wallet' && <><p className="modal-description">Create a new self-custody wallet or import an existing recovery phrase. Your encrypted wallet is stored only in this browser.</p><div className="wallet-choice-grid"><button type="button" className="wallet-choice" onClick={() => { setWalletError(''); setWalletPhrase(''); setWalletPassword(''); setModal('create'); }}><span className="wallet-choice-icon"><Sparkles size={19}/></span><strong>Create new wallet</strong><small>Generate a new recovery phrase</small></button><button type="button" className="wallet-choice" onClick={() => { setWalletError(''); setWalletImportPhrase(''); setWalletPassword(''); setModal('import'); }}><span className="wallet-choice-icon"><ArrowDownLeft size={19}/></span><strong>Import wallet</strong><small>Use an existing recovery phrase</small></button></div><div className="form-warning"><LockKeyhole size={16}/><span>Never share your recovery phrase. Nova cannot recover it if you lose it.</span></div>{hasStoredWallet && <button className="primary-button full-button" onClick={() => { setWalletPassword(''); setWalletError(''); setModal('unlock'); }}>Unlock saved wallet</button>}</>}
+      {modal === 'create' && <><p className="modal-description">Generate a new wallet locally. Write down the recovery phrase and keep it private before continuing.</p>{!walletPhrase ? <button className="primary-button full-button" onClick={() => { const fresh = EthersWallet.createRandom(); setWalletPhrase(fresh.mnemonic?.phrase || ''); setPrivateKey(fresh.privateKey); setWalletError(''); }}>Generate recovery phrase <Sparkles size={16}/></button> : <><div className="wallet-recovery-phrase">{walletPhrase.split(' ').map((word,index) => <span key={index}><small>{index+1}</small>{word}</span>)}</div><div className="form-warning"><ShieldCheck size={16}/><span>Anyone with this phrase can control this wallet. Store it offline and do not send it to anyone.</span></div><label className="form-label">Create encryption password (8+ characters)</label><input className="form-input" type="password" autoComplete="new-password" value={walletPassword} onChange={event => setWalletPassword(event.target.value)} placeholder="Choose a strong password"/><button className="primary-button full-button" disabled={walletBusy} onClick={() => void (async () => { if(walletPassword.length<8){setWalletError('Use a password with at least 8 characters.');return;} setWalletBusy(true);setWalletError('');try{const wallet=new EthersWallet(privateKey);const encrypted=await wallet.encrypt(walletPassword);localStorage.setItem('nova-wallet-keystore',encrypted);setHasStoredWallet(true);setAddress(wallet.address);setBalance(null);setModal(null);setWalletPhrase('');setWalletPassword('');setNotice('Wallet created and encrypted on this device. Back up your recovery phrase securely.');}catch{setWalletError('Could not encrypt the wallet. Try again with a different password.');}finally{setWalletBusy(false);}})()}>{walletBusy?'Encrypting wallet…':'Secure wallet and continue'} <ArrowRight size={16}/></button></>}{walletError && <p className="wallet-error" role="alert">{walletError}</p>}</>}
+      {modal === 'import' && <><p className="modal-description">Import an existing EVM wallet using its 12- or 24-word recovery phrase. The phrase is processed locally in your browser.</p><label className="form-label">Recovery phrase</label><textarea className="form-input wallet-phrase-input" rows={3} autoComplete="off" spellCheck={false} value={walletImportPhrase} onChange={event => setWalletImportPhrase(event.target.value)} placeholder="Enter your recovery phrase separated by spaces"/><label className="form-label">Create encryption password (8+ characters)</label><input className="form-input" type="password" autoComplete="new-password" value={walletPassword} onChange={event => setWalletPassword(event.target.value)} placeholder="Choose a strong password"/><button className="primary-button full-button" disabled={walletBusy} onClick={() => void (async () => { if(walletPassword.length<8){setWalletError('Use a password with at least 8 characters.');return;}setWalletBusy(true);setWalletError('');try{const wallet=EthersWallet.fromPhrase(walletImportPhrase.trim().replace(/\s+/g,' '));const encrypted=await wallet.encrypt(walletPassword);localStorage.setItem('nova-wallet-keystore',encrypted);setHasStoredWallet(true);setPrivateKey(wallet.privateKey);setAddress(wallet.address);setBalance(null);setModal(null);setWalletImportPhrase('');setWalletPassword('');setNotice('Wallet imported and encrypted on this device.');}catch{setWalletError('That recovery phrase is invalid or could not be imported. Check the words and try again.');}finally{setWalletBusy(false);}})()}>{walletBusy?'Importing wallet…':'Import and secure wallet'} <ArrowRight size={16}/></button>{walletError && <p className="wallet-error" role="alert">{walletError}</p>}</>}
+      {modal === 'unlock' && <><p className="modal-description">Enter the password you chose when saving this wallet on this device.</p><label className="form-label">Wallet password</label><input className="form-input" type="password" autoComplete="current-password" value={walletPassword} onChange={event => setWalletPassword(event.target.value)} placeholder="Wallet password"/><button className="primary-button full-button" disabled={walletBusy} onClick={() => void (async () => {setWalletBusy(true);setWalletError('');try{const encrypted=localStorage.getItem('nova-wallet-keystore');if(!encrypted)throw new Error('No saved wallet');const wallet=await EthersWallet.fromEncryptedJson(encrypted,walletPassword);setPrivateKey(wallet.privateKey);setAddress(wallet.address);setBalance(null);setModal(null);setWalletPassword('');setNotice('Wallet unlocked.');}catch{setWalletError('Incorrect password or saved wallet could not be opened.');}finally{setWalletBusy(false);}})()}>{walletBusy?'Unlocking…':'Unlock wallet'} <ArrowRight size={16}/></button>{walletError && <p className="wallet-error" role="alert">{walletError}</p>}</>}
+      {modal === 'help' && <><p className="modal-description">Nova is an early web-wallet interface. Your safety comes first.</p><div className="security-list"><div><ShieldCheck size={18}/><span><strong>Your keys stay with your wallet</strong><small>Wallet keys are encrypted with your password and saved in this browser. Keep your recovery phrase offline.</small></span></div><div><LockKeyhole size={18}/><span><strong>Review every transaction</strong><small>Always check the network, destination, amount and fee in your wallet confirmation window.</small></span></div><div><Globe2 size={18}/><span><strong>Public blockchain data</strong><small>Balances are fetched from public RPC endpoints. </small></span></div></div><button className="primary-button full-button" onClick={() => setModal(null)}>Got it</button></>}
     </section></div>}
   </div>;
 }
