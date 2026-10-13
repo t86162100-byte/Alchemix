@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, ChevronsUpDown, CircleHelp, CircleUserRound, Copy, ExternalLink, Eye, EyeOff, Flame, Globe2, Home, LayoutGrid, LockKeyhole, Menu, MoreHorizontal, QrCode, RefreshCw, Search, Settings2, ShieldCheck, Sparkles, Star, TrendingDown, TrendingUp, Wallet, X, Zap } from 'lucide-react';
 
 type Chain = { id: number; name: string; symbol: string; label: string; rpc: string; explorer: string; color: string; priceId: string; icon?: string };
-type MarketToken = { id: string; symbol: string; name: string; image: string; current_price: number | null; market_cap: number | null; total_volume: number | null; price_change_percentage_1h_in_currency?: number | null; price_change_percentage_24h: number | null; price_change_percentage_7d_in_currency?: number | null; price_change_percentage_30d_in_currency?: number | null; market_cap_rank: number | null };
+type MarketToken = { id: string; symbol: string; name: string; image: string; address?: string; current_price: number | null; market_cap: number | null; total_volume: number | null; price_change_percentage_1h_in_currency?: number | null; price_change_percentage_24h: number | null; price_change_percentage_7d_in_currency?: number | null; price_change_percentage_30d_in_currency?: number | null; market_cap_rank: number | null };
 type EthereumProvider = { request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>; on?: (event: string, cb: (...args: unknown[]) => void) => void; removeListener?: (event: string, cb: (...args: unknown[]) => void) => void };
 declare global { interface Window { ethereum?: EthereumProvider } }
 
@@ -61,6 +61,8 @@ function App() {
   const [bottomNavVisible, setBottomNavVisible] = useState(true);
   const [navRevealDirection, setNavRevealDirection] = useState<number | null>(null);
   const [marketTokens, setMarketTokens] = useState<MarketToken[]>([]);
+  const [marketNetworkId, setMarketNetworkId] = useState('all');
+  const [marketSearch, setMarketSearch] = useState('');
   const [trendingTokenIds, setTrendingTokenIds] = useState<string[]>([]);
   const [marketLoading, setMarketLoading] = useState(false);
   const [marketError, setMarketError] = useState('');
@@ -217,29 +219,39 @@ function App() {
     return () => { window.ethereum?.removeListener?.('accountsChanged', onAccounts); window.ethereum?.removeListener?.('chainChanged', onChain); };
   }, []);
 
+  const geckoTerminalNetwork = (selected: Chain) => {
+    const known: Record<number, string> = { 1: 'eth', 56: 'bsc', 8453: 'base', 137: 'polygon_pos', 42161: 'arbitrum', 10: 'optimism', 43114: 'avax', 100: 'xdai', 250: 'ftm', 42220: 'celo', 25: 'cro', 324: 'zksync', 59144: 'linea', 534352: 'scroll', 81457: 'blast', 5000: 'mantle', 7777777: 'zora', 169: 'manta', 34443: 'mode', 130: 'unichain', 80094: 'berachain', 480: 'worldchain', 42170: 'arbitrum_nova', 2020: 'ronin' };
+    return known[selected.id] || selected.name.toLowerCase().replace(/\b(chain|mainnet|network|smart chain|pos)\b/g, '').replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  };
+
   const loadMarketTokens = useCallback(async (page = 1, append = false) => {
-    setMarketLoading(true);
-    setMarketError('');
+    setMarketLoading(true); setMarketError('');
     try {
-      const response = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=${page}&sparkline=false&price_change_percentage=1h%2C24h%2C7d%2C30d`);
-      if (!response.ok) throw new Error(response.status === 429 ? 'Market data is rate-limited. Please wait a moment and retry.' : 'Market data is temporarily unavailable.');
-      const data = await response.json() as MarketToken[];
-      setMarketTokens(old => append ? [...old, ...data.filter(token => !old.some(existing => existing.id === token.id))] : data);
-      setMarketHasMore(data.length === 100);
-      setMarketPage(page);
-      if (page === 1) {
-        try {
-          const trendingResponse = await fetch('https://api.coingecko.com/api/v3/search/trending');
-          if (trendingResponse.ok) {
-            const trendingData = await trendingResponse.json() as { coins?: { item?: { id?: string } }[] };
-            setTrendingTokenIds((trendingData.coins || []).map(item => item.item?.id || '').filter(Boolean));
-          }
-        } catch { setTrendingTokenIds([]); }
+      if (marketNetworkId === 'all') {
+        const response = await fetch(`https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=100&page=${page}&sparkline=false&price_change_percentage=1h%2C24h%2C7d%2C30d`);
+        if (!response.ok) throw new Error(response.status === 429 ? 'Market data is rate-limited. Please wait a moment and retry.' : 'Market data is temporarily unavailable.');
+        const data = await response.json() as MarketToken[];
+        setMarketTokens(old => append ? [...old, ...data.filter(token => !old.some(existing => existing.id === token.id))] : data);
+        setMarketHasMore(data.length === 100); setMarketPage(page);
+        if (page === 1) {
+          try { const trendingResponse = await fetch('https://api.coingecko.com/api/v3/search/trending'); if (trendingResponse.ok) { const trendingData = await trendingResponse.json() as { coins?: { item?: { id?: string } }[] }; setTrendingTokenIds((trendingData.coins || []).map(item => item.item?.id || '').filter(Boolean)); } } catch { setTrendingTokenIds([]); }
+        }
+      } else {
+        const selected = availableChains.find(item => String(item.id) === marketNetworkId);
+        if (!selected) throw new Error('That network is not ready yet. Choose another chain.');
+        const network = geckoTerminalNetwork(selected);
+        const response = await fetch(`https://api.geckoterminal.com/api/v2/networks/${encodeURIComponent(network)}/tokens?page=${page}`);
+        if (!response.ok) { if (response.status === 404) throw new Error(`Live token listings are not available for ${selected.name} from the public market provider yet. Try a popular network or All chains.`); if (response.status === 429) throw new Error('On-chain market data is busy. Wait a moment and retry.'); throw new Error(`Could not load ${selected.name} token listings right now.`); }
+        const payload = await response.json() as { data?: { id: string; attributes?: { address?: string; name?: string; symbol?: string; image_url?: string; price_usd?: string; fdv_usd?: string; market_cap_usd?: string; volume_usd?: { h24?: string }; price_change_percentage?: { h1?: string; h24?: string; h7d?: string } } }[] };
+        const data: MarketToken[] = (payload.data || []).map((entry, index) => {
+          const a = entry.attributes || {}; const num = (value?: string | null) => value != null && Number.isFinite(Number(value)) ? Number(value) : null; const address = a.address || entry.id.split('_').slice(1).join('_');
+          return { id: `onchain-${selected.id}-${address || index}`, address, name: a.name || 'Unknown token', symbol: a.symbol || 'TOKEN', image: a.image_url || '', current_price: num(a.price_usd), market_cap: num(a.market_cap_usd) ?? num(a.fdv_usd), total_volume: num(a.volume_usd?.h24), price_change_percentage_1h_in_currency: num(a.price_change_percentage?.h1), price_change_percentage_24h: num(a.price_change_percentage?.h24), price_change_percentage_7d_in_currency: num(a.price_change_percentage?.h7d), price_change_percentage_30d_in_currency: null, market_cap_rank: null };
+        });
+        setMarketTokens(old => append ? [...old, ...data.filter(token => !old.some(existing => existing.id === token.id))] : data); setMarketHasMore(data.length > 0); setMarketPage(page); setTrendingTokenIds([]);
       }
-    } catch (error) {
-      setMarketError(error instanceof Error ? error.message : 'Could not load market data.');
-    } finally { setMarketLoading(false); }
-  }, []);
+    } catch (error) { setMarketError(error instanceof Error ? error.message : 'Could not load market data.'); if (!append) setMarketTokens([]); }
+    finally { setMarketLoading(false); }
+  }, [marketNetworkId, availableChains]);
 
   useEffect(() => {
     void loadMarketTokens(1, false);
@@ -265,6 +277,8 @@ function App() {
   const getMarketChange = (token: MarketToken) => marketTimeRange === '1h' ? token.price_change_percentage_1h_in_currency : marketTimeRange === '7d' ? token.price_change_percentage_7d_in_currency : marketTimeRange === '30d' ? token.price_change_percentage_30d_in_currency : token.price_change_percentage_24h;
   const filteredMarketTokens = useMemo(() => {
     let result = [...marketTokens];
+    const query = marketSearch.trim().toLowerCase();
+    if (query) result = result.filter(token => token.name.toLowerCase().includes(query) || token.symbol.toLowerCase().includes(query) || (token.address || '').toLowerCase().includes(query));
     if (marketCategory === 'Favorites') result = result.filter(token => favoriteTokens.includes(token.id));
     if (marketCategory === 'Gainers') result = result.filter(token => (getMarketChange(token) ?? -Infinity) > 0).sort((a, b) => (getMarketChange(b) ?? 0) - (getMarketChange(a) ?? 0));
     else if (marketCategory === 'Losers') result = result.filter(token => (getMarketChange(token) ?? Infinity) < 0).sort((a, b) => (getMarketChange(a) ?? 0) - (getMarketChange(b) ?? 0));
@@ -278,7 +292,7 @@ function App() {
     else if (marketSort === 'price') result.sort((a, b) => (b.current_price ?? 0) - (a.current_price ?? 0));
     else if (marketSort === 'change') result.sort((a, b) => (getMarketChange(b) ?? -Infinity) - (getMarketChange(a) ?? -Infinity));
     return result;
-  }, [marketTokens, marketCategory, favoriteTokens, marketSort, trendingTokenIds, marketTimeRange]);
+  }, [marketTokens, marketCategory, favoriteTokens, marketSort, trendingTokenIds, marketTimeRange, marketSearch]);
 
   const connect = async () => {
     if (!window.ethereum) { setNotice('No compatible browser wallet detected. Install a wallet extension, then reload this page.'); return; }
@@ -367,7 +381,7 @@ function App() {
 
         {activeTab === 'Market' ? <section className="market-page">
           <div className="market-topline">
-            <button type="button" className="market-search-icon-button" aria-label="Search market" onClick={() => setNotice('Market search will be added in a later step.')}><Search size={20}/></button>
+            <label className="market-search-wrap"><Search size={18}/><input value={marketSearch} onChange={event => setMarketSearch(event.target.value)} placeholder="Search all tokens or contract address…" aria-label="Search market tokens"/></label>
           </div>
           <div className="market-ticker-viewport" aria-label="Market highlights">
             <div className="market-ticker-track">
@@ -386,7 +400,7 @@ function App() {
             </div>
           </div>
           <div className="market-controls-row">
-            <button type="button" className="market-network-select" onClick={() => setModal('network')} aria-label="Select network"><Globe2 size={15}/><span>{chain.name}</span><ChevronDown size={13}/></button>
+            <label className="market-network-select"><Globe2 size={15}/><select aria-label="Filter tokens by network" value={marketNetworkId} onChange={event => { setMarketNetworkId(event.target.value); setMarketCategory('All tokens'); setMarketPage(1); }}><option value="all">All chains · global listings</option>{availableChains.map(item => <option key={item.id} value={String(item.id)}>{item.name} · {item.symbol}</option>)}</select><ChevronDown size={13}/></label>
             <div className="market-range-wrap">
               <button type="button" className="market-range-select" aria-label="Select price change range" aria-expanded={marketTimeOpen} onClick={() => setMarketTimeOpen(open => !open)}><span>{marketTimeRange}</span><ChevronDown size={12}/></button>
               {marketTimeOpen && <div className="market-range-menu">{(['1h', '24h', '7d', '30d'] as const).map(range => <button type="button" key={range} className={marketTimeRange === range ? 'active' : ''} onClick={() => { setMarketTimeRange(range); setMarketTimeOpen(false); }}>{range}</button>)}</div>}
@@ -407,7 +421,7 @@ function App() {
                 return <article className="market-compact-row" key={token.id}>
                   <span className="market-compact-rank">{token.market_cap_rank ?? index + 1}</span>
                   <div className="market-compact-asset">
-                    <div className="market-token"><img src={token.image} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }}/><div><strong>{token.name}</strong><span>{token.symbol.toUpperCase()}</span></div></div>
+                    <div className="market-token">{token.image && <img src={token.image} alt="" loading="lazy" onError={event => { event.currentTarget.style.visibility = 'hidden'; }}/>}<div><strong>{token.name}</strong><span>{token.symbol.toUpperCase()}{token.address ? ` · ${token.address.slice(0, 6)}…${token.address.slice(-4)}` : ''}</span></div></div>
                     <div className="market-compact-metrics"><span><b>MC</b> {marketNumber(token.market_cap)}</span><span><b>VOL</b> {marketNumber(token.total_volume)}</span></div>
                   </div>
                   <div className="market-compact-price"><strong>{marketPrice(token.current_price)}</strong><span className={change == null ? 'neutral' : change >= 0 ? 'positive' : 'negative'}>{change == null ? '—' : `${change > 0 ? '+' : ''}${change.toFixed(2)}%`}</span></div>
@@ -417,7 +431,7 @@ function App() {
               {!marketLoading && filteredMarketTokens.length === 0 && <div className="market-empty">{marketError ? 'Market data could not be loaded.' : marketCategory === 'Favorites' ? 'No favorites yet. Tap the star beside a token to save it here.' : 'No tokens match this category.'}</div>}
               {marketLoading && marketTokens.length === 0 && <div className="market-loading"><span className="market-loader"/><span>Loading live market catalogue…</span></div>}
             </div>
-            <div className="market-table-footer">{marketHasMore && marketCategory !== 'Hot' && marketCategory !== 'Favorites' && <button type="button" onClick={() => void loadMarketTokens(marketPage + 1, true)} disabled={marketLoading}>{marketLoading ? 'Loading…' : 'Load more tokens'} <ArrowDownLeft size={14}/></button>}</div>
+            <div className="market-table-footer">{marketHasMore && (marketNetworkId !== 'all' || (marketCategory !== 'Hot' && marketCategory !== 'Favorites')) && <button type="button" onClick={() => void loadMarketTokens(marketPage + 1, true)} disabled={marketLoading}>{marketLoading ? 'Loading…' : 'Load more tokens'} <ArrowDownLeft size={14}/></button>}</div>
           </div>
         </section> : <>
         <section className="sire-home-value-card" aria-label="Total account value">
