@@ -999,3 +999,23 @@ a:focus-visible,
 button:active, a:active, [role="button"]:active {
   -webkit-tap-highlight-color: transparent;
 }
+
+
+/* Expandable multi-chain directory and searchable network picker. */
+.network-search-wrap {
+  display:flex; align-items:center; gap:10px; margin:14px 0 9px; padding:0 13px;
+  min-height:44px; border:1px solid rgba(255,255,255,.13); border-radius:14px;
+  background:#101010; color:rgba(255,255,255,.55);
+}
+.network-search-wrap input {
+  width:100%; min-width:0; border:0; outline:0; background:transparent; color:#fff;
+  font:inherit; font-size:13px; padding:12px 0; box-shadow:none;
+}
+.network-search-wrap input::placeholder { color:rgba(255,255,255,.38); }
+.network-count { color:rgba(255,255,255,.48); font-size:11px; margin:0 2px 8px; }
+.network-loading { color:rgba(255,255,255,.58); font-size:12px; padding:8px 2px; }
+.network-list { max-height:min(48vh,430px); overflow-y:auto; overscroll-behavior:contain; }
+.network-list::-webkit-scrollbar { width:5px; }
+.network-list::-webkit-scrollbar-thumb { background:rgba(255,255,255,.2); border-radius:99px; }
+.network-marquee-pill { flex-shrink:0; cursor:pointer; font:inherit; }
+.network-marquee-pill:focus-visible { outline:2px solid rgba(255,255,255,.7); outline-offset:3px; }
