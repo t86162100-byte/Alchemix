@@ -27,6 +27,8 @@ const iconLetters: Record<string, string> = { ETH: 'Ξ', BNB: '◆', POL: '⬡' 
 
 function App() {
   const [activeTab, setActiveTab] = useState('Overview');
+  const [bottomNavVisible, setBottomNavVisible] = useState(true);
+  const [navRevealDirection, setNavRevealDirection] = useState<number | null>(null);
   const [marketTokens, setMarketTokens] = useState<MarketToken[]>([]);
   const [trendingTokenIds, setTrendingTokenIds] = useState<string[]>([]);
   const [marketLoading, setMarketLoading] = useState(false);
@@ -52,6 +54,56 @@ function App() {
   const [notice, setNotice] = useState('');
   const [mobileNav, setMobileNav] = useState(false);
   const [activity, setActivity] = useState<{ hash: string; chain: Chain; time: string }[]>([]);
+
+  useEffect(() => {
+    let hideTimer: ReturnType<typeof setTimeout>;
+    let touchStartX: number | null = null;
+    const scheduleHide = () => {
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(() => {
+        setBottomNavVisible(false);
+        setNavRevealDirection(null);
+      }, 10000);
+    };
+    const onTouchStart = (event: TouchEvent) => {
+      touchStartX = event.touches[0]?.clientX ?? null;
+      scheduleHide();
+    };
+    const onTouchEnd = (event: TouchEvent) => {
+      if (touchStartX === null) return;
+      const delta = (event.changedTouches[0]?.clientX ?? touchStartX) - touchStartX;
+      touchStartX = null;
+      if (Math.abs(delta) < 60) { scheduleHide(); return; }
+      const direction = Math.sign(delta);
+      if (!bottomNavVisible) {
+        setBottomNavVisible(true);
+        setNavRevealDirection(direction);
+        scheduleHide();
+      } else if (navRevealDirection !== null && direction === -navRevealDirection) {
+        setBottomNavVisible(false);
+        setNavRevealDirection(null);
+        clearTimeout(hideTimer);
+      } else {
+        scheduleHide();
+      }
+    };
+    const onActivity = () => scheduleHide();
+    scheduleHide();
+    window.addEventListener('touchstart', onTouchStart, { passive: true });
+    window.addEventListener('touchend', onTouchEnd, { passive: true });
+    window.addEventListener('pointerdown', onActivity, { passive: true });
+    window.addEventListener('keydown', onActivity);
+    window.addEventListener('scroll', onActivity, { passive: true });
+    return () => {
+      clearTimeout(hideTimer);
+      window.removeEventListener('touchstart', onTouchStart);
+      window.removeEventListener('touchend', onTouchEnd);
+      window.removeEventListener('pointerdown', onActivity);
+      window.removeEventListener('keydown', onActivity);
+      window.removeEventListener('scroll', onActivity);
+    };
+  }, [bottomNavVisible, navRevealDirection]);
+
   const chain = CHAINS.find(c => c.id === chainId) ?? CHAINS[0];
   const usdBalance = balance === null ? null : balance * (prices[chain.priceId] || 0);
 
@@ -345,7 +397,7 @@ function App() {
       </div>
     </main>
 
-    <nav className="bottom-navigation" aria-label="Main navigation">
+    <nav className={`bottom-navigation ${bottomNavVisible ? '' : 'nav-hidden'}`} aria-label="Main navigation">
       <button type="button" className={activeTab === 'Overview' ? 'active' : ''} aria-current={activeTab === 'Overview' ? 'page' : undefined} onClick={() => setActiveTab('Overview')}><Home size={20}/><span>Home</span></button>
       <button type="button" className={activeTab === 'Market' ? 'active' : ''} aria-current={activeTab === 'Market' ? 'page' : undefined} onClick={() => setActiveTab('Market')}><TrendingUp size={20}/><span>Market</span></button>
       <button type="button" className={activeTab === 'Activity' ? 'active' : ''} aria-current={activeTab === 'Activity' ? 'page' : undefined} onClick={() => setActiveTab('Activity')}><Activity size={20}/><span>History</span></button>
