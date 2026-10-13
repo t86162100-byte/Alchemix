@@ -21,8 +21,6 @@ type LifiChain = { id: number; key?: string; name: string; chainType?: string; l
 type LifiTokenResponse = { tokens?: Record<string, Array<MarketToken>> };
 const MARKET_FEATURED_CHAIN_IDS = [1, 56, 8453, 137, 42161, 10, 43114, 5000];
 // All supported EVM networks come from LI.FI. This list only controls their display order.
-const isMarketNativeToken = (token: MarketToken, _network: MarketNetwork) =>
-  token.address.toLowerCase() === '0x0000000000000000000000000000000000000000';
 const shortAddress = (s: string) => s ? `${s.slice(0, 6)}…${s.slice(-4)}` : '';
 const rpcCall = async (chain: Chain, method: string, params: unknown[] = []) => {
 const response = await fetch(chain.rpc, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }) });
