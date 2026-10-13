@@ -43,14 +43,14 @@ export async function fetchDexMarketMetrics(results: Array<{ chainId:number; tok
       const best = new Map<string,Pair>();
       for (const pair of payload.pairs || []) {
         if (pair.chainId !== chunk[0]?.dexChain) continue;
-        for (const address of [pair.baseToken?.address,pair.quoteToken?.address]) {
+        const address = pair.baseToken?.address;
+        if (!address) continue;
           if (!address) continue;
           const target = chunk.find(item => item.token.address.toLowerCase() === address.toLowerCase());
           if (!target) continue;
           const key = target.chainId + ':' + address.toLowerCase();
           const previous = best.get(key);
           if (!previous || Number(pair.liquidity?.usd || 0) > Number(previous.liquidity?.usd || 0)) best.set(key,pair);
-        }
       }
       return [...best.entries()].map(([key,pair]) => [key,{
         priceUsd:Number(pair.priceUsd) || undefined, priceChange:pair.priceChange, volume:pair.volume,
