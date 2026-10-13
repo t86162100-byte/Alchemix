@@ -1174,3 +1174,65 @@ button:active, a:active, [role="button"]:active {
 .bottom-navigation.nav-hidden { visibility:hidden; }
 .bottom-navigation button { appearance:none; -webkit-appearance:none; outline:none; -webkit-tap-highlight-color:transparent; }
 .bottom-navigation button:focus,.bottom-navigation button:focus-visible { outline:none; box-shadow:none; }
+
+/* Market network drawer: searchable network pills followed by token-symbol shortcuts. */
+.market-network-drawer {
+  width:min(100%,560px);
+  max-height:min(88dvh,780px);
+  padding:22px;
+  border-radius:24px;
+  background:#080808!important;
+  border:1px solid rgba(255,255,255,.13);
+  color:#fff;
+}
+.market-network-drawer .modal-head { margin-bottom:16px; }
+.market-network-drawer .modal-eyebrow { color:rgba(255,255,255,.46); }
+.market-network-drawer .modal-head h2 { color:#fff; }
+.market-network-drawer .icon-button { color:rgba(255,255,255,.65); }
+.market-network-drawer-content { display:flex; flex-direction:column; min-height:0; gap:14px; }
+.market-network-search {
+  display:flex; align-items:center; gap:10px; min-height:48px; padding:0 15px;
+  border:1px solid rgba(255,255,255,.13); border-radius:999px; background:#111;
+  color:rgba(255,255,255,.55);
+}
+.market-network-search input { flex:1; min-width:0; border:0; outline:0; background:transparent; color:#fff; font:inherit; font-size:13px; }
+.market-network-search input::placeholder { color:rgba(255,255,255,.38); }
+.market-network-search button { display:grid; place-items:center; border:0; background:transparent; color:#aaa; }
+.market-network-pill-list {
+  display:flex; align-items:center; gap:8px; overflow-x:auto; padding:1px 0 7px;
+  scrollbar-width:none; overscroll-behavior-x:contain;
+}
+.market-network-pill-list::-webkit-scrollbar { display:none; }
+.market-network-pill-list button {
+  display:inline-flex; align-items:center; gap:8px; flex:0 0 auto; min-height:43px; padding:5px 13px 5px 6px;
+  border:1px solid rgba(255,255,255,.12); border-radius:999px; background:#101010; color:rgba(255,255,255,.76);
+  font:inherit; font-size:11px; font-weight:650; white-space:nowrap; cursor:pointer;
+}
+.market-network-pill-list button.active { border-color:#fff; background:#f4f4f4; color:#080808; }
+.market-network-pill-logo { position:relative; display:grid; place-items:center; width:30px; height:30px; flex:0 0 30px; overflow:hidden; border-radius:50%; background:#202020; color:#fff; font-size:9px; font-weight:800; }
+.market-network-pill-list button.active .market-network-pill-logo { background:#e2e2e2; color:#111; }
+.market-network-pill-logo img { position:absolute; inset:0; width:100%; height:100%; object-fit:contain; background:#171717; z-index:1; }
+.market-network-pill-logo > span { position:relative; }
+.market-network-token-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:10px; padding-top:5px; border-top:1px solid rgba(255,255,255,.1); }
+.market-network-token-heading > div { display:grid; gap:5px; }
+.market-network-token-heading > div > span { color:rgba(255,255,255,.43); font-size:9px; font-weight:800; letter-spacing:.13em; }
+.market-network-token-heading strong { color:#fff; font-size:15px; font-weight:750; }
+.market-network-token-heading small { color:rgba(255,255,255,.42); font-size:10px; }
+.market-network-symbol-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; max-height:32vh; overflow-y:auto; padding:1px 2px 2px 0; }
+.market-network-symbol-list button {
+  display:grid; grid-template-columns:34px minmax(0,1fr) 14px; grid-template-rows:auto auto; align-items:center; column-gap:9px;
+  min-width:0; padding:10px; border:1px solid rgba(255,255,255,.1); border-radius:14px; background:#101010; color:#fff; text-align:left;
+}
+.market-network-symbol-list button > span { grid-row:1 / span 2; display:grid; place-items:center; width:34px; height:34px; border-radius:50%; background:#242424; color:#fff; font-size:12px; font-weight:800; }
+.market-network-symbol-list button strong { min-width:0; overflow:hidden; text-overflow:ellipsis; font-size:12px; font-weight:750; }
+.market-network-symbol-list button small { color:rgba(255,255,255,.4); font-size:9px; }
+.market-network-symbol-list button > svg { grid-column:3; grid-row:1 / span 2; color:rgba(255,255,255,.4); }
+.market-network-symbol-list button:hover { border-color:rgba(255,255,255,.28); background:#171717; }
+.market-network-note { margin:0; padding-top:9px; border-top:1px solid rgba(255,255,255,.08); color:rgba(255,255,255,.38); font-size:10px; line-height:1.6; }
+@media(max-width:560px) {
+  .market-network-drawer { width:100%; max-height:90dvh; padding:19px 16px calc(18px + env(safe-area-inset-bottom)); border-radius:24px 24px 0 0; border-bottom:0; animation:network-sheet-in .22s ease-out; }
+  .market-network-symbol-list { max-height:28vh; gap:7px; }
+  .market-network-symbol-list button { padding:9px 8px; grid-template-columns:30px minmax(0,1fr) 12px; column-gap:7px; }
+  .market-network-symbol-list button > span { width:30px; height:30px; }
+  .market-network-pill-list button { min-height:41px; padding-right:11px; }
+}
