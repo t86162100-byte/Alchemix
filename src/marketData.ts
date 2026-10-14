@@ -44,7 +44,7 @@ export async function fetchDexMarketMetrics(results: Array<{ chainId:number; tok
   });
   const dexResults = await Promise.all(dexChunks.map(async chunk => {
     try {
-      const response = await fetch('https://api.dexscreener.com/tokens/v1/'+chunk.chain+'/'+chunk.tokens.map(token=>token.address).join(','));
+      const response = await fetch('https://api.dexscreener.com/tokens/v1/'+chunk.chain+'/'+chunk.tokens.map(token=>token.address).join(','), { cache: 'no-cache' });
       if (!response.ok) return [];
       // DexScreener /tokens/v1 returns a JSON array directly (not { pairs: [...] }).
       // Accept both shapes so a provider response is never silently treated as empty.
@@ -55,7 +55,10 @@ export async function fetchDexMarketMetrics(results: Array<{ chainId:number; tok
       for (const pair of pairs) {
         const address = pair.baseToken?.address?.toLowerCase();
         const price = asNumber(pair.priceUsd);
+        const change = pair.priceChange?.h24;
         if (pair.chainId !== chunk.chain || !address || !requested.has(address) || price === undefined || price <= 0) continue;
+        // Ignore clearly corrupted provider values rather than presenting them as market data.
+        if (change !== undefined && (!Number.isFinite(change) || Math.abs(change) > 10000)) continue;
         const prior = best.get(address);
         if (!prior || Number(pair.liquidity?.usd || 0) > Number(prior.liquidity?.usd || 0)) best.set(address,pair);
       }
