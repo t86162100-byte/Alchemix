@@ -10,7 +10,7 @@ type Props = {
   onToggleFavorite:(key:string)=>void;
 };
 
-// Fallback token logos for entries where the LI.FI directory omits or serves a broken logo URI.
+// Fallback token logos for market-provider token entries where a published logo is missing or broken.
 // Multiple public logo registries plus a generated visual fallback for tokens without published logos.
 const trustWalletFolders:Record<number,string>={
 1:'ethereum',56:'smartchain',137:'polygon',42161:'arbitrum',10:'optimism',43114:'avalanchec',
@@ -49,8 +49,7 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
     const change=timeRange==='1h'?data.priceChange?.h1:timeRange==='24h'?data.priceChange?.h24:undefined;
     return {...token,key,networkName:network.name,data,price,change};
   }));
-  // Display the LI.FI token directory as supplied. Market metrics and token categories do not
-  // decide eligibility here; actual swap routes are verified by LI.FI when a swap is requested.
+  // Display the market-provider token list directly. LI.FI does not determine Market token eligibility.
   if(query) rows=rows.filter(t=>t.name.toLowerCase().includes(query)||t.symbol.toLowerCase().includes(query)||t.address.toLowerCase().includes(query)||t.networkName.toLowerCase().includes(query));
   if(category==='Favorites') rows=rows.filter(t=>favorites.includes(t.key));
   if(category==='Gainers') rows=rows.filter(t=>typeof t.change==='number'&&t.change>0);
@@ -86,5 +85,5 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
             /><span className="market-token-fallback">{(token.symbol||'?').slice(0,3).toUpperCase()}</span></span><div className="market-token-copy"><strong title={token.name||token.symbol}>{token.symbol||token.name}</strong><span title={(token.name||token.symbol)+' · '+token.networkName}>{token.networkName} · {(token.name||token.symbol)}</span></div></div><div className="market-compact-metrics"><span><b>{token.data.marketCap ? "MC" : token.data.fdv ? "FDV" : "MC"}</b> {compact(token.data.marketCap||token.data.fdv)}</span><span><b>VOL</b> {compact(token.data.volume?.h24)}</span><span><b>LIQ</b> {compact(token.data.liquidity?.usd)}</span></div></div><div className="market-compact-price"><strong>{money(token.price)}</strong><span className={typeof token.change!=='number'?'neutral':token.change>0?'positive':token.change<0?'negative':'neutral'}>{typeof token.change==='number'?(token.change>0?'+':'')+token.change.toFixed(2)+'%':'—'}</span></div><button type="button" className="market-favorite" onClick={()=>onToggleFavorite(token.key)} aria-label={favorites.includes(token.key)?'Remove from favorites':'Add to favorites'} aria-pressed={favorites.includes(token.key)}><Star size={15} fill={favorites.includes(token.key)?'currentColor':'none'}/></button></article>)}
     {rows.length > visibleCount && <button type="button" className="market-load-more" onClick={() => setVisibleCount(count => Math.min(count + 100, rows.length))}>Show more tokens ({Math.min(100, rows.length - visibleCount)} more) <ChevronDown size={15}/></button>}
     {!rows.length&&<div className="market-empty">{loading?'Loading token prices and market metrics…':error|| (category==='Favorites'?'No favorites saved yet. Tap a star beside a token to save it.':'No tokens match these filters. Try another network or search.')}</div>}
-  </div><div className="market-table-footer"><span>Tokens listed by LI.FI for the selected networks. Price and DEX metrics appear when a matching market is available; unavailable values are shown as dashes. 7d/30d changes are not available yet.</span></div></div>;
+  </div><div className="market-table-footer"><span>Tokens listed by the market provider for the selected networks. Price and DEX metrics appear when a matching market is available; unavailable values are shown as dashes. 7d/30d changes are not available yet.</span></div></div>;
 }
