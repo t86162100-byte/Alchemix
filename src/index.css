@@ -1281,8 +1281,8 @@ button:active, a:active, [role="button"]:active {
 .market-data-status { display:flex; align-items:center; gap:9px; min-height:34px; margin:10px 0 13px; color:rgba(255,255,255,.56); font-size:11px; line-height:1.5; }
 .market-data-status::before { content:""; display:block; width:6px; height:6px; flex:0 0 6px; border-radius:50%; background:#65d6a0; box-shadow:0 0 10px rgba(101,214,160,.22); }
 .market-data-status:has(+ .market-toolbar) { margin-bottom:10px; }
-.market-compact-asset .market-token-logos { position:relative; display:grid; place-items:center; width:40px; height:40px; flex:0 0 40px; overflow:hidden; border-radius:13px; background:#17191f; border:1px solid rgba(255,255,255,.07); box-shadow:inset 0 1px 0 rgba(255,255,255,.035); }
-.market-compact-asset .market-token-logos img { display:block; width:100%; height:100%; padding:3px; box-sizing:border-box; object-fit:contain; object-position:center; border-radius:12px; image-rendering:auto; }
+.market-compact-asset .market-token-logos { position:relative; display:grid; place-items:center; width:40px; height:40px; flex:0 0 40px; overflow:hidden; border-radius:50%; background:#17191f; border:1px solid rgba(255,255,255,.07); box-shadow:inset 0 1px 0 rgba(255,255,255,.035); }
+.market-compact-asset .market-token-logos img { display:block; width:100%; height:100%; padding:3px; box-sizing:border-box; object-fit:contain; object-position:center; border-radius:50%; image-rendering:auto; }
 .market-compact-asset .market-token-fallback { position:absolute; inset:0; display:grid; place-items:center; color:rgba(255,255,255,.78); font-size:9px; font-weight:800; letter-spacing:-.3px; pointer-events:none; }
 .market-compact-asset .market-token-logos img:not([src]), .market-compact-asset .market-token-logos img[src=''] { display:none; }
 .market-compact-row .market-favorite[aria-pressed="true"] { color:#fff; }
