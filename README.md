@@ -1,6 +1,6 @@
 # Ferra Wallet
 
-Ferra Wallet is being rebuilt on the `tradingview-x-clean-rebuild` branch. The prior implementation is used only as a visual reference: the existing dark dashboard styling and layout are retained, while wallet and application logic are being replaced with a clean foundation.
+Ferra Wallet is being rebuilt on the `ferra-wallet-clean-rebuild` branch. The prior implementation is used only as a visual reference: the existing dark dashboard styling and layout are retained, while wallet and application logic are being replaced with a clean foundation.
 
 ## Current phase: Stage 1 — wallet foundation
 

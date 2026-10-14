@@ -2,7 +2,7 @@ name: Ferra Wallet CI
 
 on:
   push:
-    branches: [main, wallet-web-foundation, tradingview-x-clean-rebuild]
+    branches: [main, wallet-web-foundation, ferra-wallet-clean-rebuild]
   pull_request:
 
 jobs:
