@@ -20,6 +20,9 @@ type MarketNetwork = { id: string; chainId: number; name: string; symbol: string
 type LifiChain = { id: number; key?: string; name: string; chainType?: string; logoURI?: string; nativeToken?: { address: string; symbol: string; name: string; decimals: number; logoURI?: string; priceUSD?: string; coinKey?: string } };
 type LifiTokenResponse = { tokens?: Record<string, Array<MarketToken>> };
 type CoinGeckoTokenList = { tokens?: Array<{ chainId?: number; address?: string; name?: string; symbol?: string; decimals?: number; logoURI?: string }> };
+type CoinGeckoCoin = { id: string; name?: string; symbol?: string; platforms?: Record<string, string>; image?: { large?: string; small?: string; thumb?: string } };
+type CoinGeckoCoinList = CoinGeckoCoin[];
+const COINGECKO_PLATFORM_FALLBACKS: Record<number, string> = { 1: 'ethereum', 56: 'binance-smart-chain', 8453: 'base', 137: 'polygon-pos', 42161: 'arbitrum-one', 10: 'optimistic-ethereum', 43114: 'avalanche', 5000: 'mantle', 80094: 'berachain', 81457: 'blast', 42220: 'celo', 25: 'cronos', 100: 'xdai', 59144: 'linea', 534352: 'scroll', 324: 'zksync', 130: 'unichain' };
 type CoinGeckoPlatform = { id: string; chain_identifier?: number | null; image?: { thumb?: string; small?: string; large?: string } };
 const MARKET_FEATURED_CHAIN_IDS = [1, 56, 8453, 137, 42161, 10, 43114, 5000];
 let coinGeckoPlatformsPromise: Promise<CoinGeckoPlatform[]> | null = null;
@@ -125,23 +128,38 @@ platforms.forEach(platform => {
   if (Number.isInteger(platform.chain_identifier) && platform.chain_identifier! > 0) platformByChain.set(platform.chain_identifier!, platform.id);
 });
 const results = await Promise.all(missing.map(async network => {
-  const platformId = platformByChain.get(network.chainId);
-  let providerTokens: Array<{ chainId?: number; address?: string; name?: string; symbol?: string; decimals?: number; logoURI?: string }> = [];
+  // Prefer CoinGecko's chain token list, but some platforms do not publish one.
+  // Resolve well-known platform IDs explicitly so duplicate/incomplete platform metadata
+  // cannot accidentally point Ethereum or Base at the wrong token list.
+  const platformId = COINGECKO_PLATFORM_FALLBACKS[network.chainId] || platformByChain.get(network.chainId);
+  let providerTokens: Array<{ address?: string; name?: string; symbol?: string; decimals?: number; logoURI?: string; coinKey?: string }> = [];
   if (platformId) {
     try {
       const providerResponse = await fetch('https://tokens.coingecko.com/' + encodeURIComponent(platformId) + '/all.json');
       if (providerResponse.ok) {
         const list = await providerResponse.json() as CoinGeckoTokenList;
-        providerTokens = list.tokens || [];
+        providerTokens = (list.tokens || []).map(token => ({ ...token }));
       }
-    } catch { /* Market token metadata is optional; metrics can still be loaded for any provider tokens received. */ }
+    } catch { /* Fall through to CoinGecko's contract-address catalog below. */ }
+    if (!providerTokens.length) {
+      try {
+        const catalogResponse = await fetch('https://api.coingecko.com/api/v3/coins/list?include_platform=true');
+        if (catalogResponse.ok) {
+          const catalog = await catalogResponse.json() as CoinGeckoCoinList;
+          providerTokens = catalog.flatMap(coin => {
+            const address = coin.platforms?.[platformId!];
+            if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) return [];
+            return [{ address, name: coin.name || coin.symbol || coin.id, symbol: coin.symbol || coin.id, decimals: 18, logoURI: undefined, coinKey: coin.id }];
+          });
+        }
+      } catch { /* Keep the provider list empty if both market-provider sources are unavailable. */ }
+    }
   }
-  // The Market token universe comes directly from CoinGecko's token list.
-  // Do not intersect it with LI.FI's token directory: that silently removes
-  // market-listed assets on chains where LI.FI's registry is incomplete.
+  // The Market token universe comes from CoinGecko's own catalog. It is never
+  // filtered through LI.FI. Metrics are joined by chain ID + contract address.
   const seen = new Set<string>();
   const tokens: MarketToken[] = providerTokens
-    .filter(token => Boolean(token.address) && Boolean(String(token.symbol || '').trim()) && Number.isFinite(token.decimals))
+    .filter(token => Boolean(token.address) && Boolean(String(token.symbol || '').trim()))
     .filter(token => /^0x[a-fA-F0-9]{40}$/.test(token.address || '') && (token.address || '').toLowerCase() !== '0x0000000000000000000000000000000000000000')
     .filter(token => {
       const key = (token.address || '').toLowerCase();
@@ -154,8 +172,9 @@ const results = await Promise.all(missing.map(async network => {
       address: token.address!,
       symbol: String(token.symbol).trim(),
       name: String(token.name || token.symbol).trim(),
-      decimals: Number(token.decimals),
-      logoURI: token.logoURI
+      decimals: Number.isFinite(token.decimals) ? Number(token.decimals) : 18,
+      logoURI: token.logoURI,
+      coinKey: token.coinKey
     }));
   const nativeToken = network.nativeToken;
   // Add a native-asset display row only if the market provider list is empty.
