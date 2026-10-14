@@ -19,7 +19,16 @@ type MarketToken = { chainId: number; address: string; symbol: string; name: str
 type MarketNetwork = { id: string; chainId: number; name: string; symbol: string; logoURI?: string; tokens: MarketToken[]; nativeToken?: MarketToken };
 type LifiChain = { id: number; key?: string; name: string; chainType?: string; logoURI?: string; nativeToken?: { address: string; symbol: string; name: string; decimals: number; logoURI?: string; priceUSD?: string; coinKey?: string } };
 type LifiTokenResponse = { tokens?: Record<string, Array<MarketToken>> };
+type CoinGeckoTokenList = { tokens?: Array<{ chainId?: number; address?: string; name?: string; symbol?: string; decimals?: number; logoURI?: string }> };
+type CoinGeckoPlatform = { id: string; chain_identifier?: number | null };
 const MARKET_FEATURED_CHAIN_IDS = [1, 56, 8453, 137, 42161, 10, 43114, 5000];
+let coinGeckoPlatformsPromise: Promise<CoinGeckoPlatform[]> | null = null;
+const getCoinGeckoPlatforms = async () => {
+  if (!coinGeckoPlatformsPromise) coinGeckoPlatformsPromise = fetch('https://api.coingecko.com/api/v3/asset_platforms')
+    .then(response => { if (!response.ok) throw new Error('Market provider platform list unavailable'); return response.json() as Promise<CoinGeckoPlatform[]>; })
+    .catch(error => { coinGeckoPlatformsPromise = null; throw error; });
+  return coinGeckoPlatformsPromise;
+};
 // All supported EVM networks come from LI.FI. This list only controls their display order.
 const shortAddress = (s: string) => s ? `${s.slice(0, 6)}…${s.slice(-4)}` : '';
 const rpcCall = async (chain: Chain, method: string, params: unknown[] = []) => {
@@ -103,39 +112,60 @@ const [walletBusy, setWalletBusy] = useState(false);
 const [walletError, setWalletError] = useState('');
 const [hasStoredWallet, setHasStoredWallet] = useState(() => Boolean(localStorage.getItem('nova-wallet-keystore')));
 const loadMarketTokens = useCallback(async (networkId: string, currentNetworks = marketNetworks) => {
-const targets = networkId === 'all'
-? currentNetworks
-: currentNetworks.filter(item => item.id === networkId);
+const targets = networkId === 'all' ? currentNetworks : currentNetworks.filter(item => item.id === networkId);
 const missing = targets.filter(item => !marketTokenLoaded.current.has(item.chainId) && !marketTokenRequests.current.has(item.chainId));
 if (!missing.length) return;
 missing.forEach(item => marketTokenRequests.current.add(item.chainId));
 setMarketTokensLoading(true);
+setMarketNetworkError('');
 try {
-const results = await Promise.all(missing.map(async network => {
-const response = await fetch('https://li.quest/v1/tokens?chains=' + network.chainId);
-if (!response.ok) throw new Error('Token service unavailable');
-const payload = await response.json() as LifiTokenResponse;
-const directoryTokens = (payload.tokens?.[String(network.chainId)] || []);
-const nativeToken = network.nativeToken;
-const tokens = (nativeToken && !directoryTokens.some(token => token.address.toLowerCase() === nativeToken.address.toLowerCase()) ? [...directoryTokens, nativeToken] : directoryTokens)
-.map(token => ({ ...token, chainId: network.chainId }))
-.filter(token => Boolean(String(token.symbol || '').trim()) && Boolean(token.address) && Number.isFinite(token.decimals))
-.sort((a, b) => {
-const aNative = a.address.toLowerCase() === '0x0000000000000000000000000000000000000000' || a.symbol.toLowerCase() === network.symbol.toLowerCase();
-const bNative = b.address.toLowerCase() === '0x0000000000000000000000000000000000000000' || b.symbol.toLowerCase() === network.symbol.toLowerCase();
-if (aNative !== bNative) return aNative ? -1 : 1;
-return Number(b.priceUSD || 0) - Number(a.priceUSD || 0);
+const platforms = await getCoinGeckoPlatforms();
+const platformByChain = new Map<number, string>();
+platforms.forEach(platform => {
+  if (Number.isInteger(platform.chain_identifier) && platform.chain_identifier! > 0) platformByChain.set(platform.chain_identifier!, platform.id);
 });
-return { id: network.id, chainId: network.chainId, tokens };
+const results = await Promise.all(missing.map(async network => {
+  const lifiResponse = await fetch('https://li.quest/v1/tokens?chains=' + network.chainId);
+  if (!lifiResponse.ok) throw new Error('LI.FI token directory unavailable');
+  const lifiPayload = await lifiResponse.json() as LifiTokenResponse;
+  const lifiTokens = (lifiPayload.tokens?.[String(network.chainId)] || []).map(token => ({ ...token, chainId: network.chainId }))
+    .filter(token => Boolean(String(token.symbol || '').trim()) && Boolean(token.address) && Number.isFinite(token.decimals));
+  const platformId = platformByChain.get(network.chainId);
+  let providerTokens: Array<{ address?: string; name?: string; symbol?: string; decimals?: number; logoURI?: string }> = [];
+  if (platformId) {
+    try {
+      const providerResponse = await fetch('https://tokens.coingecko.com/' + encodeURIComponent(platformId) + '/all.json');
+      if (providerResponse.ok) {
+        const list = await providerResponse.json() as CoinGeckoTokenList;
+        providerTokens = list.tokens || [];
+      }
+    } catch { /* Keep the network's native LI.FI token if the market provider list is unavailable. */ }
+  }
+  const providerByAddress = new Map(providerTokens.filter(token => token.address).map(token => [token.address!.toLowerCase(), token]));
+  // Market eligibility comes from CoinGecko's chain-specific token list; LI.FI's directory
+  // remains the canonical token object passed to swap. Never match by symbol alone.
+  const matched = lifiTokens.filter(token => providerByAddress.has(token.address.toLowerCase())).map(token => {
+    const provider = providerByAddress.get(token.address.toLowerCase())!;
+    return { ...token, name: provider.name || token.name, symbol: provider.symbol || token.symbol, logoURI: provider.logoURI || token.logoURI };
+  });
+  const nativeToken = network.nativeToken;
+  if (nativeToken && !matched.some(token => token.address.toLowerCase() === nativeToken.address.toLowerCase())) matched.push({ ...nativeToken, chainId: network.chainId });
+  const tokens = matched.sort((a, b) => {
+    const aNative = Boolean(nativeToken && a.address.toLowerCase() === nativeToken.address.toLowerCase());
+    const bNative = Boolean(nativeToken && b.address.toLowerCase() === nativeToken.address.toLowerCase());
+    if (aNative !== bNative) return aNative ? -1 : 1;
+    return Number(b.priceUSD || 0) - Number(a.priceUSD || 0);
+  });
+  return { id: network.id, chainId: network.chainId, tokens };
 }));
 results.forEach(item => marketTokenLoaded.current.add(item.chainId));
 setMarketNetworks(previous => previous.map(network => {
-const result = results.find(item => item.id === network.id);
-return result ? { ...network, tokens: result.tokens } : network;
+  const result = results.find(item => item.id === network.id);
+  return result ? { ...network, tokens: result.tokens } : network;
 }));
 void fetchDexMarketMetrics(results).then(metrics => { if (Object.keys(metrics).length) setMarketMetrics(previous => ({ ...previous, ...metrics })); });
 } catch {
-setMarketNetworkError('Live token data is temporarily unavailable. Try selecting the network again.');
+setMarketNetworkError('Market data could not be loaded. Check your connection and try again.');
 } finally {
 missing.forEach(item => marketTokenRequests.current.delete(item.chainId));
 setMarketTokensLoading(false);
