@@ -27,7 +27,7 @@ type CoinGeckoPlatform = { id: string; chain_identifier?: number | null; image?:
 const MARKET_FEATURED_CHAIN_IDS = [1, 56, 8453, 137, 42161, 10, 43114, 5000];
 let coinGeckoPlatformsPromise: Promise<CoinGeckoPlatform[]> | null = null;
 const getCoinGeckoPlatforms = async () => {
-  if (!coinGeckoPlatformsPromise) coinGeckoPlatformsPromise = fetch('https://api.coingecko.com/api/v3/asset_platforms')
+  if (!coinGeckoPlatformsPromise) coinGeckoPlatformsPromise = fetch('https://api.coingecko.com/api/v3/asset_platforms', { signal: AbortSignal.timeout(12000), cache: 'no-cache' })
     .then(response => { if (!response.ok) throw new Error('Market provider platform list unavailable'); return response.json() as Promise<CoinGeckoPlatform[]>; })
     .catch(error => { coinGeckoPlatformsPromise = null; throw error; });
   return coinGeckoPlatformsPromise;
@@ -141,8 +141,18 @@ for (let offset = 0; offset < missing.length; offset += 4) {
     try {
       const platformId = platformByChain.get(network.chainId) || COINGECKO_PLATFORM_FALLBACKS[network.chainId];
       if (!platformId) throw new Error('No CoinGecko platform mapping');
-      const response = await fetch('https://tokens.coingecko.com/' + encodeURIComponent(platformId) + '/all.json');
-      if (!response.ok) throw new Error('Provider token list unavailable');
+      const tokenListUrl = 'https://tokens.coingecko.com/' + encodeURIComponent(platformId) + '/all.json';
+      let response: Response | null = null;
+      // Public market endpoints can intermittently throttle requests when the user opens All.
+      // Retry once after a short pause instead of making the user select every network manually.
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        try {
+          response = await fetch(tokenListUrl, { signal: AbortSignal.timeout(12000), cache: 'no-cache' });
+          if (response.ok) break;
+        } catch { /* retry below */ }
+        if (attempt === 0) await new Promise(resolve => setTimeout(resolve, 350));
+      }
+      if (!response?.ok) throw new Error('Provider token list unavailable');
       const list = await response.json() as CoinGeckoTokenList;
       const tokens: MarketToken[] = (list.tokens || [])
         .filter(token => Boolean(token.address) && Boolean(String(token.symbol || '').trim()) && Number.isFinite(token.decimals))
@@ -516,7 +526,7 @@ return <div className="app-shell">
 {modal === 'market-network' && <div className="market-network-drawer-content">
 <label className="market-network-search"><Search size={17}/><input autoFocus value={marketNetworkSearch} onChange={event => setMarketNetworkSearch(event.target.value)} placeholder={`Search ${marketNetworks.length} supported EVM networks…`} aria-label="Search market networks"/>{marketNetworkSearch && <button type="button" onClick={() => setMarketNetworkSearch('')} aria-label="Clear search"><X size={15}/></button>}</label>
 <div className="market-network-vertical-list">
-<button type="button" className={marketNetworkId === 'all' ? 'active' : ''} onClick={() => { setMarketNetworkId('all'); setMarketNetworkError(''); setModal(null); }}><span className="market-network-pill-logo"><span>ALL</span></span><span className="market-network-vertical-copy"><strong>All networks</strong><small>Show tokens across every listed network</small></span>{marketNetworkId === 'all' && <span className="market-network-selected">Selected</span>}</button>
+<button type="button" className={marketNetworkId === 'all' ? 'active' : ''} aria-pressed={marketNetworkId === 'all'} onClick={() => { setMarketNetworkId('all'); setMarketNetworkError(''); setMarketTokenLoaded(current => current); setModal(null); }}><span className="market-network-pill-logo"><span>ALL</span></span><span className="market-network-vertical-copy"><strong>All networks</strong><small>Show tokens across every listed network</small></span>{marketNetworkId === 'all' && <span className="market-network-selected">Selected</span>}</button>
 {marketNetworks.filter(item => !marketNetworkSearch.trim() || item.name.toLowerCase().includes(marketNetworkSearch.trim().toLowerCase()) || item.symbol.toLowerCase().includes(marketNetworkSearch.trim().toLowerCase()) || item.id.includes(marketNetworkSearch.trim())).map(item => <button type="button" key={item.id} className={marketNetworkId === item.id ? 'active' : ''} onClick={() => { setMarketNetworkId(item.id); setMarketNetworkError(''); setModal(null); }}><span className="market-network-pill-logo">{item.logoURI && <img src={item.logoURI} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }}/>}<span>{item.symbol.slice(0,3)}</span></span><span className="market-network-vertical-copy"><strong>{item.name}</strong><small>{item.symbol} · EVM · Chain ID {item.chainId}</small></span>{marketNetworkId === item.id && <span className="market-network-selected">Selected</span>}</button>)}
 </div>
 {(marketNetworksLoading || marketNetworkError) && <div className="market-network-status">{marketNetworksLoading ? 'Loading market-provider networks…' : marketNetworkError}<button type="button" onClick={() => { marketNetworks.forEach(item => { if (marketNetworkId === 'all' || item.id === marketNetworkId) marketTokenLoaded.current.delete(item.chainId); }); setMarketNetworkError(''); void loadMarketTokens(marketNetworkId); }} disabled={marketNetworksLoading}>Retry</button></div>}
