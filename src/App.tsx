@@ -117,7 +117,12 @@ const [hasStoredWallet, setHasStoredWallet] = useState(() => Boolean(localStorag
 const loadMarketTokens = useCallback(async (networkId: string, currentNetworks = marketNetworks) => {
 const targets = networkId === 'all' ? currentNetworks : currentNetworks.filter(item => item.id === networkId);
 const missing = targets.filter(item => !marketTokenLoaded.current.has(item.chainId) && !marketTokenRequests.current.has(item.chainId));
-if (!missing.length) return;
+// Switching back to All (or to a previously loaded network) must clear stale errors.
+if (!missing.length) {
+  setMarketNetworkError('');
+  setMarketTokensLoading(false);
+  return;
+}
 missing.forEach(item => marketTokenRequests.current.add(item.chainId));
 setMarketTokensLoading(true);
 setMarketNetworkError('');
@@ -167,9 +172,14 @@ for (let offset = 0; offset < missing.length; offset += 4) {
   }
 }
 if (failedCount > 0 && results.every(result => result.tokens.length === 0)) {
-  setMarketNetworkError('The market provider is temporarily unavailable for these networks. Tap Retry or choose another network.');
-} else if (failedCount > 0) {
-  setMarketNetworkError('Some networks could not load from the market provider yet. Available networks are shown; select a failed network again to retry.');
+  setMarketNetworkError(networkId === 'all'
+    ? 'The provider did not return token lists for these networks yet. Try Retry, or select a supported network.'
+    : 'The market provider could not return this network’s token list. Tap Retry to try again.');
+} else if (failedCount > 0 && networkId !== 'all') {
+  setMarketNetworkError('Some provider data is temporarily unavailable. Any tokens that did load remain visible; tap Retry to try again.');
+} else {
+  // A partial result across All networks is normal: not every provider publishes a token list for every chain.
+  setMarketNetworkError('');
 }
 } finally {
 missing.forEach(item => marketTokenRequests.current.delete(item.chainId));
@@ -506,8 +516,8 @@ return <div className="app-shell">
 {modal === 'market-network' && <div className="market-network-drawer-content">
 <label className="market-network-search"><Search size={17}/><input autoFocus value={marketNetworkSearch} onChange={event => setMarketNetworkSearch(event.target.value)} placeholder={`Search ${marketNetworks.length} supported EVM networks…`} aria-label="Search market networks"/>{marketNetworkSearch && <button type="button" onClick={() => setMarketNetworkSearch('')} aria-label="Clear search"><X size={15}/></button>}</label>
 <div className="market-network-vertical-list">
-<button type="button" className={marketNetworkId === 'all' ? 'active' : ''} onClick={() => { setMarketNetworkId('all'); setModal(null); }}><span className="market-network-pill-logo"><span>ALL</span></span><span className="market-network-vertical-copy"><strong>All networks</strong><small>Show tokens across every listed network</small></span>{marketNetworkId === 'all' && <span className="market-network-selected">Selected</span>}</button>
-{marketNetworks.filter(item => !marketNetworkSearch.trim() || item.name.toLowerCase().includes(marketNetworkSearch.trim().toLowerCase()) || item.symbol.toLowerCase().includes(marketNetworkSearch.trim().toLowerCase()) || item.id.includes(marketNetworkSearch.trim())).map(item => <button type="button" key={item.id} className={marketNetworkId === item.id ? 'active' : ''} onClick={() => { setMarketNetworkId(item.id); setModal(null); }}><span className="market-network-pill-logo">{item.logoURI && <img src={item.logoURI} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }}/>}<span>{item.symbol.slice(0,3)}</span></span><span className="market-network-vertical-copy"><strong>{item.name}</strong><small>{item.symbol} · EVM · Chain ID {item.chainId}</small></span>{marketNetworkId === item.id && <span className="market-network-selected">Selected</span>}</button>)}
+<button type="button" className={marketNetworkId === 'all' ? 'active' : ''} onClick={() => { setMarketNetworkId('all'); setMarketNetworkError(''); setModal(null); }}><span className="market-network-pill-logo"><span>ALL</span></span><span className="market-network-vertical-copy"><strong>All networks</strong><small>Show tokens across every listed network</small></span>{marketNetworkId === 'all' && <span className="market-network-selected">Selected</span>}</button>
+{marketNetworks.filter(item => !marketNetworkSearch.trim() || item.name.toLowerCase().includes(marketNetworkSearch.trim().toLowerCase()) || item.symbol.toLowerCase().includes(marketNetworkSearch.trim().toLowerCase()) || item.id.includes(marketNetworkSearch.trim())).map(item => <button type="button" key={item.id} className={marketNetworkId === item.id ? 'active' : ''} onClick={() => { setMarketNetworkId(item.id); setMarketNetworkError(''); setModal(null); }}><span className="market-network-pill-logo">{item.logoURI && <img src={item.logoURI} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }}/>}<span>{item.symbol.slice(0,3)}</span></span><span className="market-network-vertical-copy"><strong>{item.name}</strong><small>{item.symbol} · EVM · Chain ID {item.chainId}</small></span>{marketNetworkId === item.id && <span className="market-network-selected">Selected</span>}</button>)}
 </div>
 {(marketNetworksLoading || marketNetworkError) && <div className="market-network-status">{marketNetworksLoading ? 'Loading market-provider networks…' : marketNetworkError}<button type="button" onClick={() => { marketNetworks.forEach(item => { if (marketNetworkId === 'all' || item.id === marketNetworkId) marketTokenLoaded.current.delete(item.chainId); }); setMarketNetworkError(''); void loadMarketTokens(marketNetworkId); }} disabled={marketNetworksLoading}>Retry</button></div>}
 <p className="market-network-note">Networks and token lists are sourced from the market-provider directory. Some networks may not publish a token list.</p>
