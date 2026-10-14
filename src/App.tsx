@@ -3,7 +3,6 @@ import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Chev
 import { HDNodeWallet, Wallet as EthersWallet } from 'ethers';
 import { readKeystore, writeKeystore } from './core/wallet/secureStore';
 import { createWalletDraft, importWalletDraft, unlockWallet, type WalletDraft } from './core/wallet/walletService';
-import './ferra.css';
 
 type ActiveWallet = EthersWallet | HDNodeWallet;
 type ModalStep = 'choose' | 'phrase' | 'verify' | 'password' | 'import' | 'unlock';
@@ -160,7 +159,7 @@ export default function App() {
           <div className="breadcrumb">Workspace <span>/</span> <strong>{activeTab}</strong></div>
           <div className="topbar-actions">
             <button className="network-picker" onClick={() => setNotice('Ethereum is the first supported ecosystem. Network reads and transfers will be enabled after the wallet foundation is reviewed.')}><span className="chain-dot" style={{background:'#7895ff'}} />Ethereum <ChevronDown size={13} /></button>
-            <button className={'connect-button ' + (wallet ? 'connected' : '')} onClick={() => wallet ? setNotice('Wallet is unlocked and ready for the next build phase.') : openSetup()}>{wallet ? <><span className="connected-dot" />{shortAddress(wallet.address)}</> : <><WalletIcon size={14} /> Create wallet</>}</button>
+            <button className={'connect-button ' + (wallet ? 'connected' : '')} onClick={() => wallet ? setNotice('Wallet is unlocked and ready for the next build phase.') : openSetup(storedKeystore ? 'unlock' : 'choose')}>{wallet ? <><span className="connected-dot" />{shortAddress(wallet.address)}</> : <><WalletIcon size={14} /> Create wallet</>}</button>
             <button className="icon-button top-icon" aria-label="Help" onClick={() => setNotice('Ferra is being built in phases. No network or transaction feature is advertised until it is implemented and tested.')}><CircleHelp size={17} /></button>
           </div>
         </header>
