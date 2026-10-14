@@ -33,25 +33,13 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
     const change=timeRange==='1h'?data.priceChange?.h1:timeRange==='24h'?data.priceChange?.h24:undefined;
     return {...token,key,networkName:network.name,data,price,change};
   }));
-  // Wallet-style asset discovery: keep established crypto assets from the provider directory,
-  // not every contract. Market metadata still comes from the market provider.
-  const establishedSymbols = new Set([
-    'BTC','WBTC','CBBTC','ETH','WETH','STETH','WSTETH','RETH','CBETH',
-    'BNB','WBNB','BTCB','USDT','USDC','USDC.E','USDC.EC','USDC.B','DAI','USDE','USDS','FDUSD','TUSD','USDP','FRAX','LUSD','GHO','USDT0',
-    'LINK','UNI','AAVE','MKR','SKY','CRV','LDO','COMP','SNX','SUSHI','1INCH','ENS','APE','PEPE','SHIB','DOGE','FLOKI','BONK','WIF',
-    'ARB','OP','POL','WPOL','AVAX','WAVAX','MNT','CAKE','XRP','SOL','TON','TRX','ADA','DOT','LTC','BCH','ATOM','NEAR','APT','SUI','SEI','INJ',
-    'CELO','CRO','FTM','S','SONIC','BERA','HYPE','IMX','RON','GNO','XDAI','METIS','ZK','MORPHO','PENDLE','ONDO','JUP','RAY','PYTH','JTO',
-    'XLM','XDC','OKB','VIC','TLOS','KAIA','FLR','XPL','PLUME','MON','PROS','0G','FLOW','XTZ','RBTC','PATHUSD','HONEY','WELL','AERO','VIRTUAL','FET','TAO','RENDER','FIL','ICP','VET','ETC','XMR','KAS','HBAR','ALGO','QNT','TRUMP'
-  ]);
-  rows=rows.filter(t=>establishedSymbols.has(t.symbol.trim().toUpperCase()));
   if(query) rows=rows.filter(t=>t.name.toLowerCase().includes(query)||t.symbol.toLowerCase().includes(query)||t.address.toLowerCase().includes(query)||t.networkName.toLowerCase().includes(query));
   if(category==='Favorites') rows=rows.filter(t=>favorites.includes(t.key));
   if(category==='Gainers') rows=rows.filter(t=>typeof t.change==='number'&&t.change>0);
   if(category==='Losers') rows=rows.filter(t=>typeof t.change==='number'&&t.change<0);
   if(category==='Volume') rows=rows.filter(t=>Number(t.data.volume?.h24)>0);
   rows.sort((a,b)=>sort==='price'?Number(b.price||0)-Number(a.price||0):sort==='change'?Number(b.change??-Infinity)-Number(a.change??-Infinity):sort==='volume'?Number(b.data.volume?.h24||0)-Number(a.data.volume?.h24||0):Number(b.data.marketCap||b.data.fdv||0)-Number(a.data.marketCap||a.data.fdv||0));
-  // Compact wallet view: no endless exchange-style token feed.
-  rows=rows.slice(0,20);
+  // Display every matching token returned by the market provider; no fixed row cap.
   return <div className="market-table-panel"><div className="market-compact-list">
     <div className="market-sort-bar" aria-label="Sort market instruments"><span className="market-sort-label">#</span><div className="market-sort-asset"><span>MC / VOL</span></div><div className="market-sort-values"><span>Price / {timeRange}</span></div><span className="market-sort-star"><Star size={12}/></span></div>
     {rows.map((token,index)=><article className="market-compact-row" key={token.key}><span className="market-compact-rank">{index+1}</span><div className="market-compact-asset"><div className="market-token"><span className="market-token-logos"><img
