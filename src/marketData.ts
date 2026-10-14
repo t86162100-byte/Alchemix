@@ -21,7 +21,7 @@ type Pair = {
   pairAddress?: string;
   dexId?: string;
 };
-const dexChains: Record<number, string> = { 1:'ethereum', 56:'bsc', 8453:'base', 137:'polygon', 42161:'arbitrum', 10:'optimism', 43114:'avalanche', 5000:'mantle', 250:'fantom', 100:'gnosis', 42220:'celo', 59144:'linea', 534352:'scroll', 324:'zksync', 81457:'blast', 34443:'mode', 7777777:'zora', 130:'unichain', 146:'sonic', 80094:'berachain' };
+const dexChains: Record<number, string> = { 1:'ethereum', 56:'bsc', 8453:'base', 137:'polygon', 42161:'arbitrum', 10:'optimism', 43114:'avalanche', 5000:'mantle', 16661:'0g', 2741:'abstract', 33139:'apechain', 42170:'arbitrum-nova', 5042:'arc', 80094:'berachain', 81457:'blast', 60808:'bob', 288:'boba', 42220:'celo', 25:'cronos', 42793:'etherlink', 14:'flare', 747:'flow', 252:'fraxtal', 122:'fuse', 100:'gnosis', 1625:'gravity', 43111:'hemi', 999:'hyperevm', 1337:'hyperliquid', 13371:'immutable-zkevm', 1776:'injective', 57073:'ink', 8217:'kaia', 747474:'katana', 59144:'linea', 1135:'lisk', 1088:'metis', 34443:'mode', 143:'monad', 2818:'morph', 204:'opbnb', 9745:'plasma', 98866:'plume', 4663:'robinhood', 2020:'ronin', 30:'rootstock', 534352:'scroll', 1329:'sei', 5031:'somnia', 1868:'soneium', 146:'sonic', 988:'stable', 40:'telos', 130:'unichain', 1480:'vana', 88:'viction', 480:'world-chain', 50:'xdc', 196:'xlayer', 324:'zksync', 250:'fantom', 59144:'linea', 7777777:'zora' };
 export async function fetchDexMarketMetrics(results: Array<{ chainId:number; tokens:Array<{address:string}> }>): Promise<Record<string,MarketMetrics>> {
   const targets = results.flatMap(result => {
     const dexChain = dexChains[result.chainId];
@@ -48,7 +48,7 @@ export async function fetchDexMarketMetrics(results: Array<{ chainId:number; tok
         const liquidity = Number(pair.liquidity?.usd || 0);
         const volume = Number(pair.volume?.h24 || 0);
         const price = Number(pair.priceUsd || 0);
-        if (!Number.isFinite(price) || price <= 0 || liquidity < 10000 || volume < 1000) continue;
+        if (!Number.isFinite(price) || price <= 0) continue;
         const key = target.chainId + ':' + target.token.address.toLowerCase();
         const previous = best.get(key);
         if (!previous || Number(pair.liquidity?.usd || 0) > Number(previous.liquidity?.usd || 0)) best.set(key,pair);
