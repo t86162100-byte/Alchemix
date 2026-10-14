@@ -14,13 +14,13 @@ type Props = {
 // has no image (or its image cannot load), use a crisp, local SVG fallback.
 const fallbackTokenLogo=(token:Token):string=>{
  const label=(token.symbol||token.name||'?').trim().slice(0,4).toUpperCase();
- const escaped=label.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+ const escaped=label.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
  const colors=['#2563eb','#7c3aed','#0891b2','#059669','#d97706','#db2777','#4f46e5'];
  const seed=token.chainId+':'+(token.address||token.symbol||'token').toLowerCase();
  let hash=0;for(let i=0;i<seed.length;i++)hash=(hash*31+seed.charCodeAt(i))>>>0;
  const bg=colors[hash%colors.length];
- const fontSize=escaped.length>3?16:21;
- return 'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><circle cx="64" cy="64" r="64" fill="'+bg+'"/><text x="64" y="66" text-anchor="middle" dominant-baseline="middle" font-family="Arial,sans-serif" font-size="'+fontSize+'" font-weight="700" fill="#ffffff">'+escaped+'</text></svg>');
+ const fontSize=escaped.length>3?15:20;
+ return 'data:image/svg+xml;charset=UTF-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="'+bg+'"/><stop offset="1" stop-color="#111827"/></linearGradient></defs><rect x="2" y="2" width="124" height="124" rx="30" fill="url(#g)"/><text x="64" y="66" text-anchor="middle" dominant-baseline="middle" font-family="Arial,sans-serif" font-size="'+fontSize+'" font-weight="700" letter-spacing="1" fill="#ffffff">'+escaped+'</text></svg>');
 };
 const money=(value?:number|string)=>{const n=Number(value);if(!Number.isFinite(n)||n<=0)return '—';return n>=1000?'$'+n.toLocaleString('en-US',{maximumFractionDigits:2}):n>=1?'$'+n.toLocaleString('en-US',{maximumFractionDigits:4}):'$'+n.toLocaleString('en-US',{maximumFractionDigits:8});};
 const isStockLike=(name:string,symbol:string)=>{const n=name.trim();const s=symbol.trim();return /(?:\bstock\b|\bshares?\b|\bequit(?:y|ies)\b|\btokeni[sz]ed\b|\bpre[- ]?ipo\b|\bincorporated\b|\bcorporation\b|\bcommon stock\b|\bclass [a-c] shares?\b|\bETF\b)/i.test(n)||/(?:\binc\\.?|\bcorp\\.?|\bltd\\.?|\blimited|\bplc\\.?|\bholdings?)\\s*$/i.test(n)||(/^[A-Z]{1,5}c$/.test(s)&&/(?:inc\\.?|corp\\.?|stock|shares?|holdings?|company|class [A-Z])/i.test(n));};
@@ -50,7 +50,6 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
               alt={token.name || token.symbol || 'Token'}
               loading="lazy"
               decoding="async"
-              onLoad={e=>{ e.currentTarget.style.opacity='1'; }}
               onError={e=>{
                 const image=e.currentTarget;
                 if(image.dataset.fallbackApplied==='true') return;
