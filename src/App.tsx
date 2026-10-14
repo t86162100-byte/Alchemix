@@ -142,8 +142,23 @@ for (let offset = 0; offset < missing.length; offset += 4) {
     try {
       const platformId = platformByChain.get(network.chainId) || COINGECKO_PLATFORM_FALLBACKS[network.chainId];
       let tokens: MarketToken[] = [];
-      // Try CoinGecko's published token list first when the provider supports this chain.
-      if (platformId) {
+      // Prefer GeckoTerminal's live network token feed: unlike a token directory, it
+      // includes current USD prices for actively traded tokens on supported networks.
+      const geckoNetwork = GECKOTERMINAL_NETWORKS[network.chainId];
+      if (geckoNetwork) {
+        try {
+          const response = await fetch('https://api.geckoterminal.com/api/v2/networks/' + encodeURIComponent(geckoNetwork) + '/tokens?page=1', { signal: AbortSignal.timeout(12000), cache: 'no-cache' });
+          if (response.ok) {
+            const payload = await response.json() as { data?: Array<{ attributes?: { address?: string; name?: string; symbol?: string; image_url?: string; decimals?: number; price_usd?: string | number } }> };
+            tokens = (payload.data || [])
+              .filter(item => Boolean(item.attributes?.address) && Boolean(String(item.attributes?.symbol || '').trim()))
+              .map(item => ({ chainId: network.chainId, address: item.attributes!.address!, symbol: item.attributes!.symbol!.trim(), name: (item.attributes!.name || item.attributes!.symbol || 'Unknown token').trim(), decimals: Number(item.attributes!.decimals ?? 18), logoURI: item.attributes!.image_url, priceUSD: item.attributes!.price_usd == null ? undefined : String(item.attributes!.price_usd) }));
+          }
+        } catch { /* try the token directory below */ }
+      }
+      // Fall back to CoinGecko's token directory only when the live market feed
+      // is unavailable or empty for this network.
+      if (!tokens.length && platformId) {
         const tokenListUrl = 'https://tokens.coingecko.com/' + encodeURIComponent(platformId) + '/all.json';
         let response: Response | null = null;
         for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -158,20 +173,6 @@ for (let offset = 0; offset < missing.length; offset += 4) {
           tokens = (list.tokens || [])
             .filter(token => Boolean(token.address) && Boolean(String(token.symbol || '').trim()) && Number.isFinite(token.decimals))
             .map(token => ({ chainId: network.chainId, address: token.address!, symbol: token.symbol!.trim(), name: (token.name || token.symbol || 'Unknown token').trim(), decimals: Number(token.decimals), logoURI: token.logoURI }));
-        }
-      }
-      // CoinGecko does not publish a token-list JSON for every network. Fall back to
-      // GeckoTerminal's network token endpoint instead of failing the whole market view.
-      if (!tokens.length) {
-        const geckoNetwork = GECKOTERMINAL_NETWORKS[network.chainId];
-        if (geckoNetwork) {
-          const response = await fetch('https://api.geckoterminal.com/api/v2/networks/' + encodeURIComponent(geckoNetwork) + '/tokens?page=1', { signal: AbortSignal.timeout(12000) });
-          if (response.ok) {
-            const payload = await response.json() as { data?: Array<{ attributes?: { address?: string; name?: string; symbol?: string; image_url?: string; decimals?: number } }> };
-            tokens = (payload.data || [])
-              .filter(item => Boolean(item.attributes?.address) && Boolean(String(item.attributes?.symbol || '').trim()))
-              .map(item => ({ chainId: network.chainId, address: item.attributes!.address!, symbol: item.attributes!.symbol!.trim(), name: (item.attributes!.name || item.attributes!.symbol || 'Unknown token').trim(), decimals: Number(item.attributes!.decimals ?? 18), logoURI: item.attributes!.image_url }));
-          }
         }
       }
       if (!tokens.length) throw new Error('No provider token list for this network');
