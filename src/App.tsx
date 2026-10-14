@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, CircleHelp, Copy, Eye, EyeOff, Globe2, Home, LockKeyhole, Menu, Search, Settings2, ShieldCheck, Sparkles, TrendingUp, Wallet, X } from 'lucide-react';
+import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, CircleHelp, Eye, EyeOff, Globe2, Home, LockKeyhole, Search, Settings2, ShieldCheck, Sparkles, TrendingUp, Wallet, X } from 'lucide-react';
 import { createWalletDraft, importWalletDraft, unlockWallet } from './core/wallet/walletService';
 import { readKeystore, writeKeystore } from './core/wallet/secureStore';
 
@@ -28,7 +28,6 @@ export default function App() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [hideBalance, setHideBalance] = useState(false);
   const [totalValueVisible, setTotalValueVisible] = useState(true);
 
   useEffect(() => {
