@@ -134,16 +134,17 @@ const results = await Promise.all(missing.map(async network => {
         const list = await providerResponse.json() as CoinGeckoTokenList;
         providerTokens = list.tokens || [];
       }
-    } catch { /* A provider outage should not replace the whole network directory. */ }
+    } catch { /* Market token metadata is optional; metrics can still be loaded for any provider tokens received. */ }
   }
-  // The market provider is the source of Market token eligibility and metadata.
-  // No LI.FI token-directory call is used to populate the Market list.
+  // The Market token universe comes directly from CoinGecko's token list.
+  // Do not intersect it with LI.FI's token directory: that silently removes
+  // market-listed assets on chains where LI.FI's registry is incomplete.
   const seen = new Set<string>();
   const tokens: MarketToken[] = providerTokens
     .filter(token => Boolean(token.address) && Boolean(String(token.symbol || '').trim()) && Number.isFinite(token.decimals))
-    .filter(token => token.chainId === undefined || token.chainId === network.chainId)
+    .filter(token => /^0x[a-fA-F0-9]{40}$/.test(token.address || '') && (token.address || '').toLowerCase() !== '0x0000000000000000000000000000000000000000')
     .filter(token => {
-      const key = token.address!.toLowerCase();
+      const key = (token.address || '').toLowerCase();
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -151,13 +152,15 @@ const results = await Promise.all(missing.map(async network => {
     .map(token => ({
       chainId: network.chainId,
       address: token.address!,
-      symbol: String(token.symbol || '').trim(),
-      name: String(token.name || token.symbol || 'Unknown token').trim(),
-      decimals: Number.isFinite(token.decimals) ? Number(token.decimals) : 18,
+      symbol: String(token.symbol).trim(),
+      name: String(token.name || token.symbol).trim(),
+      decimals: Number(token.decimals),
       logoURI: token.logoURI
     }));
   const nativeToken = network.nativeToken;
-  if (nativeToken && !tokens.some(token => token.address.toLowerCase() === nativeToken.address.toLowerCase())) tokens.unshift({ ...nativeToken, chainId: network.chainId });
+  // Add a native-asset display row only if the market provider list is empty.
+  // The synthetic native placeholder must never be treated as a real contract for metrics.
+  if (!tokens.length && nativeToken) tokens.push({ ...nativeToken, chainId: network.chainId });
   return { id: network.id, chainId: network.chainId, tokens };
 }));
 results.forEach(item => marketTokenLoaded.current.add(item.chainId));
