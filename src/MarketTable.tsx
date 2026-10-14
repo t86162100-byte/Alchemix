@@ -30,7 +30,8 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
   useEffect(() => { setVisibleCount(30); }, [networkId, timeRange, category, search, sort]);
   const selected=networkId==='all'?networks:networks.filter(n=>n.id===networkId);
   const query=search.trim().toLowerCase();
-  let rows=selected.flatMap(network=>network.tokens.map(token=>{
+  // Bound per-network processing as well as DOM rows; provider lists can contain very large token catalogues.
+  let rows=selected.flatMap(network=>network.tokens.slice(0, 100).map(token=>{
     const key=token.chainId+':'+token.address.toLowerCase(), data=metrics[key]||{};
     const price=data.priceUsd||undefined;
     const change=timeRange==='1h'?data.priceChange?.h1:timeRange==='24h'?data.priceChange?.h24:undefined;
