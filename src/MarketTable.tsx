@@ -53,8 +53,8 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
     <div className="market-sort-bar" aria-label="Sort market instruments"><span className="market-sort-label">#</span><div className="market-sort-asset"><span>MC / VOL</span></div><div className="market-sort-values"><span>Price / {timeRange}</span></div><span className="market-sort-star"><Star size={12}/></span></div>
     {rows.slice(0, visibleCount).map((token,index)=><article className="market-compact-row" key={token.key}><span className="market-compact-rank">{index+1}</span><div className="market-compact-asset"><div className="market-token"><span className="market-token-logos"><img
               src={token.logoURI || marketTokenLogoCandidates(token)[0] || ''}
-              data-logo-candidates={JSON.stringify(marketTokenLogoCandidates(token))}
-              data-logo-index="0"
+              data-logo-candidates={JSON.stringify(token.logoURI ? [token.logoURI,...marketTokenLogoCandidates(token)] : marketTokenLogoCandidates(token))}
+              data-logo-index={token.logoURI ? "0" : "-1"}
               alt=""
               loading="lazy"
               onError={e=>{
