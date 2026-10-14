@@ -5,7 +5,7 @@ import { createWalletDraft, importWalletDraft } from './walletService';
 describe('wallet foundation', () => {
   it('creates a valid random twelve-word wallet and derives its address', async () => {
     const draft = await createWalletDraft();
-    expect(draft.phrase.trim().split(/\\s+/)).toHaveLength(12);
+    expect(draft.phrase.trim().split(/\s+/)).toHaveLength(12);
     expect(Mnemonic.isValidMnemonic(draft.phrase)).toBe(true);
     expect(draft.address).toBe(Wallet.fromPhrase(draft.phrase).address);
   });
