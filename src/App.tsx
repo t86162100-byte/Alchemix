@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, CircleHelp, Copy, Eye, EyeOff, Home, LayoutGrid, LockKeyhole, Menu, QrCode, RefreshCw, Search, ShieldCheck, Sparkles, Wallet as WalletIcon, X, Zap } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, ChevronDown, CircleHelp, Eye, EyeOff, Home, LayoutGrid, LockKeyhole, Menu, RefreshCw, Search, ShieldCheck, Sparkles, Wallet as WalletIcon, X, Zap } from 'lucide-react';
 import { HDNodeWallet, Wallet as EthersWallet } from 'ethers';
-import { deleteKeystore, readKeystore, writeKeystore } from './core/wallet/secureStore';
+import { readKeystore, writeKeystore } from './core/wallet/secureStore';
 import { createWalletDraft, importWalletDraft, unlockWallet, type WalletDraft } from './core/wallet/walletService';
 import './ferra.css';
 
@@ -97,7 +97,7 @@ export default function App() {
       const encrypted = await draft.wallet.encrypt(password);
       await writeKeystore(encrypted);
       setStoredKeystore(encrypted);
-      setWallet(draft.wallet);
+      setWallet(new EthersWallet(draft.wallet.privateKey));
       setDraft(null); setPassword(''); setConfirmPassword(''); setAnswers({});
       setModalOpen(false);
       setNotice('Wallet created. Your recovery phrase is the only way to restore access if you forget your password.');
@@ -112,7 +112,7 @@ export default function App() {
       const imported = importWalletDraft(importPhrase);
       const encrypted = await imported.wallet.encrypt(password);
       await writeKeystore(encrypted);
-      setStoredKeystore(encrypted); setWallet(imported.wallet);
+      setStoredKeystore(encrypted); setWallet(new EthersWallet(imported.wallet.privateKey));
       setModalOpen(false); setImportPhrase(''); setPassword(''); setConfirmPassword('');
       setNotice('Wallet imported and encrypted locally.');
     } catch (e) { setError(errorMessage(e)); }
@@ -123,7 +123,7 @@ export default function App() {
     setBusy(true); setError('');
     try {
       const unlocked = await unlockWallet(storedKeystore, password);
-      setWallet(unlocked); setModalOpen(false); setPassword('');
+      setWallet(new EthersWallet(unlocked.privateKey)); setModalOpen(false); setPassword('');
       setNotice('Wallet unlocked.');
     } catch { setError('Could not unlock the wallet. Check your password.'); }
     finally { setBusy(false); }
@@ -138,7 +138,6 @@ export default function App() {
       setCopied(true); window.setTimeout(() => setCopied(false), 1600);
     } catch { setNotice('Clipboard access was blocked. You can select and copy the address manually.'); }
   };
-  const visibleAddress = useMemo(() => wallet?.address ?? '', [wallet]);
 
   return (
     <div className="app-shell">
@@ -201,7 +200,7 @@ export default function App() {
         {step === 'verify' && draft && <><div className="ferra-eyebrow">BACKUP CHECK</div><h2 id="wallet-modal-title">Verify your recovery phrase</h2><p className="ferra-modal-copy">Enter the requested words from the phrase you just saved.</p><div className="verify-grid">{phrasePositions.map((position) => <label key={position}>Word #{position}<input autoComplete="off" spellCheck={false} value={answers[position] || ''} onChange={(e) => setAnswers({ ...answers, [position]: e.target.value })} placeholder={'Enter word ' + position} /></label>)}</div><button className="primary-button ferra-full-button" onClick={checkPhrase}>Verify phrase <ArrowRight size={14} /></button></>}
         {step === 'password' && <><div className="ferra-eyebrow">ENCRYPT LOCAL STORAGE</div><h2 id="wallet-modal-title">Set a wallet password</h2><p className="ferra-modal-copy">This password encrypts the wallet file stored on this device. It is not your recovery phrase and cannot restore your wallet on its own.</p><label className="ferra-field">Password<input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 10 characters" /></label><label className="ferra-field">Confirm password<input type="password" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repeat password" /></label><button className="primary-button ferra-full-button" disabled={busy} onClick={finishCreate}>{busy ? 'Encrypting wallet…' : 'Encrypt and finish'} <ArrowRight size={14} /></button></>}
         {step === 'import' && <><div className="ferra-eyebrow">RESTORE WALLET</div><h2 id="wallet-modal-title">Import your recovery phrase</h2><p className="ferra-modal-copy">Enter your existing standard 12- or 24-word Ethereum-compatible recovery phrase. It is processed locally and never sent to a server.</p><label className="ferra-field">Recovery phrase<textarea rows={3} autoComplete="off" spellCheck={false} value={importPhrase} onChange={(e) => setImportPhrase(e.target.value)} placeholder="word1 word2 word3 …" /></label><label className="ferra-field">Create a local password<input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 10 characters" /></label><label className="ferra-field">Confirm password<input type="password" autoComplete="new-password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Repeat password" /></label><button className="primary-button ferra-full-button" disabled={busy} onClick={finishImport}>{busy ? 'Importing and encrypting…' : 'Import wallet'} <ArrowRight size={14} /></button><button className="ferra-back-button" onClick={() => { setError(''); setStep('choose'); }}>Back</button></>}
-        {step === 'unlock' && <><div className="ferra-eyebrow">WELCOME BACK</div><h2 id="wallet-modal-title">Unlock your wallet</h2><p className="ferra-modal-copy">Your encrypted wallet was found in this browser. Enter your password to unlock it.</p><label className="ferra-field">Wallet password<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void finishUnlock(); }} placeholder="Enter your password" /></label><button className="primary-button ferra-full-button" disabled={busy} onClick={finishUnlock}>{busy ? 'Unlocking…' : 'Unlock wallet'} <ArrowRight size={14} /></button><button className="ferra-back-button" onClick={() => { setStoredKeystore(null); setStep('choose'); setPassword(''); setError(''); }}>Use another wallet</button></>}
+        {step === 'unlock' && <><div className="ferra-eyebrow">WELCOME BACK</div><h2 id="wallet-modal-title">Unlock your wallet</h2><p className="ferra-modal-copy">Your encrypted wallet was found in this browser. Enter your password to unlock it.</p><label className="ferra-field">Wallet password<input type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') void finishUnlock(); }} placeholder="Enter your password" /></label><button className="primary-button ferra-full-button" disabled={busy} onClick={finishUnlock}>{busy ? 'Unlocking…' : 'Unlock wallet'} <ArrowRight size={14} /></button><button className="ferra-back-button" onClick={() => { setStep('choose'); setPassword(''); setError(''); }}>Use another wallet</button></>}
         {error && <p className="ferra-error" role="alert">{error}</p>}
         {busy && <p className="ferra-progress"><span className="spin"><RefreshCw size={13} /></span> Working locally in this browser…</p>}
         <div className="ferra-modal-foot"><span><LockKeyhole size={12} /> Encrypted locally</span><span>No server custody</span></div>
