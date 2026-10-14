@@ -46,10 +46,13 @@ export async function fetchDexMarketMetrics(results: Array<{ chainId:number; tok
     try {
       const response = await fetch('https://api.dexscreener.com/tokens/v1/'+chunk.chain+'/'+chunk.tokens.map(token=>token.address).join(','));
       if (!response.ok) return [];
-      const payload = await response.json() as {pairs?:Pair[]};
+      // DexScreener /tokens/v1 returns a JSON array directly (not { pairs: [...] }).
+      // Accept both shapes so a provider response is never silently treated as empty.
+      const payload = await response.json() as Pair[] | { pairs?: Pair[] };
+      const pairs = Array.isArray(payload) ? payload : (payload.pairs || []);
       const requested = new Set(chunk.tokens.map(token=>token.address.toLowerCase()));
       const best = new Map<string,Pair>();
-      for (const pair of payload.pairs || []) {
+      for (const pair of pairs) {
         const address = pair.baseToken?.address?.toLowerCase();
         const price = asNumber(pair.priceUsd);
         if (pair.chainId !== chunk.chain || !address || !requested.has(address) || price === undefined || price <= 0) continue;
@@ -72,8 +75,10 @@ export async function fetchDexMarketMetrics(results: Array<{ chainId:number; tok
     const missing = result.tokens.filter(token => {
       const item = metrics[result.chainId+':'+token.address.toLowerCase()];
       return !item || !(item.priceUsd && item.priceUsd > 0);
-    }).slice(0,30);
-    return missing.length ? [{chainId:result.chainId,network,tokens:missing}] : [];
+    });
+    const chunks: Array<{chainId:number;network:string;tokens:Array<{address:string}>}> = [];
+    for (let i=0;i<missing.length;i+=30) chunks.push({chainId:result.chainId,network,tokens:missing.slice(i,i+30)});
+    return chunks;
   });
   const fallbackResults = await Promise.all(fallbackRequests.map(async request => {
     try {
