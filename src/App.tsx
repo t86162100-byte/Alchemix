@@ -127,35 +127,50 @@ const platformByChain = new Map<number, string>();
 platforms.forEach(platform => {
   if (Number.isInteger(platform.chain_identifier) && platform.chain_identifier! > 0) platformByChain.set(platform.chain_identifier!, platform.id);
 });
-const results = await Promise.all(missing.map(async network => {
-  const platformId = platformByChain.get(network.chainId) || COINGECKO_PLATFORM_FALLBACKS[network.chainId];
-  if (!platformId) return { id: network.id, chainId: network.chainId, tokens: [] as MarketToken[] };
-  // The market provider is the source of the token directory. Do not filter it through LI.FI.
-  const providerResponse = await fetch('https://tokens.coingecko.com/' + encodeURIComponent(platformId) + '/all.json');
-  if (!providerResponse.ok) throw new Error('Market provider token directory unavailable for ' + network.name);
-  const list = await providerResponse.json() as CoinGeckoTokenList;
-  const tokens: MarketToken[] = (list.tokens || [])
-    .filter(token => Boolean(token.address) && Boolean(String(token.symbol || '').trim()) && Number.isFinite(token.decimals))
-    .map(token => ({
-      chainId: network.chainId,
-      address: token.address!,
-      symbol: token.symbol!.trim(),
-      name: (token.name || token.symbol || 'Unknown token').trim(),
-      decimals: Number(token.decimals),
-      logoURI: token.logoURI
-    }));
-  const unique = new Map<string, MarketToken>();
-  tokens.forEach(token => { if (!unique.has(token.address.toLowerCase())) unique.set(token.address.toLowerCase(), token); });
-  return { id: network.id, chainId: network.chainId, tokens: [...unique.values()] };
-}));
-results.forEach(item => marketTokenLoaded.current.add(item.chainId));
-setMarketNetworks(previous => previous.map(network => {
-  const result = results.find(item => item.id === network.id);
-  return result ? { ...network, tokens: result.tokens } : network;
-}));
-void fetchDexMarketMetrics(results).then(metrics => { if (Object.keys(metrics).length) setMarketMetrics(previous => ({ ...previous, ...metrics })); });
-} catch {
-setMarketNetworkError('Market provider token data could not be loaded. Check your connection and try again.');
+const results: Array<{id:string;chainId:number;tokens:MarketToken[]}> = [];
+let failedCount = 0;
+// Limit parallel requests so opening All does not overwhelm the public provider.
+for (let offset = 0; offset < missing.length; offset += 4) {
+  const batch = missing.slice(offset, offset + 4);
+  const batchResults = await Promise.all(batch.map(async network => {
+    try {
+      const platformId = platformByChain.get(network.chainId) || COINGECKO_PLATFORM_FALLBACKS[network.chainId];
+      if (!platformId) throw new Error('No CoinGecko platform mapping');
+      const response = await fetch('https://tokens.coingecko.com/' + encodeURIComponent(platformId) + '/all.json');
+      if (!response.ok) throw new Error('Provider token list unavailable');
+      const list = await response.json() as CoinGeckoTokenList;
+      const tokens: MarketToken[] = (list.tokens || [])
+        .filter(token => Boolean(token.address) && Boolean(String(token.symbol || '').trim()) && Number.isFinite(token.decimals))
+        .map(token => ({ chainId: network.chainId, address: token.address!, symbol: token.symbol!.trim(), name: (token.name || token.symbol || 'Unknown token').trim(), decimals: Number(token.decimals), logoURI: token.logoURI }));
+      const unique = new Map<string, MarketToken>();
+      tokens.forEach(token => { if (!unique.has(token.address.toLowerCase())) unique.set(token.address.toLowerCase(), token); });
+      return { id: network.id, chainId: network.chainId, tokens: [...unique.values()], ok: true };
+    } catch {
+      failedCount += 1;
+      return { id: network.id, chainId: network.chainId, tokens: [] as MarketToken[], ok: false };
+    }
+  }));
+  batchResults.forEach(result => {
+    // Cache successful provider responses, including valid empty lists; failed chains can be retried later.
+    if (result.ok) marketTokenLoaded.current.add(result.chainId);
+    results.push({ id: result.id, chainId: result.chainId, tokens: result.tokens });
+  });
+  setMarketNetworks(previous => previous.map(network => {
+    const result = batchResults.find(item => item.id === network.id && item.ok);
+    return result ? { ...network, tokens: result.tokens } : network;
+  }));
+  const metricResults = batchResults.filter(item => item.ok).map(({id,chainId,tokens}) => ({id,chainId,tokens}));
+  if (metricResults.length) {
+    void fetchDexMarketMetrics(metricResults).then(metrics => {
+      if (Object.keys(metrics).length) setMarketMetrics(previous => ({ ...previous, ...metrics }));
+    });
+  }
+}
+if (failedCount > 0 && results.every(result => result.tokens.length === 0)) {
+  setMarketNetworkError('The market provider is temporarily unavailable for these networks. Tap Retry or choose another network.');
+} else if (failedCount > 0) {
+  setMarketNetworkError('Some networks could not load from the market provider yet. Available networks are shown; select a failed network again to retry.');
+}
 } finally {
 missing.forEach(item => marketTokenRequests.current.delete(item.chainId));
 setMarketTokensLoading(false);
@@ -491,10 +506,11 @@ return <div className="app-shell">
 {modal === 'market-network' && <div className="market-network-drawer-content">
 <label className="market-network-search"><Search size={17}/><input autoFocus value={marketNetworkSearch} onChange={event => setMarketNetworkSearch(event.target.value)} placeholder={`Search ${marketNetworks.length} supported EVM networks…`} aria-label="Search market networks"/>{marketNetworkSearch && <button type="button" onClick={() => setMarketNetworkSearch('')} aria-label="Clear search"><X size={15}/></button>}</label>
 <div className="market-network-vertical-list">
+<button type="button" className={marketNetworkId === 'all' ? 'active' : ''} onClick={() => { setMarketNetworkId('all'); setModal(null); }}><span className="market-network-pill-logo"><span>ALL</span></span><span className="market-network-vertical-copy"><strong>All networks</strong><small>Show tokens across every listed network</small></span>{marketNetworkId === 'all' && <span className="market-network-selected">Selected</span>}</button>
 {marketNetworks.filter(item => !marketNetworkSearch.trim() || item.name.toLowerCase().includes(marketNetworkSearch.trim().toLowerCase()) || item.symbol.toLowerCase().includes(marketNetworkSearch.trim().toLowerCase()) || item.id.includes(marketNetworkSearch.trim())).map(item => <button type="button" key={item.id} className={marketNetworkId === item.id ? 'active' : ''} onClick={() => { setMarketNetworkId(item.id); setModal(null); }}><span className="market-network-pill-logo">{item.logoURI && <img src={item.logoURI} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }}/>}<span>{item.symbol.slice(0,3)}</span></span><span className="market-network-vertical-copy"><strong>{item.name}</strong><small>{item.symbol} · EVM · Chain ID {item.chainId}</small></span>{marketNetworkId === item.id && <span className="market-network-selected">Selected</span>}</button>)}
 </div>
-{(marketNetworksLoading || marketNetworkError) && <div className="market-network-status">{marketNetworksLoading ? 'Loading LI.FI-supported EVM networks…' : marketNetworkError}<button type="button" onClick={() => window.location.reload()} disabled={marketNetworksLoading}>Retry</button></div>}
-<p className="market-network-note">Networks are loaded from LI.FI's supported EVM chain directory. Token lists are not shown in this selector.</p>
+{(marketNetworksLoading || marketNetworkError) && <div className="market-network-status">{marketNetworksLoading ? 'Loading market-provider networks…' : marketNetworkError}<button type="button" onClick={() => { marketNetworkError && (marketNetworksLoading = false); marketNetworks.forEach(item => { if (marketNetworkId === 'all' || item.id === marketNetworkId) marketTokenLoaded.current.delete(item.chainId); }); setMarketNetworkError(''); void loadMarketTokens(marketNetworkId); }} disabled={marketNetworksLoading}>Retry</button></div>}
+<p className="market-network-note">Networks and token lists are sourced from the market-provider directory. Some networks may not publish a token list.</p>
 </div>}{modal === 'network' && <><p className="modal-description">Choose a network for your wallet. Popular chains are ready below, and the searchable directory includes additional EVM networks. Your wallet will ask you to approve any network change.</p><div className="network-search-wrap"><Search size={16}/><input value={networkSearch} onChange={event => setNetworkSearch(event.target.value)} placeholder="Search by network, token, or chain ID…" aria-label="Search networks" /><span className="network-search-shortcut">⌕</span></div>{!networkSearch && <><div className="network-section-heading"><span>POPULAR NETWORKS</span><small>Quick switch</small></div><div className="network-quick-grid">{popularNetworkOptions.map(c => <button type="button" key={c.id} className={`network-quick-option ${chainId === c.id ? 'selected' : ''}`} onClick={() => void switchNetwork(c)}><span className="network-quick-logo" style={{ background: c.color }}>{chainLogoUrl(c) && <img src={chainLogoUrl(c)} data-logo-candidates={JSON.stringify(chainLogoUrls(c))} data-logo-index="0" alt="" decoding="async" onLoad={event => { const fallback = event.currentTarget.nextElementSibling as HTMLElement | null; if (fallback) fallback.hidden = true; }} onError={handleChainLogoError} />}<span>{iconLetters[c.symbol] || c.symbol.slice(0, 3)}</span></span><span>{c.name}</span>{chainId === c.id && <span className="network-quick-check">✓</span>}</button>)}</div></>}{networkListLoading && <p className="network-loading">Refreshing network directory…</p>}<div className="network-section-heading network-directory-heading"><span>{networkSearch ? 'SEARCH RESULTS' : 'ALL NETWORKS'}</span><small>{visibleNetworkOptions.length}{networkSearch ? ' matches' : ' available'}</small></div><div className="network-list">{visibleNetworkOptions.map(c => <button className={`network-option ${chainId === c.id ? 'selected' : ''}`} key={c.id} onClick={() => void switchNetwork(c)}><span className="asset-icon network-option-logo" style={{ background: c.color }}>{chainLogoUrl(c) && <img src={chainLogoUrl(c)} data-logo-candidates={JSON.stringify(chainLogoUrls(c))} data-logo-index="0" alt="" decoding="async" onLoad={event => { const fallback = event.currentTarget.nextElementSibling as HTMLElement | null; if (fallback) fallback.hidden = true; }} onError={handleChainLogoError} />}<span>{iconLetters[c.symbol] || c.symbol.slice(0, 3)}</span></span><span className="network-option-text"><strong>{c.name}</strong><small>{c.label} · Chain ID {c.id}</small></span>{chainId === c.id ? <span className="current-tag">CURRENT</span> : <ArrowUpRight size={16}/>}</button>)}{visibleNetworkOptions.length === 0 && <p className="network-loading">No networks match that search. Try a symbol such as APE or a numeric chain ID.</p>}</div></>}
 {modal === 'send' && <><p className="modal-description">Send native {chain.symbol} on {chain.name}. Check the address and network carefully before confirming in your wallet.</p><label className="form-label">Recipient address</label><input className="form-input" placeholder="0x…" value={sendTo} onChange={e => setSendTo(e.target.value)} autoComplete="off"/><label className="form-label">Amount ({chain.symbol})</label><input className="form-input" type="number" min="0" step="any" placeholder="0.00" value={sendAmount} onChange={e => setSendAmount(e.target.value)}/><div className="form-warning"><ShieldCheck size={16}/><span>Nova will never ask for your seed phrase. Your wallet provider will display the final transaction for approval.</span></div><button className="primary-button full-button" onClick={() => void send()}>Continue to wallet <ArrowUpRight size={16}/></button></>}
 {modal === 'receive' && <><p className="modal-description">Share your public wallet address to receive assets on the selected network.</p><div className="receive-card"><div className="receive-chain"><span className="chain-dot" style={{ background: chain.color }}/>{chain.name} <span className="receive-symbol">{chain.symbol}</span></div><div className="receive-address">{address}</div><button className="primary-button full-button" onClick={() => void copyAddress()}><Copy size={16}/> Copy address</button></div><div className="form-warning"><CircleHelp size={16}/><span>Only send assets compatible with this network to this address. Sending on the wrong network can result in permanent loss.</span></div></>}
