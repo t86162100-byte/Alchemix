@@ -119,7 +119,7 @@ missing.forEach(item => marketTokenRequests.current.add(item.chainId));
 setMarketTokensLoading(true);
 setMarketNetworkError('');
 try {
-const platforms = await getCoinGeckoPlatforms();
+const platforms = await getCoinGeckoPlatforms().catch(() => [] as CoinGeckoPlatform[]);
 const platformByChain = new Map<number, string>();
 platforms.forEach(platform => {
   if (Number.isInteger(platform.chain_identifier) && platform.chain_identifier! > 0) platformByChain.set(platform.chain_identifier!, platform.id);
