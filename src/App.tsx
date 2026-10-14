@@ -128,59 +128,25 @@ platforms.forEach(platform => {
   if (Number.isInteger(platform.chain_identifier) && platform.chain_identifier! > 0) platformByChain.set(platform.chain_identifier!, platform.id);
 });
 const results = await Promise.all(missing.map(async network => {
-  // Prefer CoinGecko's chain token list, but some platforms do not publish one.
-  // Resolve well-known platform IDs explicitly so duplicate/incomplete platform metadata
-  // cannot accidentally point Ethereum or Base at the wrong token list.
-  const platformId = COINGECKO_PLATFORM_FALLBACKS[network.chainId] || platformByChain.get(network.chainId);
-  let providerTokens: Array<{ address?: string; name?: string; symbol?: string; decimals?: number; logoURI?: string; coinKey?: string }> = [];
-  if (platformId) {
-    try {
-      const providerResponse = await fetch('https://tokens.coingecko.com/' + encodeURIComponent(platformId) + '/all.json');
-      if (providerResponse.ok) {
-        const list = await providerResponse.json() as CoinGeckoTokenList;
-        providerTokens = (list.tokens || []).map(token => ({ ...token }));
-      }
-    } catch { /* Fall through to CoinGecko's contract-address catalog below. */ }
-    if (!providerTokens.length) {
-      try {
-        const catalogResponse = await fetch('https://api.coingecko.com/api/v3/coins/list?include_platform=true');
-        if (catalogResponse.ok) {
-          const catalog = await catalogResponse.json() as CoinGeckoCoinList;
-          providerTokens = catalog.flatMap(coin => {
-            const address = coin.platforms?.[platformId!];
-            if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) return [];
-            return [{ address, name: coin.name || coin.symbol || coin.id, symbol: coin.symbol || coin.id, decimals: 18, logoURI: undefined, coinKey: coin.id }];
-          });
-        }
-      } catch { /* Keep the provider list empty if both market-provider sources are unavailable. */ }
-    }
-  }
-  // The Market token universe comes from CoinGecko's own catalog. It is never
-  // filtered through LI.FI. Metrics are joined by chain ID + contract address.
-  const seen = new Set<string>();
-  const tokens: MarketToken[] = providerTokens
-    .filter(token => Boolean(token.address) && Boolean(String(token.symbol || '').trim()))
-    .filter(token => /^0x[a-fA-F0-9]{40}$/.test(token.address || '') && (token.address || '').toLowerCase() !== '0x0000000000000000000000000000000000000000')
-    .filter(token => {
-      const key = (token.address || '').toLowerCase();
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    })
+  const platformId = platformByChain.get(network.chainId) || COINGECKO_PLATFORM_FALLBACKS[network.chainId];
+  if (!platformId) return { id: network.id, chainId: network.chainId, tokens: [] as MarketToken[] };
+  // The market provider is the source of the token directory. Do not filter it through LI.FI.
+  const providerResponse = await fetch('https://tokens.coingecko.com/' + encodeURIComponent(platformId) + '/all.json');
+  if (!providerResponse.ok) throw new Error('Market provider token directory unavailable for ' + network.name);
+  const list = await providerResponse.json() as CoinGeckoTokenList;
+  const tokens: MarketToken[] = (list.tokens || [])
+    .filter(token => Boolean(token.address) && Boolean(String(token.symbol || '').trim()) && Number.isFinite(token.decimals))
     .map(token => ({
       chainId: network.chainId,
       address: token.address!,
-      symbol: String(token.symbol).trim(),
-      name: String(token.name || token.symbol).trim(),
-      decimals: Number.isFinite(token.decimals) ? Number(token.decimals) : 18,
-      logoURI: token.logoURI,
-      coinKey: token.coinKey
+      symbol: token.symbol!.trim(),
+      name: (token.name || token.symbol || 'Unknown token').trim(),
+      decimals: Number(token.decimals),
+      logoURI: token.logoURI
     }));
-  const nativeToken = network.nativeToken;
-  // Add a native-asset display row only if the market provider list is empty.
-  // The synthetic native placeholder must never be treated as a real contract for metrics.
-  if (!tokens.length && nativeToken) tokens.push({ ...nativeToken, chainId: network.chainId });
-  return { id: network.id, chainId: network.chainId, tokens };
+  const unique = new Map<string, MarketToken>();
+  tokens.forEach(token => { if (!unique.has(token.address.toLowerCase())) unique.set(token.address.toLowerCase(), token); });
+  return { id: network.id, chainId: network.chainId, tokens: [...unique.values()] };
 }));
 results.forEach(item => marketTokenLoaded.current.add(item.chainId));
 setMarketNetworks(previous => previous.map(network => {
