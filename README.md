@@ -1,30 +1,36 @@
 # Ferra Wallet
 
-Ferra Wallet is being rebuilt on the `ferra-wallet-clean-rebuild` branch. The prior implementation is used only as a visual reference: the existing dark dashboard styling and layout are retained, while wallet and application logic are being replaced with a clean foundation.
+Ferra Wallet is a clean self-custody wallet foundation. The existing dashboard appearance is retained as a visual reference; application behavior is being rebuilt separately.
 
-## Current phase: Stage 1 — wallet foundation
+## Current phase: local wallet foundation
 
-Implemented in this phase:
-- Create a new Ethereum-compatible wallet using ethers' maintained wallet and BIP-39 implementations.
-- Display the recovery phrase once during setup and require a three-word backup check.
+Implemented:
+- Generate a new EVM wallet locally with ethers.
+- Reveal the generated recovery phrase in the setup flow and require a backup confirmation before saving.
 - Import a valid BIP-39 recovery phrase locally.
-- Encrypt the wallet JSON with a user password using ethers' keystore encryption.
-- Store only the encrypted keystore in IndexedDB; no recovery phrase or plaintext private key is written to localStorage or sent to a backend.
-- Unlock the stored encrypted wallet with the password and lock the in-memory wallet session.
+- Encrypt wallet JSON with the user's password.
+- Persist only the encrypted keystore in IndexedDB.
+- Unlock the encrypted keystore for the current browser session.
 
-Not implemented yet: live balances, token discovery, prices, transaction history, send, receive QR codes, swaps, dApp connections, other chain families, or mainnet transaction signing/broadcasting. The dashboard intentionally shows unavailable/empty states instead of fabricated values.
+Not implemented and intentionally disabled:
+- Live native/token balances and price feeds.
+- Network switching and RPC-based asset discovery.
+- Transaction signing or broadcasting, send flows, QR receive, swaps, dApp connections, or transaction history.
+- Security audit or production readiness.
+
+The UI must not fabricate balances or claim a transaction succeeded. These capabilities will be added in separate phases with tests before they are enabled.
 
 ## Development
 
 ```bash
 npm install
-npm run dev
+npm run test
 npm run typecheck
 npm run build
 ```
 
-## Important security boundaries
+## Security notes
 
-This is a web wallet foundation, not a completed or independently audited production wallet. Browser storage is not equivalent to hardware-backed mobile secure storage: a successful same-origin script injection or compromised browser extension may access data available to the app, and JavaScript cannot guarantee immediate zeroization of secrets from memory. Use a strong unique password, keep the recovery phrase offline, and do not use significant funds until a threat model, automated tests, independent security review, and controlled release process are complete.
+This is not an independently audited production wallet. Browser-based storage is exposed to risks from compromised devices, malicious extensions, and same-origin script injection. Use a strong unique password, store the recovery phrase offline, and do not use significant funds until threat modeling, automated testing, and independent security review are complete.
 
-Never send the recovery phrase to a server, analytics tool, crash report, or support agent. Future blockchain reads and market-data services must not receive wallet secrets.
+The recovery phrase and plaintext private key must never be sent to a server, analytics system, crash report, or support agent. Future market-data and blockchain-read services must never receive wallet secrets.
