@@ -20,15 +20,6 @@ type MarketNetwork = { id: string; chainId: number; name: string; symbol: string
 type LifiChain = { id: number; key?: string; name: string; chainType?: string; logoURI?: string; nativeToken?: { address: string; symbol: string; name: string; decimals: number; logoURI?: string; priceUSD?: string; coinKey?: string } };
 type LifiTokenResponse = { tokens?: Record<string, Array<MarketToken>> };
 const MARKET_FEATURED_CHAIN_IDS = [1, 56, 8453, 137, 42161, 10, 43114, 5000];
-// Keep the Market focused on familiar, established crypto assets and common wrapped/native variants.
-const NORMAL_MARKET_SYMBOLS = new Set([
-'BTC','WBTC','CBBTC','TBTC','ETH','WETH','STETH','WSTETH','CBETH','RETH','BNB','WBNB','SOL','WSOL',
-'USDC','USDT','DAI','USDE','USDS','TUSD','FDUSD','PYUSD','FRAX','LUSD','USDBC','USDC.E','USDT.E',
-'XRP','TRX','TON','ADA','DOGE','DOT','LTC','BCH','LINK','UNI','AAVE','AVAX','POL','MATIC','ARB','OP',
-'NEAR','ATOM','APT','SUI','SEI','INJ','TIA','FIL','ICP','XLM','HBAR','ETC','XMR','CRO','MNT','FTM','S','ALGO',
-'RENDER','FET','TAO','GRT','MKR','CRV','LDO','SNX','COMP','ENS','IMX','PEPE','SHIB','FLOKI','BONK','JUP','ONDO',
-'RUNE','KAS','VET','EGLD','FLOW','XTZ','ZEC','ZRX','BAT','1INCH','CAKE','RAY','JTO','PYTH','WIF','BRETT','MORPHO'
-]);
 // All supported EVM networks come from LI.FI. This list only controls their display order.
 const shortAddress = (s: string) => s ? `${s.slice(0, 6)}…${s.slice(-4)}` : '';
 const rpcCall = async (chain: Chain, method: string, params: unknown[] = []) => {
@@ -128,7 +119,7 @@ const directoryTokens = (payload.tokens?.[String(network.chainId)] || []);
 const nativeToken = network.nativeToken;
 const tokens = (nativeToken && !directoryTokens.some(token => token.address.toLowerCase() === nativeToken.address.toLowerCase()) ? [...directoryTokens, nativeToken] : directoryTokens)
 .map(token => ({ ...token, chainId: network.chainId }))
-.filter(token => Boolean(String(token.symbol || '').trim()) && Boolean(token.address) && Number.isFinite(token.decimals) && NORMAL_MARKET_SYMBOLS.has(String(token.symbol || '').trim().toUpperCase()))
+.filter(token => Boolean(String(token.symbol || '').trim()) && Boolean(token.address) && Number.isFinite(token.decimals))
 .sort((a, b) => {
 const aNative = a.address.toLowerCase() === '0x0000000000000000000000000000000000000000' || a.symbol.toLowerCase() === network.symbol.toLowerCase();
 const bNative = b.address.toLowerCase() === '0x0000000000000000000000000000000000000000' || b.symbol.toLowerCase() === network.symbol.toLowerCase();
