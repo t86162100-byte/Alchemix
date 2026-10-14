@@ -192,6 +192,10 @@ for (let offset = 0; offset < missing.length; offset += 4) {
     const result = batchResults.find(item => item.id === network.id && item.ok);
     return result ? { ...network, tokens: result.tokens } : network;
   }));
+  // Treat the first completed batch as the initial render milestone. The remaining
+  // network batches and market-metric requests continue in the background, so the
+  // Market tab never shows a blocking loader while every supported chain is queried.
+  if (offset === 0) setMarketTokensLoading(false);
   const metricResults = batchResults.filter(item => item.ok).map(({id,chainId,tokens}) => ({id,chainId,tokens}));
   if (metricResults.length) {
     void fetchDexMarketMetrics(metricResults).then(metrics => {
@@ -468,7 +472,7 @@ return <div className="app-shell">
 {marketSearchOpen && <label className="market-search-wrap"><Search size={17}/><input autoFocus value={marketSearch} onChange={event => setMarketSearch(event.target.value)} placeholder="Search tokens or contract address…" aria-label="Search market tokens"/><button type="button" onClick={() => { setMarketSearch(''); setMarketSearchOpen(false); }} aria-label="Close search"><X size={15}/></button></label>}
 <button type="button" className="market-search-icon-button" aria-label={marketSearchOpen ? 'Close market search' : 'Search market'} onClick={() => setMarketSearchOpen(open => !open)}><Search size={18}/></button>
 </div>
-<div className="market-data-status">{marketTokensLoading || marketNetworksLoading ? "Loading live token prices and market data…" : marketNetworkError || "Live token prices and available DEX market metrics"}</div>
+<div className="market-data-status">{marketNetworksLoading ? "Loading market networks…" : marketTokensLoading ? "Loading initial market data…" : marketNetworkError || "Live market data updates as network tokens and metrics arrive"}</div>
 <div className="market-toolbar"><div className="market-category-list" role="tablist" aria-label="Market categories">
 {['Hot','All tokens','Favorites','Gainers','Losers','Volume'].map(category => <button type="button" role="tab" aria-selected={marketCategory === category} className={marketCategory === category ? 'active' : ''} key={category} onClick={() => { setMarketCategory(category); if (category === 'Volume') setMarketSort('volume'); else if (category === 'Gainers' || category === 'Losers') setMarketSort('change'); else setMarketSort('market_cap'); }}>{category === 'Hot' && <Zap size={14}/>} {category === 'Favorites' && <Sparkles size={14}/>} {category === 'Gainers' && <ArrowUpRight size={14}/>} {category === 'Losers' && <ArrowDownLeft size={14}/>} {category}</button>)}
 </div></div>
