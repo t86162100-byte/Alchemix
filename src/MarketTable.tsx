@@ -34,15 +34,19 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
   let rows=selected.flatMap(network=>network.tokens.slice(0, 100).map(token=>{
     const key=token.chainId+':'+token.address.toLowerCase(), data=metrics[key]||{};
     const price=data.priceUsd ?? (token.priceUSD != null && token.priceUSD !== '' ? Number(token.priceUSD) : undefined);
-    const change=timeRange==='1h'?data.priceChange?.h1:timeRange==='24h'?data.priceChange?.h24:undefined;
+    const rawChange=timeRange==='1h'?data.priceChange?.h1:timeRange==='24h'?data.priceChange?.h24:undefined;
+    // Never let malformed provider outliers (for example 10^29% changes) contaminate rankings.
+    const change=typeof rawChange==='number'&&Number.isFinite(rawChange)&&Math.abs(rawChange)<=10000?rawChange:undefined;
     return {...token,key,networkName:network.name,data,price,change};
   }));
   if(query) rows=rows.filter(t=>t.name.toLowerCase().includes(query)||t.symbol.toLowerCase().includes(query)||t.address.toLowerCase().includes(query)||t.networkName.toLowerCase().includes(query));
   if(category==='Favorites') rows=rows.filter(t=>favorites.includes(t.key));
   if(category==='Gainers') rows=rows.filter(t=>typeof t.change==='number'&&t.change>0);
   if(category==='Losers') rows=rows.filter(t=>typeof t.change==='number'&&t.change<0);
-  if(category==='Volume') rows=rows.filter(t=>Number(t.data.volume?.h24)>0);
-  rows.sort((a,b)=>sort==='price'?Number(b.price||0)-Number(a.price||0):sort==='change'?Number(b.change??-Infinity)-Number(a.change??-Infinity):sort==='volume'?Number(b.data.volume?.h24||0)-Number(a.data.volume?.h24||0):Number(b.data.marketCap||b.data.fdv||0)-Number(a.data.marketCap||a.data.fdv||0));
+  if(category==='Volume'||category==='Hot') rows=rows.filter(t=>Number(t.data.volume?.h24)>0);
+  // Hot is a live-activity view, ranked by real 24h traded volume; Gainers/Losers rank by selected-range change.
+  const effectiveSort=(category==='Hot'||category==='Volume')?'volume':(category==='Gainers'||category==='Losers')?'change':sort;
+  rows.sort((a,b)=>effectiveSort==='price'?Number(b.price||0)-Number(a.price||0):effectiveSort==='change'?(category==='Losers'?Number(a.change??Infinity)-Number(b.change??Infinity):Number(b.change??-Infinity)-Number(a.change??-Infinity)):effectiveSort==='volume'?Number(b.data.volume?.h24||0)-Number(a.data.volume?.h24||0):Number(b.data.marketCap||b.data.fdv||0)-Number(a.data.marketCap||a.data.fdv||0));
   // Render a small page at a time so large provider lists cannot block wallet navigation.
   const visibleRows = rows.slice(0, visibleCount);
   return <div className="market-table-panel"><div className="market-compact-list">
