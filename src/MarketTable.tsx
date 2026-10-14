@@ -72,9 +72,15 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
                 const next=Number(image.dataset.logoIndex||'0')+1;
                 if(candidates[next]){image.dataset.logoIndex=String(next);image.src=candidates[next];}
                 else{
-                  // Stop retrying remote registries and reveal the always-present local symbol badge.
-                  image.style.display='none';
-                  image.removeAttribute('src');
+                  // Use a self-contained SVG as the final fallback so the logo never becomes blank.
+                  const symbol=(image.closest('.market-token')?.querySelector('.market-token-copy strong')?.textContent||'?').trim().slice(0,4).toUpperCase();
+                  const escaped=symbol.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+                  const colors=['#26364f','#334155','#3f315e','#244b4a','#59402f'];
+                  let hash=0;for(let i=0;i<symbol.length;i++)hash=(hash*31+symbol.charCodeAt(i))>>>0;
+                  const bg=colors[hash%colors.length];
+                  image.dataset.logoIndex=String(candidates.length);
+                  image.onerror=null;
+                  image.src='data:image/svg+xml;charset=UTF-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="'+bg+'"/><text x="32" y="35" text-anchor="middle" dominant-baseline="middle" font-family="Arial,sans-serif" font-size="'+(escaped.length>3?17:22)+'" font-weight="700" fill="#ffffff">'+escaped+'</text></svg>');
                 }
               }}
             /><span className="market-token-fallback">{(token.symbol||'?').slice(0,3).toUpperCase()}</span></span><div className="market-token-copy"><strong title={token.name||token.symbol}>{token.symbol||token.name}</strong><span title={(token.name||token.symbol)+' · '+token.networkName}>{token.networkName} · {(token.name||token.symbol)}</span></div></div><div className="market-compact-metrics"><span><b>{token.data.marketCap ? "MC" : token.data.fdv ? "FDV" : "MC"}</b> {compact(token.data.marketCap||token.data.fdv)}</span><span><b>VOL</b> {compact(token.data.volume?.h24)}</span><span><b>LIQ</b> {compact(token.data.liquidity?.usd)}</span></div></div><div className="market-compact-price"><strong>{money(token.price)}</strong><span className={typeof token.change!=='number'?'neutral':token.change>0?'positive':token.change<0?'negative':'neutral'}>{typeof token.change==='number'?(token.change>0?'+':'')+token.change.toFixed(2)+'%':'—'}</span></div><button type="button" className="market-favorite" onClick={()=>onToggleFavorite(token.key)} aria-label={favorites.includes(token.key)?'Remove from favorites':'Add to favorites'} aria-pressed={favorites.includes(token.key)}><Star size={15} fill={favorites.includes(token.key)?'currentColor':'none'}/></button></article>)}
