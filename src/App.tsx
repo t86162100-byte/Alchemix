@@ -145,16 +145,9 @@ const results = await Promise.all(missing.map(async network => {
     const key = token.address.toLowerCase();
     if (!unique.has(key)) unique.set(key, token);
   });
-  const nativeToken = network.nativeToken;
-  if (nativeToken && ![...unique.values()].some(token => token.symbol.toLowerCase() === nativeToken.symbol.toLowerCase() && token.address.toLowerCase() === nativeToken.address.toLowerCase())) {
-    unique.set(nativeToken.address.toLowerCase(), { ...nativeToken, chainId: network.chainId });
-  }
-  const sorted = [...unique.values()].sort((a, b) => {
-    const aNative = Boolean(nativeToken && a.address.toLowerCase() === nativeToken.address.toLowerCase());
-    const bNative = Boolean(nativeToken && b.address.toLowerCase() === nativeToken.address.toLowerCase());
-    if (aNative !== bNative) return aNative ? -1 : 1;
-    return a.symbol.localeCompare(b.symbol);
-  });
+  // Keep Market listings strictly CoinGecko-sourced. Do not inject the LI.FI
+  // native-token object here, because its logo may be missing or come from another provider.
+  const sorted = [...unique.values()].sort((a, b) => a.symbol.localeCompare(b.symbol));
   return { id: network.id, chainId: network.chainId, tokens: sorted };
 }));
 results.forEach(item => marketTokenLoaded.current.add(item.chainId));
