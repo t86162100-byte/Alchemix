@@ -33,7 +33,7 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
   // Bound per-network processing as well as DOM rows; provider lists can contain very large token catalogues.
   let rows=selected.flatMap(network=>network.tokens.slice(0, 100).map(token=>{
     const key=token.chainId+':'+token.address.toLowerCase(), data=metrics[key]||{};
-    const price=data.priceUsd||undefined;
+    const price=data.priceUsd ?? (token.priceUSD != null && token.priceUSD !== '' ? Number(token.priceUSD) : undefined);
     const change=timeRange==='1h'?data.priceChange?.h1:timeRange==='24h'?data.priceChange?.h24:undefined;
     return {...token,key,networkName:network.name,data,price,change};
   }));
