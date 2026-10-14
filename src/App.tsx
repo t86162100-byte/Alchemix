@@ -119,44 +119,43 @@ missing.forEach(item => marketTokenRequests.current.add(item.chainId));
 setMarketTokensLoading(true);
 setMarketNetworkError('');
 try {
-const platforms = await getCoinGeckoPlatforms().catch(() => [] as CoinGeckoPlatform[]);
-const platformByChain = new Map<number, string>();
+const platforms = await getCoinGeckoPlatforms();
+const platformByChain = new Map<number, CoinGeckoPlatform>();
 platforms.forEach(platform => {
-  if (Number.isInteger(platform.chain_identifier) && platform.chain_identifier! > 0) platformByChain.set(platform.chain_identifier!, platform.id);
+  if (Number.isInteger(platform.chain_identifier) && platform.chain_identifier! > 0) platformByChain.set(platform.chain_identifier!, platform);
 });
 const results = await Promise.all(missing.map(async network => {
-  const lifiResponse = await fetch('https://li.quest/v1/tokens?chains=' + network.chainId);
-  if (!lifiResponse.ok) throw new Error('LI.FI token directory unavailable');
-  const lifiPayload = await lifiResponse.json() as LifiTokenResponse;
-  const lifiTokens = (lifiPayload.tokens?.[String(network.chainId)] || []).map(token => ({ ...token, chainId: network.chainId }))
-    .filter(token => Boolean(String(token.symbol || '').trim()) && Boolean(token.address) && Number.isFinite(token.decimals));
-  const platformId = platformByChain.get(network.chainId);
-  let providerTokens: Array<{ address?: string; name?: string; symbol?: string; decimals?: number; logoURI?: string }> = [];
-  if (platformId) {
-    try {
-      const providerResponse = await fetch('https://tokens.coingecko.com/' + encodeURIComponent(platformId) + '/all.json');
-      if (providerResponse.ok) {
-        const list = await providerResponse.json() as CoinGeckoTokenList;
-        providerTokens = list.tokens || [];
-      }
-    } catch { /* Keep the network's native LI.FI token if the market provider list is unavailable. */ }
-  }
-  const providerByAddress = new Map(providerTokens.filter(token => token.address).map(token => [token.address!.toLowerCase(), token]));
-  // Market eligibility comes from CoinGecko's chain-specific token list; LI.FI's directory
-  // remains the canonical token object passed to swap. Never match by symbol alone.
-  const matched: MarketToken[] = lifiTokens.filter(token => providerByAddress.has(token.address.toLowerCase())).map(token => {
-    const provider = providerByAddress.get(token.address.toLowerCase())!;
-    return { ...token, name: provider.name || token.name, symbol: provider.symbol || token.symbol, logoURI: provider.logoURI || token.logoURI };
+  const platform = platformByChain.get(network.chainId);
+  if (!platform) return { id: network.id, chainId: network.chainId, tokens: [] as MarketToken[] };
+  const providerResponse = await fetch('https://tokens.coingecko.com/' + encodeURIComponent(platform.id) + '/all.json');
+  if (!providerResponse.ok) throw new Error('Market provider token list unavailable for ' + network.name);
+  const list = await providerResponse.json() as CoinGeckoTokenList;
+  const tokens: MarketToken[] = (list.tokens || [])
+    .filter(token => Boolean(token.address) && Boolean(String(token.symbol || '').trim()) && Number.isFinite(token.decimals))
+    .map(token => ({
+      chainId: network.chainId,
+      address: token.address!,
+      symbol: token.symbol!.trim(),
+      name: token.name?.trim() || token.symbol!.trim(),
+      decimals: Number(token.decimals),
+      logoURI: token.logoURI
+    }));
+  const unique = new Map<string, MarketToken>();
+  tokens.forEach(token => {
+    const key = token.address.toLowerCase();
+    if (!unique.has(key)) unique.set(key, token);
   });
   const nativeToken = network.nativeToken;
-  if (nativeToken && !matched.some(token => token.address.toLowerCase() === nativeToken.address.toLowerCase())) matched.push({ ...nativeToken, chainId: network.chainId });
-  const tokens = matched.sort((a, b) => {
+  if (nativeToken && ![...unique.values()].some(token => token.symbol.toLowerCase() === nativeToken.symbol.toLowerCase() && token.address.toLowerCase() === nativeToken.address.toLowerCase())) {
+    unique.set(nativeToken.address.toLowerCase(), { ...nativeToken, chainId: network.chainId });
+  }
+  const sorted = [...unique.values()].sort((a, b) => {
     const aNative = Boolean(nativeToken && a.address.toLowerCase() === nativeToken.address.toLowerCase());
     const bNative = Boolean(nativeToken && b.address.toLowerCase() === nativeToken.address.toLowerCase());
     if (aNative !== bNative) return aNative ? -1 : 1;
-    return Number(b.priceUSD || 0) - Number(a.priceUSD || 0);
+    return a.symbol.localeCompare(b.symbol);
   });
-  return { id: network.id, chainId: network.chainId, tokens };
+  return { id: network.id, chainId: network.chainId, tokens: sorted };
 }));
 results.forEach(item => marketTokenLoaded.current.add(item.chainId));
 setMarketNetworks(previous => previous.map(network => {
@@ -165,7 +164,7 @@ setMarketNetworks(previous => previous.map(network => {
 }));
 void fetchDexMarketMetrics(results).then(metrics => { if (Object.keys(metrics).length) setMarketMetrics(previous => ({ ...previous, ...metrics })); });
 } catch {
-setMarketNetworkError('Market data could not be loaded. Check your connection and try again.');
+setMarketNetworkError('Market provider token list could not be loaded for one or more networks. Try again shortly.');
 } finally {
 missing.forEach(item => marketTokenRequests.current.delete(item.chainId));
 setMarketTokensLoading(false);
