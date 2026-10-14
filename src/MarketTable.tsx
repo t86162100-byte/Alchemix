@@ -71,7 +71,11 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
                 try{candidates=JSON.parse(image.dataset.logoCandidates||'[]') as string[];}catch{}
                 const next=Number(image.dataset.logoIndex||'0')+1;
                 if(candidates[next]){image.dataset.logoIndex=String(next);image.src=candidates[next];}
-                else{image.style.display='none';}
+                else{
+                  // Stop retrying remote registries and reveal the always-present local symbol badge.
+                  image.style.display='none';
+                  image.removeAttribute('src');
+                }
               }}
             /><span className="market-token-fallback">{(token.symbol||'?').slice(0,3).toUpperCase()}</span></span><div className="market-token-copy"><strong title={token.name||token.symbol}>{token.symbol||token.name}</strong><span title={(token.name||token.symbol)+' · '+token.networkName}>{token.networkName} · {(token.name||token.symbol)}</span></div></div><div className="market-compact-metrics"><span><b>{token.data.marketCap ? "MC" : token.data.fdv ? "FDV" : "MC"}</b> {compact(token.data.marketCap||token.data.fdv)}</span><span><b>VOL</b> {compact(token.data.volume?.h24)}</span><span><b>LIQ</b> {compact(token.data.liquidity?.usd)}</span></div></div><div className="market-compact-price"><strong>{money(token.price)}</strong><span className={typeof token.change!=='number'?'neutral':token.change>0?'positive':token.change<0?'negative':'neutral'}>{typeof token.change==='number'?(token.change>0?'+':'')+token.change.toFixed(2)+'%':'—'}</span></div><button type="button" className="market-favorite" onClick={()=>onToggleFavorite(token.key)} aria-label={favorites.includes(token.key)?'Remove from favorites':'Add to favorites'} aria-pressed={favorites.includes(token.key)}><Star size={15} fill={favorites.includes(token.key)?'currentColor':'none'}/></button></article>)}
     {rows.length > visibleCount && <button type="button" className="market-load-more" onClick={() => setVisibleCount(count => Math.min(count + 100, rows.length))}>Show more tokens ({Math.min(100, rows.length - visibleCount)} more) <ChevronDown size={15}/></button>}
