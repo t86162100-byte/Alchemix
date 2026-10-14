@@ -64,8 +64,17 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
               data-logo-index={token.logoURI ? "0" : "-1"}
               alt=""
               loading="lazy"
+              decoding="async"
+              onLoad={e=>{
+                const image=e.currentTarget;
+                const fallback=image.parentElement?.querySelector('.market-token-fallback') as HTMLElement|null;
+                if(fallback) fallback.style.display='none';
+                image.style.opacity='1';
+              }}
               onError={e=>{
                 const image=e.currentTarget;
+                const fallback=image.parentElement?.querySelector('.market-token-fallback') as HTMLElement|null;
+                if(fallback) fallback.style.display='grid';
                 let candidates:string[]=[];
                 try{candidates=JSON.parse(image.dataset.logoCandidates||'[]') as string[];}catch{}
                 const next=Number(image.dataset.logoIndex||'0')+1;
@@ -79,6 +88,8 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
                   const bg=colors[hash%colors.length];
                   image.dataset.logoIndex=String(candidates.length);
                   image.onerror=null;
+                  if(fallback) fallback.style.display='none';
+                  image.style.objectFit='cover';
                   image.src='data:image/svg+xml;charset=UTF-8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><rect width="64" height="64" rx="32" fill="'+bg+'"/><text x="32" y="35" text-anchor="middle" dominant-baseline="middle" font-family="Arial,sans-serif" font-size="'+(escaped.length>3?17:22)+'" font-weight="700" fill="#ffffff">'+escaped+'</text></svg>');
                 }
               }}
