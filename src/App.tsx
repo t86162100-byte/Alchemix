@@ -20,7 +20,7 @@ type MarketNetwork = { id: string; chainId: number; name: string; symbol: string
 type LifiChain = { id: number; key?: string; name: string; chainType?: string; logoURI?: string; nativeToken?: { address: string; symbol: string; name: string; decimals: number; logoURI?: string; priceUSD?: string; coinKey?: string } };
 type LifiTokenResponse = { tokens?: Record<string, Array<MarketToken>> };
 type CoinGeckoTokenList = { tokens?: Array<{ chainId?: number; address?: string; name?: string; symbol?: string; decimals?: number; logoURI?: string }> };
-type CoinGeckoPlatform = { id: string; chain_identifier?: number | null };
+type CoinGeckoPlatform = { id: string; chain_identifier?: number | null; image?: { thumb?: string; small?: string; large?: string } };
 const MARKET_FEATURED_CHAIN_IDS = [1, 56, 8453, 137, 42161, 10, 43114, 5000];
 let coinGeckoPlatformsPromise: Promise<CoinGeckoPlatform[]> | null = null;
 const getCoinGeckoPlatforms = async () => {
@@ -176,13 +176,28 @@ const directory: Array<[number, string, string]> = [
 [1,'Ethereum','ETH'],[56,'BSC','BNB'],[8453,'Base','ETH'],[137,'Polygon','POL'],[42161,'Arbitrum','ETH'],[10,'OP Mainnet','ETH'],[43114,'Avalanche','AVAX'],[5000,'Mantle','MNT'],
 [16661,'0G Mainnet','0G'],[2741,'Abstract','ETH'],[33139,'Apechain','APE'],[42170,'Arbitrum Nova','ETH'],[421614,'Arbitrum Sepolia Testnet','ETH'],[5042,'Arc','USDC'],[5042002,'Arc Testnet','USDC'],[84532,'Base Sepolia Testnet','ETH'],[80094,'Berachain','BERA'],[81457,'Blast','ETH'],[60808,'BOB','ETH'],[288,'Boba','ETH'],[42220,'Celo','CELO'],[25,'Cronos','CRO'],[11155111,'Ethereum Sepolia Testnet','ETH'],[42793,'Etherlink','XTZ'],[14,'Flare','FLR'],[747,'Flow','FLOW'],[252,'Fraxtal','FRAX'],[122,'FUSE','FUSE'],[100,'Gnosis','xDAI'],[1625,'Gravity','G'],[43111,'Hemi','ETH'],[999,'HyperEVM','HYPE'],[1337,'Hyperliquid','USDC'],[13371,'Immutable zkEVM','IMX'],[1776,'Injective','INJ'],[57073,'Ink','ETH'],[8217,'Kaia','KAIA'],[747474,'Katana','ETH'],[232,'Lens','GHO'],[3586256,'Lighter','USDC'],[59144,'Linea','ETH'],[1135,'Lisk','ETH'],[4326,'MegaETH','ETH'],[1088,'Metis','METIS'],[34443,'Mode','ETH'],[143,'Monad','MON'],[2818,'Morph','ETH'],[11155420,'OP Sepolia Testnet','ETH'],[204,'opBNB','BNB'],[1672,'Pharos Mainnet','PROS'],[9745,'Plasma','XPL'],[98866,'Plume','PLUME'],[4663,'Robinhood Chain','ETH'],[2020,'Ronin','RON'],[30,'Rootstock','RBTC'],[534352,'Scroll','ETH'],[1329,'Sei','SEI'],[5031,'Somnia','SOMI'],[1868,'Soneium','ETH'],[146,'Sonic','S'],[988,'Stable','USDT0'],[40,'Telos','TLOS'],[4217,'Tempo','PathUSD'],[130,'Unichain','ETH'],[1480,'Vana','VAN'],[88,'Viction','VIC'],[480,'World Chain','ETH'],[50,'XDC','XDC'],[196,'XLayer','OKB'],[324,'zkSync','ETH']
 ];
-const providerNetworks: MarketNetwork[] = directory.map(([chainId, name, symbol]) => ({
-id: String(chainId), chainId, name, symbol,
-tokens: [],
-nativeToken: { chainId, address: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', symbol, name: symbol === 'USDC' ? 'USD Coin' : symbol === 'USDT0' ? 'USDT0' : name === 'BSC' ? 'BNB' : name === 'Polygon' ? 'POL' : name === 'Avalanche' ? 'Avalanche' : symbol, decimals: 18 }
-}));
-setMarketNetworksLoading(false);
+getCoinGeckoPlatforms().catch(() => [] as CoinGeckoPlatform[]).then(platforms => {
+const platformByChain = new Map<number, CoinGeckoPlatform>();
+platforms.forEach(platform => {
+  if (Number.isInteger(platform.chain_identifier) && platform.chain_identifier! > 0) platformByChain.set(platform.chain_identifier!, platform);
+});
+const providerNetworks: MarketNetwork[] = directory.map(([chainId, name, symbol]) => {
+  const platform = platformByChain.get(chainId);
+  return {
+    id: String(chainId), chainId, name, symbol,
+    logoURI: platform?.image?.large || platform?.image?.small || platform?.image?.thumb,
+    tokens: [],
+    nativeToken: { chainId, address: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', symbol, name: symbol === 'USDC' ? 'USD Coin' : symbol === 'USDT0' ? 'USDT0' : name === 'BSC' ? 'BNB' : name === 'Polygon' ? 'POL' : name === 'Avalanche' ? 'Avalanche' : symbol, decimals: 18 }
+  };
+});
 setMarketNetworks(providerNetworks);
+}).catch(() => {
+const providerNetworks: MarketNetwork[] = directory.map(([chainId, name, symbol]) => ({
+id: String(chainId), chainId, name, symbol, tokens: [],
+nativeToken: { chainId, address: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', symbol, name, decimals: 18 }
+}));
+setMarketNetworks(providerNetworks);
+}).finally(() => setMarketNetworksLoading(false));
 }, []);
 useEffect(() => {
 if (activeTab === 'Market' && marketNetworks.length) void loadMarketTokens(marketNetworkId);
