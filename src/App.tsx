@@ -251,6 +251,20 @@ setMarketNetworks(providerNetworks);
 useEffect(() => {
 if (activeTab === 'Market' && marketNetworks.length) void loadMarketTokens(marketNetworkId);
 }, [activeTab, marketNetworks.length, marketNetworkId, loadMarketTokens]);
+// Refresh live metrics for the visible market scope instead of leaving the first snapshot frozen.
+useEffect(() => {
+  if (activeTab !== 'Market' || !marketNetworks.length) return;
+  const refresh = () => {
+    const selected = marketNetworkId === 'all' ? marketNetworks : marketNetworks.filter(network => network.id === marketNetworkId);
+    const targets = selected.filter(network => network.tokens.length).map(({id,chainId,tokens}) => ({id,chainId,tokens:tokens.slice(0, 40)}));
+    if (!targets.length) return;
+    void fetchDexMarketMetrics(targets).then(next => {
+      if (Object.keys(next).length) setMarketMetrics(previous => ({...previous,...next}));
+    }).catch(() => {});
+  };
+  const timer = window.setInterval(refresh, 60000);
+  return () => window.clearInterval(timer);
+}, [activeTab, marketNetworkId, marketNetworks]);
 useEffect(() => {
 const savedAddress = localStorage.getItem('nova-wallet-address');
 const savedChain = Number(localStorage.getItem('nova-wallet-chain-id') || '1');
