@@ -46,7 +46,6 @@ export default function App() {
     try {
       const draft = await createWalletDraft();
       setPhrase(draft.phrase);
-      setAddress(draft.address);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not create a wallet on this device.');
     } finally { setBusy(false); }
