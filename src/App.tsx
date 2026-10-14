@@ -21,6 +21,7 @@ export default function App() {
   const [address, setAddress] = useState('');
   const [unlockedWallet, setUnlockedWallet] = useState<Awaited<ReturnType<typeof unlockWallet>> | null>(null);
   const [keystoreExists, setKeystoreExists] = useState(false);
+  const [storageReady, setStorageReady] = useState(false);
   const [password, setPassword] = useState('');
   const [phrase, setPhrase] = useState('');
   const [importPhrase, setImportPhrase] = useState('');
@@ -34,7 +35,7 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-    readKeystore().then(value => { if (!cancelled) setKeystoreExists(Boolean(value)); })
+    readKeystore().then(value => { if (!cancelled) { setKeystoreExists(Boolean(value)); setStorageReady(true); } })
       .catch(() => { if (!cancelled) setNotice('Secure browser storage is unavailable. Wallet setup cannot continue until storage is available.'); });
     return () => { cancelled = true; };
   }, []);
@@ -44,6 +45,7 @@ export default function App() {
     setShowPhrase(false); setConfirmedBackup(false); setReplaceExisting(false);
   };
   const startCreate = async () => {
+    if (!storageReady) { setError('Secure browser storage has not been verified yet.'); return; }
     setBusy(true); setError('');
     try {
       const draft = await createWalletDraft();
@@ -53,6 +55,7 @@ export default function App() {
     } finally { setBusy(false); }
   };
   const saveCreatedWallet = async () => {
+    if (!storageReady) { setError('Secure browser storage is unavailable.'); return; }
     if (password.length < 8) { setError('Use a password with at least 8 characters.'); return; }
     if (keystoreExists && !replaceExisting) { setError('Confirm that you understand this will replace the wallet currently saved in this browser.'); return; }
     if (!confirmedBackup) { setError('Confirm that you have safely written down the recovery phrase first.'); return; }
@@ -68,6 +71,7 @@ export default function App() {
     } finally { setBusy(false); }
   };
   const saveImportedWallet = async () => {
+    if (!storageReady) { setError('Secure browser storage is unavailable.'); return; }
     if (password.length < 8) { setError('Use a password with at least 8 characters.'); return; }
     if (keystoreExists && !replaceExisting) { setError('Confirm that you understand this will replace the wallet currently saved in this browser.'); return; }
     setBusy(true); setError('');
@@ -121,7 +125,7 @@ export default function App() {
     {notice && <div className="toast" role="status"><span className="toast-dot"/><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss notification"><X size={16}/></button></div>}
     {modal && <div className="modal-backdrop" onClick={closeModal}><section className="modal-card" onClick={event => event.stopPropagation()}>
       <div className="modal-head"><div><span className="modal-eyebrow">FERRA WALLET</span><h2>{modal === 'wallet' ? 'Your wallet' : modal === 'create' ? 'Create a wallet' : modal === 'import' ? 'Import a wallet' : modal === 'unlock' ? 'Unlock your wallet' : 'Help & security'}</h2></div><button className="icon-button" onClick={closeModal} aria-label="Close dialog"><X size={19}/></button></div>
-      {modal === 'wallet' && <><p className="modal-description">Create a new self-custody wallet or import an existing recovery phrase. Wallet data is encrypted before it is saved in this browser.</p><div className="wallet-choice-grid"><button type="button" className="wallet-choice" onClick={() => { setError(''); setPhrase(''); setPassword(''); setModal('create'); void startCreate(); }}><span className="wallet-choice-icon"><Sparkles size={19}/></span><strong>Create new wallet</strong><small>Generate a recovery phrase</small></button><button type="button" className="wallet-choice" onClick={() => { setError(''); setImportPhrase(''); setPassword(''); setModal('import'); }}><span className="wallet-choice-icon"><ArrowDownLeft size={19}/></span><strong>Import wallet</strong><small>Use an existing recovery phrase</small></button></div>{keystoreExists && <button className="primary-button full-button" onClick={() => { setError(''); setPassword(''); setModal('unlock'); }}>Unlock saved wallet</button>}{unlockedWallet && <button className="primary-button full-button" onClick={() => { setUnlockedWallet(null); setAddress(''); closeModal(); setNotice('Wallet locked for this session. Encrypted data remains saved on this device.'); }}>Lock wallet</button>}<div className="form-warning"><LockKeyhole size={16}/><span>Never share your recovery phrase. Ferra cannot recover it if you lose it.</span></div></>}
+      {modal === 'wallet' && <><p className="modal-description">Create a new self-custody wallet or import an existing recovery phrase. Wallet data is encrypted before it is saved in this browser.</p>{!storageReady && <p className="wallet-error" role="status">Checking secure browser storage. If it is unavailable, wallet setup remains disabled.</p>}<div className="wallet-choice-grid"><button type="button" className="wallet-choice" disabled={!storageReady || busy} onClick={() => { setError(''); setPhrase(''); setPassword(''); setModal('create'); void startCreate(); }}><span className="wallet-choice-icon"><Sparkles size={19}/></span><strong>Create new wallet</strong><small>Generate a recovery phrase</small></button><button type="button" className="wallet-choice" disabled={!storageReady || busy} onClick={() => { setError(''); setImportPhrase(''); setPassword(''); setModal('import'); }}><span className="wallet-choice-icon"><ArrowDownLeft size={19}/></span><strong>Import wallet</strong><small>Use an existing recovery phrase</small></button></div>{keystoreExists && <button className="primary-button full-button" onClick={() => { setError(''); setPassword(''); setModal('unlock'); }}>Unlock saved wallet</button>}{unlockedWallet && <button className="primary-button full-button" onClick={() => { setUnlockedWallet(null); setAddress(''); closeModal(); setNotice('Wallet locked for this session. Encrypted data remains saved on this device.'); }}>Lock wallet</button>}<div className="form-warning"><LockKeyhole size={16}/><span>Never share your recovery phrase. Ferra cannot recover it if you lose it.</span></div></>}
       {modal === 'create' && <><p className="modal-description">Your recovery phrase is generated locally. Write it down and store it offline before securing the wallet.</p>{keystoreExists && <label className="form-label"><input type="checkbox" checked={replaceExisting} onChange={event => setReplaceExisting(event.target.checked)}/> I understand this will replace the wallet currently saved in this browser.</label>}{busy && !phrase ? <p className="network-loading">Generating wallet locally…</p> : phrase && <><div className="wallet-recovery-phrase">{phrase.split(' ').map((word,index) => <span key={index}><small>{index+1}</small>{showPhrase ? word : '••••'}</span>)}</div><button className="text-button" onClick={() => setShowPhrase(value => !value)}>{showPhrase ? 'Hide recovery phrase' : 'Reveal recovery phrase'}</button><label className="form-label"><input type="checkbox" checked={confirmedBackup} onChange={event => setConfirmedBackup(event.target.checked)}/> I have written down my recovery phrase and stored it safely.</label><label className="form-label">Encryption password (8+ characters)</label><input className="form-input" type="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} placeholder="Choose a strong password"/><button className="primary-button full-button" disabled={busy || !showPhrase} onClick={() => void saveCreatedWallet()}>{busy ? 'Securing wallet…' : 'Secure wallet and continue'} <ArrowRight size={16}/></button></>}{error && <p className="wallet-error" role="alert">{error}</p>}</>}
       {modal === 'import' && <><p className="modal-description">Import a valid 12- or 24-word recovery phrase. The phrase is processed locally and is never sent to a server.</p>{keystoreExists && <label className="form-label"><input type="checkbox" checked={replaceExisting} onChange={event => setReplaceExisting(event.target.checked)}/> I understand this will replace the wallet currently saved in this browser.</label>}<label className="form-label">Recovery phrase</label><textarea className="form-input wallet-phrase-input" rows={3} autoComplete="off" spellCheck={false} value={importPhrase} onChange={event => setImportPhrase(event.target.value)} placeholder="Enter recovery phrase separated by spaces"/><label className="form-label">Encryption password (8+ characters)</label><input className="form-input" type="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} placeholder="Choose a strong password"/><button className="primary-button full-button" disabled={busy} onClick={() => void saveImportedWallet()}>{busy ? 'Importing wallet…' : 'Import and secure wallet'} <ArrowRight size={16}/></button>{error && <p className="wallet-error" role="alert">{error}</p>}</>}
       {modal === 'unlock' && <><p className="modal-description">Enter the password used to encrypt the wallet saved in this browser.</p><label className="form-label">Wallet password</label><input className="form-input" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} placeholder="Wallet password"/><button className="primary-button full-button" disabled={busy} onClick={() => void unlockSavedWallet()}>{busy ? 'Unlocking…' : 'Unlock wallet'} <ArrowRight size={16}/></button>{error && <p className="wallet-error" role="alert">{error}</p>}</>}
