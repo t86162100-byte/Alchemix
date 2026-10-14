@@ -144,7 +144,7 @@ const results = await Promise.all(missing.map(async network => {
   const providerByAddress = new Map(providerTokens.filter(token => token.address).map(token => [token.address!.toLowerCase(), token]));
   // Market eligibility comes from CoinGecko's chain-specific token list; LI.FI's directory
   // remains the canonical token object passed to swap. Never match by symbol alone.
-  const matched = lifiTokens.filter(token => providerByAddress.has(token.address.toLowerCase())).map(token => {
+  const matched: MarketToken[] = lifiTokens.filter(token => providerByAddress.has(token.address.toLowerCase())).map(token => {
     const provider = providerByAddress.get(token.address.toLowerCase())!;
     return { ...token, name: provider.name || token.name, symbol: provider.symbol || token.symbol, logoURI: provider.logoURI || token.logoURI };
   });
