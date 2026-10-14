@@ -196,7 +196,8 @@ for (let offset = 0; offset < missing.length; offset += 4) {
   // network batches and market-metric requests continue in the background, so the
   // Market tab never shows a blocking loader while every supported chain is queried.
   if (offset === 0) setMarketTokensLoading(false);
-  const metricResults = batchResults.filter(item => item.ok).map(({id,chainId,tokens}) => ({id,chainId,tokens}));
+  // Keep DEX metric lookups bounded per chain; provider token lists can contain thousands of entries.
+  const metricResults = batchResults.filter(item => item.ok).map(({id,chainId,tokens}) => ({id,chainId,tokens:tokens.slice(0, 100)}));
   if (metricResults.length) {
     void fetchDexMarketMetrics(metricResults).then(metrics => {
       if (Object.keys(metrics).length) setMarketMetrics(previous => ({ ...previous, ...metrics }));
