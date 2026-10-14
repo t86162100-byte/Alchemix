@@ -11,21 +11,29 @@ type Props = {
 };
 
 // Fallback token logos for entries where the LI.FI directory omits or serves a broken logo URI.
+// Multiple public logo registries plus a generated visual fallback for tokens without published logos.
 const trustWalletFolders:Record<number,string>={
-  1:'ethereum',56:'smartchain',137:'polygon',42161:'arbitrum',10:'optimism',
-  43114:'avalanchec',100:'xdai',250:'fantom',42220:'celo',1313161554:'aurora',
-  25:'cronos',1284:'moonbeam',1285:'moonriver',1666600000:'harmony',1088:'metis',
-  40:'telos',8217:'klaytn',122:'fuse',324:'zksync',59144:'linea',534352:'scroll',
-  8453:'base',81457:'blast',7777777:'zora',5000:'mantle',204:'opbnb'
+1:'ethereum',56:'smartchain',137:'polygon',42161:'arbitrum',10:'optimism',43114:'avalanchec',
+100:'xdai',250:'fantom',42220:'celo',1313161554:'aurora',25:'cronos',1284:'moonbeam',
+1285:'moonriver',1666600000:'harmony',1088:'metis',40:'telos',8217:'klaytn',122:'fuse',
+324:'zksync',59144:'linea',534352:'scroll',8453:'base',81457:'blast',7777777:'zora',
+5000:'mantle',204:'opbnb',42170:'arbitrumnova',1116:'core',169:'manta',196:'xlayer',
+146:'sonic',57073:'ink',80094:'berachain'
 };
 const marketTokenLogoCandidates=(token:Token):string[]=>{
-  const address=token.address?.trim();
-  if(!address)return [];
-  const candidates:string[]=[];
-  const folder=trustWalletFolders[token.chainId];
-  if(folder)candidates.push(`https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/${folder}/assets/${address}/logo.png`);
-  candidates.push(`https://icons.llamao.fi/icons/tokens/${token.chainId}/${encodeURIComponent(address)}?w=64&h=64`);
-  return candidates;
+ const address=token.address?.trim();
+ if(!address)return [];
+ const candidates:string[]=[];
+ const folder=trustWalletFolders[token.chainId];
+ if(folder){
+  candidates.push(`https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/${folder}/assets/${address}/logo.png`);
+  candidates.push(`https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/${folder}/assets/${address.toLowerCase()}/logo.png`);
+ }
+ candidates.push(`https://raw.githubusercontent.com/Uniswap/assets/master/blockchains/ethereum/assets/${address}/logo.png`);
+ candidates.push(`https://icons.llamao.fi/icons/tokens/${token.chainId}/${encodeURIComponent(address)}?w=64&h=64`);
+ const seed=encodeURIComponent(`${token.chainId}-${address.toLowerCase()}-${token.symbol||'token'}`);
+ candidates.push(`https://api.dicebear.com/9.x/shapes/png?seed=${seed}&size=64&backgroundColor=171923,20283b,243b53,3b2f63`);
+ return [...new Set(candidates)];
 };
 const money=(value?:number|string)=>{const n=Number(value);if(!Number.isFinite(n)||n<=0)return '—';return n>=1000?'$'+n.toLocaleString('en-US',{maximumFractionDigits:2}):n>=1?'$'+n.toLocaleString('en-US',{maximumFractionDigits:4}):'$'+n.toLocaleString('en-US',{maximumFractionDigits:8});};
 const isStockLike=(name:string,symbol:string)=>{const n=name.trim();const s=symbol.trim();return /(?:\bstock\b|\bshares?\b|\bequit(?:y|ies)\b|\btokeni[sz]ed\b|\bpre[- ]?ipo\b|\bincorporated\b|\bcorporation\b|\bcommon stock\b|\bclass [a-c] shares?\b|\bETF\b)/i.test(n)||/(?:\binc\\.?|\bcorp\\.?|\bltd\\.?|\blimited|\bplc\\.?|\bholdings?)\\s*$/i.test(n)||(/^[A-Z]{1,5}c$/.test(s)&&/(?:inc\\.?|corp\\.?|stock|shares?|holdings?|company|class [A-Z])/i.test(n));};
