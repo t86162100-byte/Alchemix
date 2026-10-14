@@ -1,4 +1,5 @@
-import { Star } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Star, ChevronDown } from 'lucide-react';
 import type { MarketMetrics } from './marketData';
 
 type Token = { chainId:number; address:string; symbol:string; name:string; decimals:number; logoURI?:string; priceUSD?:string };
@@ -25,6 +26,8 @@ const money=(value?:number|string)=>{const n=Number(value);if(!Number.isFinite(n
 const isStockLike=(name:string,symbol:string)=>{const n=name.trim();const s=symbol.trim();return /(?:\bstock\b|\bshares?\b|\bequit(?:y|ies)\b|\btokeni[sz]ed\b|\bpre[- ]?ipo\b|\bincorporated\b|\bcorporation\b|\bcommon stock\b|\bclass [a-c] shares?\b|\bETF\b)/i.test(n)||/(?:\binc\\.?|\bcorp\\.?|\bltd\\.?|\blimited|\bplc\\.?|\bholdings?)\\s*$/i.test(n)||(/^[A-Z]{1,5}c$/.test(s)&&/(?:inc\\.?|corp\\.?|stock|shares?|holdings?|company|class [A-Z])/i.test(n));};
 const compact=(value?:number)=>{if(!Number.isFinite(value)||!value)return '—';const n=Math.abs(value);return n>=1e12?'$'+(value/1e12).toFixed(2)+'T':n>=1e9?'$'+(value/1e9).toFixed(2)+'B':n>=1e6?'$'+(value/1e6).toFixed(2)+'M':n>=1e3?'$'+(value/1e3).toFixed(2)+'K':'$'+value.toFixed(2);};
 export default function MarketTable({networks,networkId,timeRange,category,search,sort,metrics,favorites,loading,error,onToggleFavorite}:Props){
+  const [visibleCount, setVisibleCount] = useState(30);
+  useEffect(() => { setVisibleCount(30); }, [networkId, timeRange, category, search, sort]);
   const selected=networkId==='all'?networks:networks.filter(n=>n.id===networkId);
   const query=search.trim().toLowerCase();
   let rows=selected.flatMap(network=>network.tokens.map(token=>{
@@ -39,10 +42,11 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
   if(category==='Losers') rows=rows.filter(t=>typeof t.change==='number'&&t.change<0);
   if(category==='Volume') rows=rows.filter(t=>Number(t.data.volume?.h24)>0);
   rows.sort((a,b)=>sort==='price'?Number(b.price||0)-Number(a.price||0):sort==='change'?Number(b.change??-Infinity)-Number(a.change??-Infinity):sort==='volume'?Number(b.data.volume?.h24||0)-Number(a.data.volume?.h24||0):Number(b.data.marketCap||b.data.fdv||0)-Number(a.data.marketCap||a.data.fdv||0));
-  // Display every matching token returned by the market provider; no fixed row cap.
+  // Render a small page at a time so large provider lists cannot block wallet navigation.
+  const visibleRows = rows.slice(0, visibleCount);
   return <div className="market-table-panel"><div className="market-compact-list">
     <div className="market-sort-bar" aria-label="Sort market instruments"><span className="market-sort-label">#</span><div className="market-sort-asset"><span>MC / VOL</span></div><div className="market-sort-values"><span>Price / {timeRange}</span></div><span className="market-sort-star"><Star size={12}/></span></div>
-    {rows.map((token,index)=><article className="market-compact-row" key={token.key}><span className="market-compact-rank">{index+1}</span><div className="market-compact-asset"><div className="market-token"><span className="market-token-logos"><img
+    {visibleRows.map((token,index)=><article className="market-compact-row" key={token.key}><span className="market-compact-rank">{index+1}</span><div className="market-compact-asset"><div className="market-token"><span className="market-token-logos"><img
               src={token.logoURI || fallbackTokenLogo(token)}
               alt={token.name || token.symbol || 'Token'}
               loading="lazy"
@@ -56,5 +60,6 @@ export default function MarketTable({networks,networkId,timeRange,category,searc
               }}
             /></span><div className="market-token-copy"><strong title={token.name||token.symbol}>{token.symbol||token.name}</strong><span title={(token.name||token.symbol)+' · '+token.networkName}>{token.networkName} · {(token.name||token.symbol)}</span></div></div><div className="market-compact-metrics"><span><b>{token.data.marketCap ? "MC" : token.data.fdv ? "FDV" : "MC"}</b> {compact(token.data.marketCap||token.data.fdv)}</span><span><b>VOL</b> {compact(token.data.volume?.h24)}</span><span><b>LIQ</b> {compact(token.data.liquidity?.usd)}</span></div></div><div className="market-compact-price"><strong>{money(token.price)}</strong><span className={typeof token.change!=='number'?'neutral':token.change>0?'positive':token.change<0?'negative':'neutral'}>{typeof token.change==='number'?(token.change>0?'+':'')+token.change.toFixed(2)+'%':'—'}</span></div><button type="button" className="market-favorite" onClick={()=>onToggleFavorite(token.key)} aria-label={favorites.includes(token.key)?'Remove from favorites':'Add to favorites'} aria-pressed={favorites.includes(token.key)}><Star size={15} fill={favorites.includes(token.key)?'currentColor':'none'}/></button></article>)}
     {!rows.length&&<div className="market-empty">{loading?'Loading token prices and market metrics…':error|| (category==='Favorites'?'No favorites saved yet. Tap a star beside a token to save it.':'No tokens match these filters. Try another network or search.')}</div>}
+    {rows.length > visibleCount && <button type="button" className="market-load-more" onClick={() => setVisibleCount(count => Math.min(count + 30, rows.length))}>Load 30 more tokens <ChevronDown size={15}/><span>{Math.min(30, rows.length - visibleCount)} of {rows.length - visibleCount} next</span></button>}
   </div><div className="market-table-footer"><span>A compact wallet list of established crypto assets. Prices and DEX market metrics appear when available; unavailable values are shown as dashes.</span></div></div>;
 }
