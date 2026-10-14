@@ -172,34 +172,17 @@ setMarketTokensLoading(false);
 }
 }, [marketNetworks]);
 useEffect(() => {
-let cancelled = false;
-setMarketNetworksLoading(true);
-fetch('https://li.quest/v1/chains?chainTypes=EVM')
-.then(response => { if (!response.ok) throw new Error('Supported-chain service unavailable'); return response.json(); })
-.then((payload: { chains?: LifiChain[] }) => {
-const chains = (payload.chains || [])
-.filter(item => Number.isInteger(item.id) && item.id > 0 && item.chainType === 'EVM' && item.name && item.nativeToken?.symbol)
-.map(item => ({
-id: String(item.id),
-chainId: item.id,
-name: item.name,
-symbol: item.nativeToken!.symbol,
-logoURI: item.logoURI || item.nativeToken?.logoURI,
-nativeToken: item.nativeToken ? { ...item.nativeToken, chainId: item.id } : undefined,
-tokens: []
-}))
-.sort((a, b) => {
-const ai = MARKET_FEATURED_CHAIN_IDS.indexOf(a.chainId);
-const bi = MARKET_FEATURED_CHAIN_IDS.indexOf(b.chainId);
-if (ai >= 0 || bi >= 0) return (ai < 0 ? 999 : ai) - (bi < 0 ? 999 : bi);
-return a.name.localeCompare(b.name);
-});
-if (!cancelled && chains.length) setMarketNetworks(chains);
-else if (!cancelled) setMarketNetworkError('No supported EVM networks were returned by the swap network directory.');
-})
-.catch(() => { if (!cancelled) setMarketNetworkError('Could not load supported EVM networks. Check your connection and retry.'); })
-.finally(() => { if (!cancelled) setMarketNetworksLoading(false); });
-return () => { cancelled = true; };
+const directory: Array<[number, string, string]> = [
+[1,'Ethereum','ETH'],[56,'BSC','BNB'],[8453,'Base','ETH'],[137,'Polygon','POL'],[42161,'Arbitrum','ETH'],[10,'OP Mainnet','ETH'],[43114,'Avalanche','AVAX'],[5000,'Mantle','MNT'],
+[16661,'0G Mainnet','0G'],[2741,'Abstract','ETH'],[33139,'Apechain','APE'],[42170,'Arbitrum Nova','ETH'],[421614,'Arbitrum Sepolia Testnet','ETH'],[5042,'Arc','USDC'],[5042002,'Arc Testnet','USDC'],[84532,'Base Sepolia Testnet','ETH'],[80094,'Berachain','BERA'],[81457,'Blast','ETH'],[60808,'BOB','ETH'],[288,'Boba','ETH'],[42220,'Celo','CELO'],[25,'Cronos','CRO'],[11155111,'Ethereum Sepolia Testnet','ETH'],[42793,'Etherlink','XTZ'],[14,'Flare','FLR'],[747,'Flow','FLOW'],[252,'Fraxtal','FRAX'],[122,'FUSE','FUSE'],[100,'Gnosis','xDAI'],[1625,'Gravity','G'],[43111,'Hemi','ETH'],[999,'HyperEVM','HYPE'],[1337,'Hyperliquid','USDC'],[13371,'Immutable zkEVM','IMX'],[1776,'Injective','INJ'],[57073,'Ink','ETH'],[8217,'Kaia','KAIA'],[747474,'Katana','ETH'],[232,'Lens','GHO'],[3586256,'Lighter','USDC'],[59144,'Linea','ETH'],[1135,'Lisk','ETH'],[4326,'MegaETH','ETH'],[1088,'Metis','METIS'],[34443,'Mode','ETH'],[143,'Monad','MON'],[2818,'Morph','ETH'],[11155420,'OP Sepolia Testnet','ETH'],[204,'opBNB','BNB'],[1672,'Pharos Mainnet','PROS'],[9745,'Plasma','XPL'],[98866,'Plume','PLUME'],[4663,'Robinhood Chain','ETH'],[2020,'Ronin','RON'],[30,'Rootstock','RBTC'],[534352,'Scroll','ETH'],[1329,'Sei','SEI'],[5031,'Somnia','SOMI'],[1868,'Soneium','ETH'],[146,'Sonic','S'],[988,'Stable','USDT0'],[40,'Telos','TLOS'],[4217,'Tempo','PathUSD'],[130,'Unichain','ETH'],[1480,'Vana','VAN'],[88,'Viction','VIC'],[480,'World Chain','ETH'],[50,'XDC','XDC'],[196,'XLayer','OKB'],[324,'zkSync','ETH']
+];
+const providerNetworks: MarketNetwork[] = directory.map(([chainId, name, symbol]) => ({
+id: String(chainId), chainId, name, symbol,
+tokens: [],
+nativeToken: { chainId, address: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee', symbol, name: symbol === 'USDC' ? 'USD Coin' : symbol === 'USDT0' ? 'USDT0' : name === 'BSC' ? 'BNB' : name === 'Polygon' ? 'POL' : name === 'Avalanche' ? 'Avalanche' : symbol, decimals: 18 }
+}));
+setMarketNetworksLoading(false);
+setMarketNetworks(providerNetworks);
 }, []);
 useEffect(() => {
 if (activeTab === 'Market' && marketNetworks.length) void loadMarketTokens(marketNetworkId);
