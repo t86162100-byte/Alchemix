@@ -69,7 +69,7 @@ async function deriveEd25519Seed(seedHex: string): Promise<Uint8Array> {
 
 /** Derive the first Solana account from a BIP-39 phrase using a hardened Ed25519 path. */
 export async function deriveSolanaKeypair(phraseInput: string) {
-  const phrase = phraseInput.trim().toLowerCase().replace(/\\s+/g, ' ');
+  const phrase = phraseInput.trim().toLowerCase().replace(/\s+/g, ' ');
   if (!Mnemonic.isValidMnemonic(phrase)) {
     throw new Error('A valid recovery phrase is required to derive the Solana account.');
   }
@@ -137,7 +137,7 @@ export type SolanaTransferPreview = {
 
 function parseSolAmount(amountInput: string): bigint {
   const value = amountInput.trim();
-  if (!/^\\d+(?:\\.\\d{1,9})?$/.test(value)) {
+  if (!/^\d+(?:\.\d{1,9})?$/.test(value)) {
     throw new Error('Enter a positive SOL amount with no more than 9 decimal places.');
   }
   let amount: bigint;
@@ -151,7 +151,7 @@ export async function previewSolanaTransfer(phraseInput: string, recipientInput:
   const keypair = await deriveSolanaKeypair(phraseInput);
   let recipient;
   try { recipient = new PublicKey(recipientInput.trim()); } catch { throw new Error('Enter a valid Solana recipient address.'); }
-  if (!recipient.toBase58() || !PublicKey.isOnCurve(recipient.toBytes()) && recipient.equals(keypair.publicKey)) {
+  if (!recipient.toBase58()) {
     throw new Error('The recipient address is invalid.');
   }
   if (recipient.equals(keypair.publicKey)) throw new Error('Sending SOL to the same wallet address is not allowed.');
@@ -207,7 +207,7 @@ export async function sendSolanaTransfer(
     recentBlockhash: preview.blockhash,
   }).add(SystemProgram.transfer({
     fromPubkey: keypair.publicKey,
-    toPubkey: (await import('@solana/web3.js')).PublicKey.fromBase58(preview.to),
+    toPubkey: new (await import('@solana/web3.js')).PublicKey(preview.to),
     lamports: BigInt(preview.amountLamports),
   }));
   const signature = await connection.sendTransaction(transaction, [keypair], {
