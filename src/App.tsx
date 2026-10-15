@@ -43,6 +43,7 @@ export default function App() {
   const [networkSnapshot, setNetworkSnapshot] = useState<NetworkSnapshot | null>(null);
   const [networkStatus, setNetworkStatus] = useState<'idle' | 'loading' | 'connected' | 'error'>('idle');
   const [networkError, setNetworkError] = useState('');
+  const [activeRpcUrl, setActiveRpcUrl] = useState('');
   const [txRecipient, setTxRecipient] = useState('');
   const [txAmount, setTxAmount] = useState('');
   const [txEstimate, setTxEstimate] = useState<TransferEstimate | null>(null);
@@ -63,7 +64,8 @@ export default function App() {
       setNetworkStatus('loading');
       setNetworkError('');
       try {
-        await readNetworkHealth(selectedNetwork);
+        const health = await readNetworkHealth(selectedNetwork);
+        setActiveRpcUrl(health.rpcUrl);
         setNetworkStatus('connected');
       } catch (e) {
         setNetworkStatus('error');
@@ -76,6 +78,7 @@ export default function App() {
     try {
       const snapshot = await readNetworkSnapshot(selectedNetwork, address);
       setNetworkSnapshot(snapshot);
+      setActiveRpcUrl(snapshot.rpcUrl);
       setNetworkStatus('connected');
     } catch (e) {
       setNetworkSnapshot(null);
@@ -90,8 +93,8 @@ export default function App() {
     setNetworkError('');
     if (!address) {
       setNetworkSnapshot(null);
-      readNetworkHealth(selectedNetwork).then(() => {
-        if (!cancelled) setNetworkStatus('connected');
+      readNetworkHealth(selectedNetwork).then(health => {
+        if (!cancelled) { setActiveRpcUrl(health.rpcUrl); setNetworkStatus('connected'); }
       }).catch(e => {
         if (!cancelled) {
           setNetworkStatus('error');
@@ -102,6 +105,7 @@ export default function App() {
       readNetworkSnapshot(selectedNetwork, address).then(snapshot => {
         if (!cancelled) {
           setNetworkSnapshot(snapshot);
+          setActiveRpcUrl(snapshot.rpcUrl);
           setNetworkStatus('connected');
         }
       }).catch(e => {
@@ -219,7 +223,7 @@ export default function App() {
                 <span>{networkStatus === 'loading' ? 'Connecting to RPC…' : networkStatus === 'connected' ? `Connected · block ${networkSnapshot?.blockNumber ?? '—'}` : networkStatus === 'error' ? 'Connection failed' : address ? 'Waiting for connection' : 'Connected; unlock wallet to check balance'}</span>
               </div>
               {networkStatus === 'error' && <p className="wallet-error" role="alert">{networkError}</p>}
-              <div className="chain-meta"><span>RPC provider</span><strong>{selectedNetwork.rpcUrl}</strong></div>
+              <div className="chain-meta"><span>RPC provider</span><strong>{activeRpcUrl || selectedNetwork.rpcUrl}</strong></div>
               <div className="chain-meta"><span>Wallet address</span><strong>{address ? shortAddress(address) : 'Not unlocked'}</strong></div>
               <p className="chain-disclaimer">Read-only connection. Only your public address is queried; recovery phrase and private key are never sent to the RPC provider.</p>
             </div>
