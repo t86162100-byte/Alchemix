@@ -1434,3 +1434,38 @@ button:active, a:active, [role="button"]:active {
   .network-picker-row { min-height:58px; }
   @keyframes network-picker-sheet-in { from { transform:translateY(20px); opacity:.8; } to { transform:translateY(0); opacity:1; } }
 }
+
+
+/* Indexed multichain asset portfolio; follows Ferra's existing dark wallet style. */
+.evm-assets-panel { margin-bottom:16px; }
+.evm-assets-disclosure { display:flex; align-items:flex-start; gap:8px; margin:0 18px 10px; padding:10px 11px; border:1px solid rgba(166,154,255,.16); border-radius:10px; background:rgba(166,154,255,.045); color:rgba(232,236,246,.53); font-size:10px; line-height:1.6; }
+.evm-assets-disclosure svg { flex:0 0 14px; margin-top:1px; color:#a99cff; }
+.evm-assets-error { margin:0 18px 12px; }
+.evm-assets-search { display:flex; align-items:center; gap:9px; margin:0 18px 10px; padding:0 11px; min-height:39px; border:1px solid #29344b; border-radius:10px; background:#0d1424; color:#7f8ca6; }
+.evm-assets-search input { width:100%; min-width:0; border:0; outline:0; background:transparent; color:#eef1ff; font-size:11px; }
+.evm-assets-search input::placeholder { color:#687590; }
+.evm-token-list { display:flex; flex-direction:column; }
+.evm-token-row { display:grid; grid-template-columns:38px minmax(0,1fr) minmax(95px,auto); align-items:center; gap:11px; padding:13px 18px; border-top:1px solid rgba(255,255,255,.055); }
+.evm-token-icon { display:grid; place-items:center; width:36px; height:36px; border-radius:50%; background:linear-gradient(145deg,#c2b7ff,#7ae2c0); color:#12172a; font-size:10px; font-weight:850; overflow:hidden; }
+.evm-erc20-icon { background:#202940; border:1px solid #333e59; color:#d2caff; }
+.evm-token-copy { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.evm-token-copy strong { color:#e8ecf6; font-size:11px; font-weight:750; overflow-wrap:anywhere; }
+.evm-token-copy small { color:#8996b0; font-size:9px; overflow-wrap:anywhere; }
+.evm-token-copy .evm-token-contract { color:#687692; font-family:ui-monospace,SFMono-Regular,monospace; }
+.evm-token-balance { display:flex; flex-direction:column; align-items:flex-end; gap:4px; min-width:0; }
+.evm-token-balance strong { color:#e8ecf6; font-size:11px; font-weight:750; overflow-wrap:anywhere; text-align:right; }
+.evm-token-balance small { color:#8996b0; font-size:9px; }
+.evm-token-send { padding:5px 10px; border:1px solid #39365d; border-radius:7px; background:#211f3b; color:#c9c0ff; font-size:9px; font-weight:750; }
+.evm-token-send:hover { border-color:#8273d4; background:#2a2748; }
+.evm-native-row { background:rgba(120,224,189,.025); }
+.evm-assets-panel .empty-inline { min-height:58px; padding:16px 20px; text-align:center; line-height:1.6; }
+.evm-assets-panel .asset-footer { border-top:1px solid rgba(255,255,255,.06); }
+@media(max-width:560px) {
+  .evm-assets-disclosure { margin:0 12px 10px; font-size:9px; }
+  .evm-assets-search { margin:0 12px 8px; }
+  .evm-token-row { grid-template-columns:31px minmax(0,1fr) minmax(74px,auto); gap:8px; padding:12px; }
+  .evm-token-icon { width:30px; height:30px; font-size:9px; }
+  .evm-token-copy strong,.evm-token-balance strong { font-size:10px; }
+  .evm-token-copy small,.evm-token-balance small { font-size:8px; }
+  .evm-token-send { padding:5px 8px; }
+}
