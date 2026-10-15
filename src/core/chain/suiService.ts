@@ -1,7 +1,7 @@
 import { Mnemonic } from 'ethers';
 import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
 
-const DEFAULT_API = 'https://fullnode.mainnet.sui.io:443';
+const DEFAULT_API = 'https://sui-rpc.publicnode.com';
 export const SUI_DERIVATION_PATH = "m/44'/784'/0'/0'/0'";
 export type SuiSnapshot = { address: string; balanceSui: string; apiUrl: string };
 
@@ -21,7 +21,7 @@ export function deriveSuiAddress(input: string): string {
   return Ed25519Keypair.deriveKeypair(phrase, SUI_DERIVATION_PATH).getPublicKey().toSuiAddress();
 }
 
-/** Read the native SUI balance with a public JSON-RPC request. */
+/** Read the native SUI balance from a public Sui JSON-RPC provider. */
 export async function readSuiSnapshot(input: string): Promise<SuiSnapshot> {
   const address = deriveSuiAddress(input);
   const apiUrl = getApiUrl();
