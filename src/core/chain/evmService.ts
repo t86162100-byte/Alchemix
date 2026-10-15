@@ -28,6 +28,25 @@ export const EVM_NETWORKS: EvmNetwork[] = [
   },
 ];
 
+export type NetworkHealth = {
+  chainId: number;
+  blockNumber: number;
+};
+
+/** Verify RPC connectivity without requiring or transmitting a wallet address. */
+export async function readNetworkHealth(network: EvmNetwork): Promise<NetworkHealth> {
+  const provider = providerFor(network);
+  try {
+    const [chain, blockNumber] = await Promise.all([provider.getNetwork(), provider.getBlockNumber()]);
+    if (Number(chain.chainId) !== network.chainId) {
+      throw new Error(`RPC network mismatch: expected chain ID ${network.chainId}, received ${chain.chainId.toString()}.`);
+    }
+    return { chainId: Number(chain.chainId), blockNumber };
+  } finally {
+    provider.destroy();
+  }
+}
+
 export type NetworkSnapshot = {
   chainId: number;
   blockNumber: number;
