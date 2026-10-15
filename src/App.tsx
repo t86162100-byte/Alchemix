@@ -8,7 +8,7 @@ import { previewTokenTransfer, sendTokenTransfer, type TokenTransferPreview } fr
 import { discoverEvmTokenHoldings, readCommonTokenBalances, type EvmTokenHolding } from './core/chain/evmTokenPortfolioService';
 import { loadEvmMarketTokenCatalog, clearEvmMarketTokenCache, type EvmMarketToken } from './core/chain/evmMarketTokenService';
 import { loadNonEvmMarketTokenCatalog, clearNonEvmMarketTokenCache } from './core/chain/nonEvmMarketTokenService';
-import { readSolanaSnapshot, previewSolanaTransfer, sendSolanaTransfer, type SolanaSnapshot, type SolanaTransferPreview } from './core/chain/solanaService';
+import { readSolanaSnapshot, readSolanaTokenHoldings, previewSolanaTransfer, sendSolanaTransfer, type SolanaSnapshot, type SolanaTokenHolding, type SolanaTransferPreview } from './core/chain/solanaService';
 import { readTronSnapshot, type TronSnapshot } from './core/chain/tronService';
 import { readBitcoinSnapshot, type BitcoinSnapshot } from './core/chain/bitcoinService';
 import type { TonSnapshot } from './core/chain/tonService';
@@ -180,6 +180,11 @@ export default function App() {
   const [activeMnemonicPhrase, setActiveMnemonicPhrase] = useState('');
   const [solanaSnapshot, setSolanaSnapshot] = useState<SolanaSnapshot | null>(null);
   const [solanaTransferPreview, setSolanaTransferPreview] = useState<SolanaTransferPreview | null>(null);
+  const [solanaTokenHoldings, setSolanaTokenHoldings] = useState<SolanaTokenHolding[]>([]);
+  const [solanaTokenCatalog, setSolanaTokenCatalog] = useState<EvmMarketToken[]>([]);
+  const [solanaTokensLoading, setSolanaTokensLoading] = useState(false);
+  const [solanaTokensError, setSolanaTokensError] = useState('');
+  const [solanaTokensUpdatedAt, setSolanaTokensUpdatedAt] = useState('');
   const [tronSnapshot, setTronSnapshot] = useState<TronSnapshot | null>(null);
   const [bitcoinSnapshot, setBitcoinSnapshot] = useState<BitcoinSnapshot | null>(null);
   const [tonSnapshot, setTonSnapshot] = useState<TonSnapshot | null>(null);
@@ -595,6 +600,29 @@ export default function App() {
     return () => { cancelled = true; };
   }, [address, activeMnemonicPhrase, selectedOtherNetwork, selectedNetworkKey, selectedNetwork]);
 
+  const discoverSolanaTokenBalances = async () => {
+    if (!activeMnemonicPhrase) { setSolanaTokensError('Unlock your wallet before checking SPL token balances.'); return; }
+    setSolanaTokensLoading(true);
+    setSolanaTokensError('');
+    try {
+      const holdings = await readSolanaTokenHoldings(activeMnemonicPhrase);
+      setSolanaTokenHoldings(holdings);
+      setSolanaTokensUpdatedAt(new Date().toISOString());
+      // Load metadata for any matching mints. Balance discovery still succeeds if
+      // the public directory is temporarily unavailable.
+      try {
+        const catalog = await loadNonEvmMarketTokenCatalog('Solana');
+        setSolanaTokenCatalog(catalog.tokens);
+      } catch {
+        // Mint addresses and on-chain balances remain visible without metadata.
+      }
+    } catch (e) {
+      setSolanaTokensError(e instanceof Error ? e.message : 'Could not read SPL token balances from Solana RPC.');
+    } finally {
+      setSolanaTokensLoading(false);
+    }
+  };
+
   const prepareTransfer = async () => {
     setTxBusy(true); setTxError(''); setTxEstimate(null); setTokenPreview(null); setSolanaTransferPreview(null); setTxConfirmed(false); setTxHash('');
     try {
@@ -797,6 +825,27 @@ export default function App() {
             {txError && <p className="wallet-error" role="alert">{txError}</p>}
             {solanaTransferPreview && <div className="tx-estimate" role="status"><div><span>Network</span><strong>Solana Mainnet</strong></div><div><span>From</span><strong>{solanaTransferPreview.from}</strong></div><div><span>Recipient</span><strong>{solanaTransferPreview.to}</strong></div><div><span>Amount</span><strong>{solanaTransferPreview.amountSol} SOL</strong></div><div><span>Available balance</span><strong>{solanaTransferPreview.balanceSol} SOL</strong></div><div><span>Estimated network fee</span><strong>{solanaTransferPreview.estimatedFeeSol} SOL</strong></div><div><span>Estimated total required</span><strong>{solanaTransferPreview.totalRequiredSol} SOL</strong></div><label className="form-label"><input type="checkbox" checked={txConfirmed} onChange={event => setTxConfirmed(event.target.checked)}/> I checked the Solana network, full recipient address, amount and estimated fee.</label><button className="primary-button full-button" disabled={!txConfirmed || txBusy} onClick={() => void submitTransfer()}>{txBusy ? 'Submitting…' : `Send ${solanaTransferPreview.amountSol} SOL`} <ArrowUpRight size={16}/></button><p className="chain-disclaimer">This sends native SOL only. Transfers are generally irreversible. The network fee may change before submission.</p></div>}
             {txHash && <div className="tx-estimate" role="status"><div><span>Transaction signature</span><strong>{txHash}</strong></div><a className="panel-action" href={`https://explorer.solana.com/tx/${txHash}`} target="_blank" rel="noreferrer">View on Solana Explorer <ArrowUpRight size={14}/></a><p className="chain-disclaimer">If confirmation timed out, inspect this signature before retrying to avoid sending twice.</p></div>}
+          </section>}
+          {selectedOtherNetwork === 'Solana' && <section className="panel activity-panel chain-panel" aria-labelledby="solana-assets-title">
+            <div className="panel-heading"><div><h2 id="solana-assets-title">Your Solana tokens</h2><p>Actual non-zero SPL and Token-2022 balances held by this wallet.</p></div><button type="button" className="panel-action" onClick={() => void discoverSolanaTokenBalances()} disabled={!activeMnemonicPhrase || solanaTokensLoading}>{solanaTokensLoading ? 'Scanning…' : solanaTokensUpdatedAt ? 'Refresh balances' : 'Discover balances'} <Activity size={13}/></button></div>
+            <div className="evm-assets-disclosure"><ShieldCheck size={14}/><span>Balances are read from the wallet's on-chain token accounts. Directory listings are not balances, and token transfers remain disabled until mint/program validation and a dedicated SPL transfer flow are implemented.</span></div>
+            {!activeMnemonicPhrase && <div className="empty-inline">Unlock your wallet to check its SPL token balances.</div>}
+            {solanaTokensError && <p className="wallet-error" role="alert">{solanaTokensError}</p>}
+            {solanaTokensLoading && <div className="empty-inline">Reading SPL Token and Token-2022 accounts from Solana RPC…</div>}
+            {activeMnemonicPhrase && solanaTokensUpdatedAt && !solanaTokensLoading && <>
+              <div className="market-list-header"><span>{solanaTokenHoldings.length} non-zero token balance(s)</span><span>Updated {new Date(solanaTokensUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
+              <div className="market-token-list">
+                {solanaTokenHoldings.map(holding => {
+                  const metadata = solanaTokenCatalog.find(token => token.address === holding.mint);
+                  return <div className="market-token-row" key={holding.mint}>
+                    <span className="market-token-logo">{metadata?.logoURI ? <img src={metadata.logoURI} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }}/> : (metadata?.symbol ?? 'SPL').slice(0, 2).toUpperCase()}</span>
+                    <span className="market-token-main"><strong>{metadata?.name ?? 'Unknown token'}</strong><small>{metadata?.symbol ?? 'SPL token'} · {holding.decimals} decimals · {holding.programId === 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' ? 'Token-2022' : 'SPL Token'}</small><small className="market-token-address">{holding.mint}</small></span>
+                    <span className="market-token-actions"><strong>{formatTokenBalance(holding.balance)} {metadata?.symbol ?? ''}</strong><small>Wallet balance</small><small>Sending disabled</small></span>
+                  </div>;
+                })}
+                {!solanaTokenHoldings.length && <div className="empty-inline">No non-zero SPL token balances were found for this wallet.</div>}
+              </div>
+            </>}
           </section>}
                     {selectedOtherNetwork && selectedOtherNetwork !== 'Solana' && <section className="panel activity-panel chain-panel" id="transfer-panel">
             <div className="panel-heading"><div><h2>Send crypto</h2><p>Chain-specific transaction support is not enabled for {selectedOtherNetwork} yet.</p></div><span className="market-placeholder-tag">READ ONLY</span></div>

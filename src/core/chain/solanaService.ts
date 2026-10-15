@@ -120,6 +120,54 @@ export async function readSolanaSnapshot(phraseInput: string): Promise<SolanaSna
 }
 
 
+export type SolanaTokenHolding = {
+  mint: string;
+  amountRaw: string;
+  balance: string;
+  decimals: number;
+  programId: string;
+};
+
+/**
+ * Read actual non-zero SPL and Token-2022 balances for the currently unlocked
+ * wallet. Only the public owner address is queried; this never signs or sends.
+ */
+export async function readSolanaTokenHoldings(phraseInput: string): Promise<SolanaTokenHolding[]> {
+  const { Connection, PublicKey } = await import('@solana/web3.js');
+  const keypair = await deriveSolanaKeypair(phraseInput);
+  const connection = new Connection(getSolanaRpcUrl(), { commitment: 'confirmed' });
+  const owner = keypair.publicKey;
+  const programIds = [
+    'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
+    'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
+  ];
+
+  const accountSets = await Promise.all(programIds.map(programId =>
+    connection.getParsedTokenAccountsByOwner(owner, { programId: new PublicKey(programId) }, 'confirmed'),
+  ));
+  const holdings: SolanaTokenHolding[] = [];
+  for (const accountSet of accountSets) {
+    for (const item of accountSet.value) {
+      const parsed = (item.account.data as any)?.parsed?.info;
+      const mint = parsed?.mint;
+      const tokenAmount = parsed?.tokenAmount;
+      const amountRaw = typeof tokenAmount?.amount === 'string' ? tokenAmount.amount : '';
+      const decimals = tokenAmount?.decimals;
+      if (typeof mint !== 'string' || !amountRaw || !/^\d+$/.test(amountRaw)
+        || !Number.isInteger(decimals) || decimals < 0 || decimals > 255 || BigInt(amountRaw) === 0n) continue;
+      holdings.push({
+        mint,
+        amountRaw,
+        balance: formatUnits(BigInt(amountRaw), decimals),
+        decimals,
+        programId: item.account.owner.toBase58(),
+      });
+    }
+  }
+  return holdings.sort((a, b) => a.mint.localeCompare(b.mint));
+}
+
+
 export type SolanaTransferPreview = {
   from: string;
   to: string;
