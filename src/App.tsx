@@ -68,57 +68,6 @@ const networkMatchesEntry = (network: EvmNetwork, entry: CuratedNetwork) => {
 };
 
 
-type CuratedNetwork = { name: string; aliases: string[]; family: 'EVM' | 'Other' };
-const CURATED_NETWORKS: CuratedNetwork[] = [
-  { name: 'BNB Chain', aliases: ['bnb smart chain', 'binance smart chain', 'bnb chain'], family: 'EVM' },
-  { name: 'Ethereum', aliases: ['ethereum mainnet', 'ethereum'], family: 'EVM' },
-  { name: 'Arc', aliases: ['arc'], family: 'EVM' },
-  { name: 'Solana', aliases: [], family: 'Other' },
-  { name: 'Tron', aliases: [], family: 'Other' },
-  { name: 'HyperEVM', aliases: ['hyperevm'], family: 'EVM' },
-  { name: 'Bitcoin', aliases: [], family: 'Other' },
-  { name: 'Robinhood', aliases: [], family: 'Other' },
-  { name: 'Base', aliases: ['base mainnet', 'base'], family: 'EVM' },
-  { name: 'Polygon(Matic)', aliases: ['polygon mainnet', 'polygon pos', 'matic mainnet', 'polygon'], family: 'EVM' },
-  { name: 'Ton', aliases: [], family: 'Other' },
-  { name: 'Plasma', aliases: ['plasma'], family: 'EVM' },
-  { name: 'Stellar', aliases: [], family: 'Other' },
-  { name: 'Mantle', aliases: ['mantle'], family: 'EVM' },
-  { name: 'Aptos', aliases: [], family: 'Other' },
-  { name: 'ENI', aliases: ['eni'], family: 'EVM' },
-  { name: 'Optimism', aliases: ['optimism', 'op mainnet'], family: 'EVM' },
-  { name: 'BOT Chain', aliases: ['bot chain'], family: 'EVM' },
-  { name: 'Anubis', aliases: ['anubis'], family: 'EVM' },
-  { name: 'Linea', aliases: ['linea'], family: 'EVM' },
-  { name: 'Berachain', aliases: ['berachain'], family: 'EVM' },
-  { name: 'MegaETH', aliases: ['megaeth'], family: 'EVM' },
-  { name: 'Mova', aliases: ['mova'], family: 'EVM' },
-  { name: 'zkSync Era', aliases: ['zksync era', 'zksync'], family: 'EVM' },
-  { name: 'Cosmos', aliases: [], family: 'Other' },
-  { name: 'smartBCH', aliases: ['smartbch'], family: 'EVM' },
-  { name: 'Ethereum Classic', aliases: ['ethereum classic'], family: 'EVM' },
-  { name: 'Doge', aliases: [], family: 'Other' },
-  { name: 'opBNB', aliases: ['opbnb'], family: 'EVM' },
-  { name: 'Kaia', aliases: ['kaia'], family: 'EVM' },
-  { name: 'Core', aliases: ['core blockchain', 'core dao', 'core'], family: 'EVM' },
-  { name: 'Celo', aliases: ['celo'], family: 'EVM' },
-  { name: 'Scroll', aliases: ['scroll'], family: 'EVM' },
-  { name: 'Morph', aliases: ['morph'], family: 'EVM' },
-  { name: 'XRPL', aliases: [], family: 'Other' },
-  { name: 'Monad', aliases: ['monad'], family: 'EVM' },
-  { name: 'Ink', aliases: ['ink'], family: 'EVM' },
-  { name: 'SUI', aliases: [], family: 'Other' },
-  { name: 'Avalanche-C', aliases: ['avalanche c-chain', 'avalanche mainnet', 'avalanche'], family: 'EVM' },
-  { name: 'Arbitrum', aliases: ['arbitrum one', 'arbitrum'], family: 'EVM' },
-  { name: 'MakaChain', aliases: ['makachain'], family: 'EVM' },
-  { name: 'HyperLiquid L1', aliases: [], family: 'Other' },
-  { name: 'Sonic', aliases: ['sonic'], family: 'EVM' },
-  { name: 'X Layer', aliases: ['x layer', 'okx x layer'], family: 'EVM' },
-  { name: 'Sei EVM', aliases: ['sei evm', 'sei network'], family: 'EVM' },
-];
-const networkMatchesEntry = (network: EvmNetwork, entry: CuratedNetwork) =>
-  entry.aliases.some(alias => `${network.name} ${network.symbol} ${network.chainId}`.toLowerCase().includes(alias.toLowerCase()));
-
 const shortAddress = (value: string) => value ? value.slice(0, 6) + '…' + value.slice(-4) : '';
 const formatEthForDisplay = (value: string) => {
   const amount = Number(value);
@@ -154,7 +103,6 @@ export default function App() {
   const [networkDrawerCategory, setNetworkDrawerCategory] = useState<'All' | 'EVM' | 'Other'>('All');
   const [networkDrawerOpen, setNetworkDrawerOpen] = useState(false);
   const [networkDrawerSearch, setNetworkDrawerSearch] = useState('');
-  const [networkDrawerCategory, setNetworkDrawerCategory] = useState<'All' | 'EVM' | 'Other'>('All');
   const [selectedNetworkKey, setSelectedNetworkKey] = useState('');
   const [networkSnapshot, setNetworkSnapshot] = useState<NetworkSnapshot | null>(null);
   const [networkStatus, setNetworkStatus] = useState<'idle' | 'loading' | 'connected' | 'error'>('idle');
@@ -432,6 +380,38 @@ export default function App() {
           {!visibleCuratedNetworks.length && <div className="network-picker-empty">No networks match “{networkDrawerSearch}”. Try another name.</div>}
         </div>
         <footer className="network-picker-footer"><span className="network-picker-footer-dot"/><span>{networks.length} curated EVM networks currently have a usable registry match. Unsupported chains are shown honestly and won’t be selected until their adapters are implemented.</span></footer>
+      </section>
+    </div>}
+
+
+    {networkDrawerOpen && <div className="network-picker-backdrop" onClick={() => setNetworkDrawerOpen(false)}>
+      <section className="network-picker-drawer" role="dialog" aria-modal="true" aria-labelledby="network-picker-title" onClick={event => event.stopPropagation()}>
+        <div className="network-picker-grabber" aria-hidden="true"/>
+        <header className="network-picker-header">
+          <div><span className="network-picker-eyebrow">FERRA WALLET</span><h2 id="network-picker-title">Choose network</h2><p>Find your chain and switch in one tap.</p></div>
+          <button type="button" className="network-picker-close" onClick={() => setNetworkDrawerOpen(false)} aria-label="Close network list"><X size={19}/></button>
+        </header>
+        <label className="network-picker-search"><Search size={17}/><input autoFocus type="search" value={networkDrawerSearch} onChange={event => setNetworkDrawerSearch(event.target.value)} placeholder="Search networks" aria-label="Search networks"/>{networkDrawerSearch && <button type="button" onClick={() => setNetworkDrawerSearch('')} aria-label="Clear search"><X size={15}/></button>}</label>
+        <div className="network-picker-filters" role="group" aria-label="Filter network type">
+          {(['All', 'EVM', 'Other'] as const).map(category => <button type="button" key={category} className={networkDrawerCategory === category ? 'active' : ''} onClick={() => setNetworkDrawerCategory(category)}>{category}<span>{category === 'All' ? CURATED_NETWORKS.length : CURATED_NETWORKS.filter(entry => entry.family === category).length}</span></button>)}
+        </div>
+        <div className="network-picker-list">
+          {visibleCuratedNetworks.map(entry => {
+            const network = networkForEntry(entry);
+            const active = Boolean(network && network.key === selectedNetworkKey);
+            const unavailable = !network;
+            return <button type="button" key={entry.name} className={`network-picker-row ${active ? 'active' : ''} ${unavailable ? 'unavailable' : ''}`} onClick={() => {
+              if (!network) { setNotice(`${entry.name} is listed in Ferra’s network directory, but its chain adapter is not integrated yet.`); return; }
+              setSelectedNetworkKey(network.key); setTxEstimate(null); setTxError(''); setNetworkDrawerOpen(false); setNotice(`Switched to ${entry.name}.`);
+            }}>
+              <span className="network-picker-icon">{entry.name === 'Ethereum' ? 'Ξ' : entry.name === 'Bitcoin' ? '₿' : entry.name.slice(0, 1).toUpperCase()}</span>
+              <span className="network-picker-row-copy"><strong>{entry.name}</strong><small>{network ? `${network.symbol} · Chain ID ${network.chainId}` : entry.family === 'Other' ? 'Non-EVM · integration pending' : 'EVM · integration pending'}</small></span>
+              {active ? <span className="network-picker-check">✓</span> : unavailable ? <span className="network-picker-soon">SOON</span> : <ArrowRight size={16} className="network-picker-arrow"/>}
+            </button>;
+          })}
+          {!visibleCuratedNetworks.length && <div className="network-picker-empty">No networks match “{networkDrawerSearch}”. Try another name.</div>}
+        </div>
+        <footer className="network-picker-footer"><span className="network-picker-footer-dot"/><span>{networks.length} curated EVM networks currently have a usable registry match. Other chains are shown honestly and stay unavailable until integrated.</span></footer>
       </section>
     </div>}
 
