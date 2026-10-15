@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, CircleHelp, Eye, EyeOff, Globe2, Home, LockKeyhole, Search, Settings2, ShieldCheck, Sparkles, TrendingUp, Wallet, X } from 'lucide-react';
 import { createWalletDraft, importWalletDraft, unlockWallet } from './core/wallet/walletService';
 import { readKeystore, writeKeystore } from './core/wallet/secureStore';
 import { loadEvmNetworks, estimateNativeTransfer, readNetworkHealth, readNetworkSnapshot, type EvmNetwork, type NetworkSnapshot, type TransferEstimate } from './core/chain/evmService';
 import { sendNativeTransfer } from './core/chain/evmTransactionService';
 import { previewTokenTransfer, sendTokenTransfer, type TokenTransferPreview } from './core/chain/evmTokenTransactionService';
-import { discoverEvmTokenHoldings, type EvmTokenHolding } from './core/chain/evmTokenPortfolioService';
+import { discoverEvmTokenHoldings, readCommonTokenBalances, type EvmTokenHolding } from './core/chain/evmTokenPortfolioService';
 import { readSolanaSnapshot, type SolanaSnapshot } from './core/chain/solanaService';
 import { readTronSnapshot, type TronSnapshot } from './core/chain/tronService';
 import { readBitcoinSnapshot, type BitcoinSnapshot } from './core/chain/bitcoinService';
@@ -225,19 +225,42 @@ export default function App() {
     return () => { cancelled = true; };
   }, []);
 
-  const discoverTokens = async () => {
+  const discoverTokens = useCallback(async () => {
     if (!address) { setNotice('Create or unlock a wallet before discovering token balances.'); setModal('wallet'); return; }
     setTokenPortfolioLoading(true); setTokenPortfolioError('');
+    let indexedHoldings: EvmTokenHolding[] = [];
+    let indexerError = '';
     try {
-      const holdings = await discoverEvmTokenHoldings(address);
-      setTokenHoldings(holdings);
-      setTokenPortfolioAddress(address);
-      setTokenPortfolioUpdatedAt(new Date().toISOString());
-      setNotice(holdings.length ? `Found ${holdings.length} ERC-20 holding(s) across indexed EVM networks.` : 'No non-zero ERC-20 holdings were returned by the indexer.');
+      indexedHoldings = await discoverEvmTokenHoldings(address);
     } catch (e) {
-      setTokenPortfolioError(e instanceof Error ? e.message : 'Could not discover token holdings.');
-    } finally { setTokenPortfolioLoading(false); }
-  };
+      indexerError = e instanceof Error ? e.message : 'Token indexer could not be reached.';
+    }
+
+    let commonHoldings: EvmTokenHolding[] = [];
+    if (selectedNetwork) {
+      try {
+        commonHoldings = await readCommonTokenBalances(address, selectedNetwork.chainId, selectedNetwork.rpcUrl);
+      } catch (e) {
+        if (!indexerError) indexerError = e instanceof Error ? e.message : 'Could not read common token balances from this network.';
+      }
+    }
+    // Always show the common-token catalog for supported networks; indexed on-chain
+    // holdings replace the catalog row when they contain a fresher positive balance.
+    const merged = new Map<string, EvmTokenHolding>();
+    for (const token of commonHoldings) merged.set(`${token.chainId}:${token.tokenAddress.toLowerCase()}`, token);
+    for (const token of indexedHoldings) { const key = `${token.chainId}:${token.tokenAddress.toLowerCase()}`; const existing = merged.get(key); merged.set(key, existing ? { ...token, category: 'common' } : { ...token, category: 'detected' }); }
+    const holdings = [...merged.values()].sort((a, b) => a.tokenName.localeCompare(b.tokenName) || a.tokenSymbol.localeCompare(b.tokenSymbol));
+    setTokenHoldings(holdings);
+    setTokenPortfolioAddress(address);
+    setTokenPortfolioUpdatedAt(new Date().toISOString());
+    setTokenPortfolioError(indexerError ? `${indexerError} Common-token balances are still shown where the selected network RPC responded.` : '');
+    setNotice(`Loaded ${holdings.filter(token => token.chainId === selectedNetwork?.chainId).length} token row(s) for ${selectedNetwork?.name ?? 'the selected EVM network'}.`);
+    setTokenPortfolioLoading(false);
+  }, [address, selectedNetwork]);
+
+  useEffect(() => {
+    if (address && selectedNetwork) void discoverTokens();
+  }, [address, selectedNetwork, discoverTokens]);
 
   const refreshNetwork = async () => {
     if (selectedOtherNetwork === 'HyperLiquid L1') {
@@ -638,18 +661,21 @@ export default function App() {
             </div>
           </section>
           <section id="evm-assets-panel" className="panel activity-panel evm-assets-panel" aria-labelledby="evm-assets-title">
-            <div className="panel-heading"><div><h2 id="evm-assets-title">Assets on {selectedNetwork?.name ?? 'this network'}</h2><p>Native coin and discovered ERC-20 balances for the selected chain.</p></div><button type="button" className="panel-action" onClick={() => void discoverTokens()} disabled={!address || tokenPortfolioLoading}>{tokenPortfolioLoading ? 'Scanning…' : tokenPortfolioAddress === address && tokenPortfolioUpdatedAt ? 'Refresh assets' : 'Discover assets'} <Activity size={13}/></button></div>
+            <div className="panel-heading"><div><h2 id="evm-assets-title">Assets on {selectedNetwork?.name ?? 'this network'}</h2><p>Native coin, common tokens, and other detected ERC-20 balances for the selected chain.</p></div><button type="button" className="panel-action" onClick={() => void discoverTokens()} disabled={!address || tokenPortfolioLoading}>{tokenPortfolioLoading ? 'Scanning…' : tokenPortfolioAddress === address && tokenPortfolioUpdatedAt ? 'Refresh assets' : 'Discover assets'} <Activity size={13}/></button></div>
             <div className="evm-assets-disclosure"><ShieldCheck size={14}/><span>Discovery uses Routescan’s public indexer and sends your public wallet address to it. Only indexed mainnet chains are covered; token names and symbols are not proof a token is safe.</span></div>
             {tokenPortfolioError && <p className="wallet-error evm-assets-error" role="alert">{tokenPortfolioError}</p>}
-            {address && tokenPortfolioAddress !== address && !tokenPortfolioLoading && <div className="empty-inline">Choose Discover assets to look up this public address across indexed EVM networks.</div>}
+            {address && tokenPortfolioAddress !== address && !tokenPortfolioLoading && <div className="empty-inline">Loading the common token list and checking your public address for additional ERC-20 assets…</div>}
             {!address && <div className="empty-inline">Unlock your wallet to discover its ERC-20 holdings.</div>}
             {tokenPortfolioLoading && <div className="empty-inline">Checking indexed token balances…</div>}
             {tokenPortfolioAddress === address && address && selectedNetwork && <>
               <label className="evm-assets-search"><Search size={15}/><input type="search" value={tokenSearch} onChange={event => setTokenSearch(event.target.value)} placeholder="Search name, symbol or contract" aria-label="Search assets on selected network"/></label>
               <div className="evm-token-list">
                 <div className="evm-token-row evm-native-row"><span className="evm-token-icon">{selectedNetwork.symbol.slice(0, 2)}</span><span className="evm-token-copy"><strong>{selectedNetwork.name}</strong><small>{selectedNetwork.symbol} · Native coin · Chain ID {selectedNetwork.chainId}</small></span><span className="evm-token-balance"><strong>{networkSnapshot ? formatEthForDisplay(networkSnapshot.balanceEth) : '—'}</strong><small>{selectedNetwork.symbol}</small></span></div>
-                {tokenHoldings.filter(token => token.chainId === selectedNetwork.chainId && `${token.tokenName} ${token.tokenSymbol} ${token.tokenAddress}`.toLowerCase().includes(tokenSearch.trim().toLowerCase())).map(token => <div className="evm-token-row" key={`${token.chainId}:${token.tokenAddress.toLowerCase()}`}><span className="evm-token-icon evm-erc20-icon">{token.tokenSymbol.slice(0, 2).toUpperCase()}</span><span className="evm-token-copy"><strong>{token.tokenName}</strong><small>{token.tokenSymbol} · ERC-20 · {shortAddress(token.tokenAddress)}</small><small className="evm-token-contract">{token.tokenAddress}</small></span><span className="evm-token-balance"><strong>{formatTokenBalance(token.balance)}</strong><small>{token.tokenSymbol}</small><button type="button" className="evm-token-send" onClick={() => { setTxKind('token'); setTxTokenAddress(token.tokenAddress); setTxAmount(''); setTxEstimate(null); setTokenPreview(null); setTxConfirmed(false); setTxHash(''); setTxError(''); document.getElementById('transfer-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setNotice(`Selected ${token.tokenSymbol} on ${selectedNetwork.name}. Enter recipient and amount to review a transfer.`); }}>Send</button></span></div>)}
-                {!tokenHoldings.some(token => token.chainId === selectedNetwork.chainId && `${token.tokenName} ${token.tokenSymbol} ${token.tokenAddress}`.toLowerCase().includes(tokenSearch.trim().toLowerCase())) && <div className="empty-inline">{tokenSearch.trim() ? 'No assets match this search.' : 'No non-zero ERC-20 holdings were found for this network by the indexer.'}</div>}
+                {tokenHoldings.some(token => token.chainId === selectedNetwork.chainId && token.category === 'common') && <h3 className="evm-token-group-title">Common tokens</h3>}
+                {tokenHoldings.filter(token => token.chainId === selectedNetwork.chainId && token.category === 'common' && `${token.tokenName} ${token.tokenSymbol} ${token.tokenAddress}`.toLowerCase().includes(tokenSearch.trim().toLowerCase())).map(token => <div className="evm-token-row" key={`${token.chainId}:${token.tokenAddress.toLowerCase()}`}><span className="evm-token-icon evm-erc20-icon">{token.tokenSymbol.slice(0, 2).toUpperCase()}</span><span className="evm-token-copy"><strong>{token.tokenName}</strong><small>{token.tokenSymbol} · ERC-20 · {shortAddress(token.tokenAddress)}</small><small className="evm-token-contract">{token.tokenAddress}</small></span><span className="evm-token-balance"><strong>{token.balance === '—' ? '—' : formatTokenBalance(token.balance)}</strong><small>{token.tokenSymbol} · ERC-20 balance</small><button type="button" className="evm-token-send" onClick={() => { setTxKind('token'); setTxTokenAddress(token.tokenAddress); setTxAmount(''); setTxEstimate(null); setTokenPreview(null); setTxConfirmed(false); setTxHash(''); setTxError(''); document.getElementById('transfer-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setNotice(`Selected ${token.tokenSymbol} on ${selectedNetwork.name}. Enter recipient and amount to review a transfer.`); }}>Send</button></span></div>)}
+                {tokenHoldings.some(token => token.chainId === selectedNetwork.chainId && token.category === 'detected' && `${token.tokenName} ${token.tokenSymbol} ${token.tokenAddress}`.toLowerCase().includes(tokenSearch.trim().toLowerCase())) && <h3 className="evm-token-group-title">Other detected tokens</h3>}
+                {tokenHoldings.filter(token => token.chainId === selectedNetwork.chainId && token.category === 'detected' && `${token.tokenName} ${token.tokenSymbol} ${token.tokenAddress}`.toLowerCase().includes(tokenSearch.trim().toLowerCase())).map(token => <div className="evm-token-row" key={`${token.chainId}:${token.tokenAddress.toLowerCase()}`}><span className="evm-token-icon evm-erc20-icon">{token.tokenSymbol.slice(0, 2).toUpperCase()}</span><span className="evm-token-copy"><strong>{token.tokenName}</strong><small>{token.tokenSymbol} · ERC-20 · {shortAddress(token.tokenAddress)}</small><small className="evm-token-contract">{token.tokenAddress}</small></span><span className="evm-token-balance"><strong>{formatTokenBalance(token.balance)}</strong><small>{token.tokenSymbol} · ERC-20 balance</small><button type="button" className="evm-token-send" onClick={() => { setTxKind('token'); setTxTokenAddress(token.tokenAddress); setTxAmount(''); setTxEstimate(null); setTokenPreview(null); setTxConfirmed(false); setTxHash(''); setTxError(''); document.getElementById('transfer-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setNotice(`Selected ${token.tokenSymbol} on ${selectedNetwork.name}. Enter recipient and amount to review a transfer.`); }}>Send</button></span></div>)}
+                {!tokenHoldings.some(token => token.chainId === selectedNetwork.chainId && `${token.tokenName} ${token.tokenSymbol} ${token.tokenAddress}`.toLowerCase().includes(tokenSearch.trim().toLowerCase())) && <div className="empty-inline">{tokenSearch.trim() ? 'No assets match this search.' : 'No additional detected tokens on this network. Common tokens remain listed above when supported.'}</div>}
               </div>
               <div className="asset-footer"><span>{tokenHoldings.filter(token => token.chainId === selectedNetwork.chainId).length} ERC-20 holding(s) on this chain</span><span>{tokenPortfolioUpdatedAt ? `Updated ${new Date(tokenPortfolioUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Not refreshed'}</span></div>
             </>}
