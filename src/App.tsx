@@ -394,11 +394,12 @@ export default function App() {
           </section>
           <section className="panel activity-panel chain-panel">
             <div className="panel-heading"><div><h2>Prepare a transfer</h2><p>Validate details and estimate network fees — no transaction will be sent.</p></div><span className="market-placeholder-tag">NO SIGNING</span></div>
+            {selectedOtherNetwork && <p className="chain-disclaimer">Transfer fee estimation is currently available for EVM networks only. Solana sending is disabled.</p>}
             <label className="form-label" htmlFor="ferra-recipient">Recipient address</label>
             <input id="ferra-recipient" className="form-input" inputMode="text" autoComplete="off" spellCheck={false} value={txRecipient} onChange={event => { setTxRecipient(event.target.value); setTxEstimate(null); setTxError(''); }} placeholder="0x… recipient address"/>
             <label className="form-label" htmlFor="ferra-amount">Amount ({selectedNetwork?.symbol ?? 'native coin'})</label>
             <input id="ferra-amount" className="form-input" inputMode="decimal" autoComplete="off" value={txAmount} onChange={event => { setTxAmount(event.target.value); setTxEstimate(null); setTxError(''); }} placeholder="0.01"/>
-            <button className="primary-button full-button" disabled={!address || txBusy || networkStatus !== 'connected'} onClick={() => void prepareTransfer()}>{txBusy ? 'Estimating fees…' : 'Validate & estimate fees'} <ArrowRight size={16}/></button>
+            <button className="primary-button full-button" disabled={!address || Boolean(selectedOtherNetwork) || txBusy || networkStatus !== 'connected'} onClick={() => void prepareTransfer()}>{txBusy ? 'Estimating fees…' : 'Validate & estimate fees'} <ArrowRight size={16}/></button>
             {!address && <p className="chain-disclaimer">Unlock your wallet to use its public address as the sender. The private key is not used for fee estimation.</p>}
             {txError && <p className="wallet-error" role="alert">{txError}</p>}
             {txEstimate && <div className="tx-estimate" role="status">
