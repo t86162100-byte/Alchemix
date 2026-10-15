@@ -19,89 +19,43 @@ type TokenListToken = {
   tags?: Array<string | { name?: string }>;
 };
 type TokenListResponse = { tokens?: TokenListToken[] };
+type CoinGeckoPlatform = { id?: string; chain_identifier?: string | number; name?: string };
+type CachedPlatforms = { expiresAt: number; platforms: CoinGeckoPlatform[] };
 
 const TOKEN_LIST_CACHE_TTL_MS = 30 * 60 * 1000;
+const PLATFORM_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const tokenCache = new Map<number, { expiresAt: number; tokens: EvmMarketToken[] }>();
+let platformCache: CachedPlatforms | null = null;
 
-// These are registry/platform identifiers, not token addresses or a fixed token catalogue.
-// The token entries themselves are fetched live from the registry for each chain.
-const COINGECKO_PLATFORM_BY_CHAIN: Record<number, string[]> = {
-  1: ['ethereum'],
-  56: ['binance-smart-chain'],
-  8453: ['base'],
-  137: ['polygon-pos'],
-  42161: ['arbitrum-one'],
-  10: ['optimistic-ethereum'],
-  43114: ['avalanche'],
-  100: ['xdai'],
-  42220: ['celo'],
-  59144: ['linea'],
-  324: ['zksync'],
-  534352: ['scroll'],
-  81457: ['blast'],
-  5000: ['mantle'],
-  204: ['opbnb'],
-  146: ['sonic'],
-  130: ['unichain'],
-  250: ['fantom'],
-  25: ['cronos'],
-  288: ['boba'],
-  1101: ['polygon-zkevm'],
-  7777777: ['zora'],
-  34443: ['mode'],
-  252: ['fraxtal'],
-  122: ['fuse'],
-  10000: ['smartbch'],
-  1284: ['moonbeam'],
-  1285: ['moonriver'],
-  1666600000: ['harmony-shard-0'],
-  66: ['okexchain'],
-  199: ['bttc'],
-  7000: ['zetachain'],
-  169: ['manta-pacific'],
-  2741: ['abstract'],
-  33139: ['apechain'],
-  80094: ['berachain'],
-};
+async function loadCoinGeckoPlatforms(): Promise<CoinGeckoPlatform[]> {
+  if (platformCache && platformCache.expiresAt > Date.now()) return platformCache.platforms;
+  const response = await fetch('https://api.coingecko.com/api/v3/asset_platforms', {
+    headers: { Accept: 'application/json' },
+    signal: AbortSignal.timeout(15000),
+  });
+  if (!response.ok) throw new Error(`Chain registry responded with HTTP ${response.status}.`);
+  const payload = await response.json() as unknown;
+  if (!Array.isArray(payload)) throw new Error('Chain registry returned an invalid response.');
+  const platforms = payload.filter((item): item is CoinGeckoPlatform => Boolean(
+    item && typeof item === 'object' && typeof (item as CoinGeckoPlatform).id === 'string',
+  ));
+  platformCache = { expiresAt: Date.now() + PLATFORM_CACHE_TTL_MS, platforms };
+  return platforms;
+}
 
-const TOKEN_LIST_URLS: Record<number, string[]> = {
-  1: ['https://tokens.coingecko.com/ethereum/all.json'],
-  56: ['https://tokens.coingecko.com/binance-smart-chain/all.json'],
-  8453: ['https://tokens.coingecko.com/base/all.json'],
-  137: ['https://tokens.coingecko.com/polygon-pos/all.json'],
-  42161: ['https://tokens.coingecko.com/arbitrum-one/all.json'],
-  10: ['https://tokens.coingecko.com/optimistic-ethereum/all.json'],
-  43114: ['https://tokens.coingecko.com/avalanche/all.json'],
-  100: ['https://tokens.coingecko.com/xdai/all.json'],
-  42220: ['https://tokens.coingecko.com/celo/all.json'],
-  59144: ['https://tokens.coingecko.com/linea/all.json'],
-  324: ['https://tokens.coingecko.com/zksync/all.json'],
-  534352: ['https://tokens.coingecko.com/scroll/all.json'],
-  81457: ['https://tokens.coingecko.com/blast/all.json'],
-  5000: ['https://tokens.coingecko.com/mantle/all.json'],
-  204: ['https://tokens.coingecko.com/opbnb/all.json'],
-  146: ['https://tokens.coingecko.com/sonic/all.json'],
-  130: ['https://tokens.coingecko.com/unichain/all.json'],
-  250: ['https://tokens.coingecko.com/fantom/all.json'],
-  25: ['https://tokens.coingecko.com/cronos/all.json'],
-  288: ['https://tokens.coingecko.com/boba/all.json'],
-  1101: ['https://tokens.coingecko.com/polygon-zkevm/all.json'],
-  7777777: ['https://tokens.coingecko.com/zora/all.json'],
-  34443: ['https://tokens.coingecko.com/mode/all.json'],
-  252: ['https://tokens.coingecko.com/fraxtal/all.json'],
-  122: ['https://tokens.coingecko.com/fuse/all.json'],
-  10000: ['https://tokens.coingecko.com/smartbch/all.json'],
-  1284: ['https://tokens.coingecko.com/moonbeam/all.json'],
-  1285: ['https://tokens.coingecko.com/moonriver/all.json'],
-  1666600000: ['https://tokens.coingecko.com/harmony-shard-0/all.json'],
-  66: ['https://tokens.coingecko.com/okexchain/all.json'],
-  199: ['https://tokens.coingecko.com/bttc/all.json'],
-  7000: ['https://tokens.coingecko.com/zetachain/all.json'],
-  169: ['https://tokens.coingecko.com/manta-pacific/all.json'],
-  2741: ['https://tokens.coingecko.com/abstract/all.json'],
-  33139: ['https://tokens.coingecko.com/apechain/all.json'],
-  80094: ['https://tokens.coingecko.com/berachain/all.json'],
-};
+async function resolveTokenListUrls(chainId: number, networkName: string): Promise<string[]> {
+  const platforms = await loadCoinGeckoPlatforms();
+  const matchingPlatforms = platforms
+    .filter(platform => Number(platform.chain_identifier) === chainId && typeof platform.id === 'string')
+    .map(platform => platform.id as string);
+  // The platform registry is live, so newly supported EVM chains do not require
+  // a token-address catalogue or a chain-ID edit in Ferra.
+  const urls = matchingPlatforms.map(platform => `https://tokens.coingecko.com/${encodeURIComponent(platform)}/all.json`);
+  // A final name-derived candidate helps when a registry platform has no chain ID.
+  const nameSlug = networkName.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  if (nameSlug) urls.push(`https://tokens.coingecko.com/${encodeURIComponent(nameSlug)}/all.json`);
+  return [...new Set(urls)];
+}
 
 function isValidToken(token: TokenListToken, chainId: number): token is Required<Pick<TokenListToken, 'chainId' | 'address' | 'name' | 'symbol' | 'decimals'>> & TokenListToken {
   return token.chainId === chainId
@@ -116,9 +70,14 @@ export async function loadEvmMarketTokenCatalog(chainId: number, networkName: st
   const cached = tokenCache.get(chainId);
   if (cached && cached.expiresAt > Date.now()) return cached.tokens;
 
-  const urls = TOKEN_LIST_URLS[chainId] ?? COINGECKO_PLATFORM_BY_CHAIN[chainId]?.map(platform => `https://tokens.coingecko.com/${platform}/all.json`) ?? [];
+  let urls: string[];
+  try {
+    urls = await resolveTokenListUrls(chainId, networkName);
+  } catch (error) {
+    throw new Error(`Could not discover the token registry for ${networkName}. ${error instanceof Error ? error.message : 'Chain registry unavailable.'}`);
+  }
   if (!urls.length) {
-    throw new Error(`No public token-list registry is configured for ${networkName} (chain ID ${chainId}) yet. The network remains selectable, but its token directory needs a registry source.`);
+    throw new Error(`No public token-list registry was found for ${networkName} (chain ID ${chainId}). The network stays selectable, but its registry does not currently publish a matching token directory.`);
   }
 
   let lastError = 'Token registry returned no usable tokens.';
@@ -158,4 +117,5 @@ export async function loadEvmMarketTokenCatalog(chainId: number, networkName: st
 export function clearEvmMarketTokenCache(chainId?: number): void {
   if (typeof chainId === 'number') tokenCache.delete(chainId);
   else tokenCache.clear();
+  if (typeof chainId !== 'number') platformCache = null;
 }
