@@ -97,7 +97,6 @@ export default function App() {
   const [networks, setNetworks] = useState<EvmNetwork[]>([]);
   const [registryLoading, setRegistryLoading] = useState(true);
   const [registryError, setRegistryError] = useState('');
-  const [networkSearch, setNetworkSearch] = useState('');
   const [networkDrawerOpen, setNetworkDrawerOpen] = useState(false);
   const [networkDrawerSearch, setNetworkDrawerSearch] = useState('');
   const [networkDrawerCategory, setNetworkDrawerCategory] = useState<'All' | 'EVM' | 'Other'>('All');
@@ -166,7 +165,7 @@ export default function App() {
       if (!cancelled) {
         const curatedLoaded = loaded.filter(network => CURATED_NETWORKS.some(entry => entry.family === 'EVM' && networkMatchesEntry(network, entry)));
         setNetworks(curatedLoaded);
-        setSelectedNetworkKey(current => current && loaded.some(network => network.key === current) ? current : (loaded.find(network => network.chainId === 1)?.key ?? loaded[0]?.key ?? ''));
+        setSelectedNetworkKey(current => current && curatedLoaded.some(network => network.key === current) ? current : (curatedLoaded.find(network => network.chainId === 1)?.key ?? curatedLoaded[0]?.key ?? ''));
         setRegistryError('');
         setRegistryLoading(false);
       }
