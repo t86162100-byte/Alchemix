@@ -54,7 +54,10 @@ export default function App() {
   const [txError, setTxError] = useState('');
   const [txBusy, setTxBusy] = useState(false);
   const selectedNetwork = networks.find(network => network.key === selectedNetworkKey); 
-  const filteredNetworks = networks.filter(network => `${network.name} ${network.symbol} ${network.chainId}`.toLowerCase().includes(networkSearch.trim().toLowerCase())).slice(0, 150);
+  const matchingNetworks = networks.filter(network => `${network.name} ${network.symbol} ${network.chainId}`.toLowerCase().includes(networkSearch.trim().toLowerCase()));
+  const filteredNetworks = selectedNetwork && !matchingNetworks.some(network => network.key === selectedNetwork.key)
+    ? [selectedNetwork, ...matchingNetworks.slice(0, 149)]
+    : matchingNetworks.slice(0, 150);
 
   useEffect(() => {
     let cancelled = false;
