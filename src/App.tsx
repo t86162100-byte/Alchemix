@@ -67,6 +67,58 @@ const networkMatchesEntry = (network: EvmNetwork, entry: CuratedNetwork) => {
   return entry.aliases.some(alias => candidate.includes(alias.toLowerCase()));
 };
 
+
+type CuratedNetwork = { name: string; aliases: string[]; family: 'EVM' | 'Other' };
+const CURATED_NETWORKS: CuratedNetwork[] = [
+  { name: 'BNB Chain', aliases: ['bnb smart chain', 'binance smart chain', 'bnb chain'], family: 'EVM' },
+  { name: 'Ethereum', aliases: ['ethereum mainnet', 'ethereum'], family: 'EVM' },
+  { name: 'Arc', aliases: ['arc'], family: 'EVM' },
+  { name: 'Solana', aliases: [], family: 'Other' },
+  { name: 'Tron', aliases: [], family: 'Other' },
+  { name: 'HyperEVM', aliases: ['hyperevm'], family: 'EVM' },
+  { name: 'Bitcoin', aliases: [], family: 'Other' },
+  { name: 'Robinhood', aliases: [], family: 'Other' },
+  { name: 'Base', aliases: ['base mainnet', 'base'], family: 'EVM' },
+  { name: 'Polygon(Matic)', aliases: ['polygon mainnet', 'polygon pos', 'matic mainnet', 'polygon'], family: 'EVM' },
+  { name: 'Ton', aliases: [], family: 'Other' },
+  { name: 'Plasma', aliases: ['plasma'], family: 'EVM' },
+  { name: 'Stellar', aliases: [], family: 'Other' },
+  { name: 'Mantle', aliases: ['mantle'], family: 'EVM' },
+  { name: 'Aptos', aliases: [], family: 'Other' },
+  { name: 'ENI', aliases: ['eni'], family: 'EVM' },
+  { name: 'Optimism', aliases: ['optimism', 'op mainnet'], family: 'EVM' },
+  { name: 'BOT Chain', aliases: ['bot chain'], family: 'EVM' },
+  { name: 'Anubis', aliases: ['anubis'], family: 'EVM' },
+  { name: 'Linea', aliases: ['linea'], family: 'EVM' },
+  { name: 'Berachain', aliases: ['berachain'], family: 'EVM' },
+  { name: 'MegaETH', aliases: ['megaeth'], family: 'EVM' },
+  { name: 'Mova', aliases: ['mova'], family: 'EVM' },
+  { name: 'zkSync Era', aliases: ['zksync era', 'zksync'], family: 'EVM' },
+  { name: 'Cosmos', aliases: [], family: 'Other' },
+  { name: 'smartBCH', aliases: ['smartbch'], family: 'EVM' },
+  { name: 'Ethereum Classic', aliases: ['ethereum classic'], family: 'EVM' },
+  { name: 'Doge', aliases: [], family: 'Other' },
+  { name: 'opBNB', aliases: ['opbnb'], family: 'EVM' },
+  { name: 'Kaia', aliases: ['kaia'], family: 'EVM' },
+  { name: 'Core', aliases: ['core blockchain', 'core dao', 'core'], family: 'EVM' },
+  { name: 'Celo', aliases: ['celo'], family: 'EVM' },
+  { name: 'Scroll', aliases: ['scroll'], family: 'EVM' },
+  { name: 'Morph', aliases: ['morph'], family: 'EVM' },
+  { name: 'XRPL', aliases: [], family: 'Other' },
+  { name: 'Monad', aliases: ['monad'], family: 'EVM' },
+  { name: 'Ink', aliases: ['ink'], family: 'EVM' },
+  { name: 'SUI', aliases: [], family: 'Other' },
+  { name: 'Avalanche-C', aliases: ['avalanche c-chain', 'avalanche mainnet', 'avalanche'], family: 'EVM' },
+  { name: 'Arbitrum', aliases: ['arbitrum one', 'arbitrum'], family: 'EVM' },
+  { name: 'MakaChain', aliases: ['makachain'], family: 'EVM' },
+  { name: 'HyperLiquid L1', aliases: [], family: 'Other' },
+  { name: 'Sonic', aliases: ['sonic'], family: 'EVM' },
+  { name: 'X Layer', aliases: ['x layer', 'okx x layer'], family: 'EVM' },
+  { name: 'Sei EVM', aliases: ['sei evm', 'sei network'], family: 'EVM' },
+];
+const networkMatchesEntry = (network: EvmNetwork, entry: CuratedNetwork) =>
+  entry.aliases.some(alias => `${network.name} ${network.symbol} ${network.chainId}`.toLowerCase().includes(alias.toLowerCase()));
+
 const shortAddress = (value: string) => value ? value.slice(0, 6) + '…' + value.slice(-4) : '';
 const formatEthForDisplay = (value: string) => {
   const amount = Number(value);
