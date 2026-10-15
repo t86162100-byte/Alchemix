@@ -3,6 +3,7 @@ import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell
 import { createWalletDraft, importWalletDraft, unlockWallet } from './core/wallet/walletService';
 import { readKeystore, writeKeystore } from './core/wallet/secureStore';
 import { loadEvmNetworks, estimateNativeTransfer, readNetworkHealth, readNetworkSnapshot, type EvmNetwork, type NetworkSnapshot, type TransferEstimate } from './core/chain/evmService';
+import { readSolanaSnapshot, type SolanaSnapshot } from './core/chain/solanaService';
 
 type Tab = 'Overview' | 'Market' | 'Activity' | 'Wallet' | 'Swap' | 'Explore';
 type Modal = 'wallet' | 'create' | 'import' | 'unlock' | 'help' | null;
@@ -152,6 +153,9 @@ export default function App() {
   const [networkDrawerSearch, setNetworkDrawerSearch] = useState('');
   const [networkDrawerCategory, setNetworkDrawerCategory] = useState<'All' | 'EVM' | 'Other'>('All');
   const [selectedNetworkKey, setSelectedNetworkKey] = useState('');
+  const [selectedOtherNetwork, setSelectedOtherNetwork] = useState('');
+  const [activeMnemonicPhrase, setActiveMnemonicPhrase] = useState('');
+  const [solanaSnapshot, setSolanaSnapshot] = useState<SolanaSnapshot | null>(null);
   const [networkSnapshot, setNetworkSnapshot] = useState<NetworkSnapshot | null>(null);
   const [networkStatus, setNetworkStatus] = useState<'idle' | 'loading' | 'connected' | 'error'>('idle');
   const [networkError, setNetworkError] = useState('');
@@ -161,8 +165,9 @@ export default function App() {
   const [txEstimate, setTxEstimate] = useState<TransferEstimate | null>(null);
   const [txError, setTxError] = useState('');
   const [txBusy, setTxBusy] = useState(false);
-  const selectedNetwork = networks.find(network => network.key === selectedNetworkKey);
-  const selectedCuratedEntry = selectedNetwork ? CURATED_NETWORKS.find(entry => networkMatchesEntry(selectedNetwork, entry)) : undefined;
+  const selectedNetwork = selectedOtherNetwork ? undefined : networks.find(network => network.key === selectedNetworkKey);
+  const selectedCuratedEntry = selectedOtherNetwork ? CURATED_NETWORKS.find(entry => entry.name === selectedOtherNetwork) : selectedNetwork ? CURATED_NETWORKS.find(entry => networkMatchesEntry(selectedNetwork, entry)) : undefined;
+  const selectedChainAddress = selectedOtherNetwork === 'Solana' ? (solanaSnapshot?.address ?? '') : address;
   const visibleCuratedNetworks = CURATED_NETWORKS.filter(entry => {
     const matchesCategory = networkDrawerCategory === 'All' || entry.family === networkDrawerCategory;
     const matchesSearch = entry.name.toLowerCase().includes(networkDrawerSearch.trim().toLowerCase());
@@ -178,6 +183,13 @@ export default function App() {
   }, []);
 
   const refreshNetwork = async () => {
+    if (selectedOtherNetwork === 'Solana') {
+      if (!activeMnemonicPhrase) { setNetworkStatus('error'); setNetworkError('Unlock this wallet with its recovery phrase available to derive the Solana account.'); return; }
+      setNetworkStatus('loading'); setNetworkError('');
+      try { const snapshot = await readSolanaSnapshot(activeMnemonicPhrase); setSolanaSnapshot(snapshot); setActiveRpcUrl(snapshot.rpcUrl); setNetworkStatus('connected'); }
+      catch (e) { setSolanaSnapshot(null); setNetworkStatus('error'); setNetworkError(e instanceof Error ? e.message : 'Could not read the Solana balance.'); }
+      return;
+    }
     if (!selectedNetwork) { setNetworkError('Wait for the network registry to load.'); return; }
     setActiveRpcUrl('');
     if (!address) {
@@ -226,6 +238,15 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    if (selectedOtherNetwork === 'Solana') {
+      setNetworkStatus('loading'); setNetworkError(''); setNetworkSnapshot(null); setActiveRpcUrl(''); setSolanaSnapshot(null);
+      if (!activeMnemonicPhrase) { setNetworkStatus('error'); setNetworkError('Unlock the wallet with its recovery phrase to derive its Solana address.'); return () => { cancelled = true; }; }
+      readSolanaSnapshot(activeMnemonicPhrase).then(snapshot => {
+        if (!cancelled) { setSolanaSnapshot(snapshot); setActiveRpcUrl(snapshot.rpcUrl); setNetworkStatus('connected'); }
+      }).catch(e => { if (!cancelled) { setSolanaSnapshot(null); setNetworkStatus('error'); setNetworkError(e instanceof Error ? e.message : 'Could not read the Solana balance.'); } });
+      return () => { cancelled = true; };
+    }
+    setSolanaSnapshot(null);
     if (!selectedNetwork) { setNetworkStatus('idle'); setNetworkSnapshot(null); setActiveRpcUrl(''); return () => { cancelled = true; }; }
     setNetworkStatus('loading');
     setNetworkError('');
@@ -256,7 +277,7 @@ export default function App() {
       });
     }
     return () => { cancelled = true; };
-  }, [address, selectedNetworkKey, selectedNetwork]);
+  }, [address, activeMnemonicPhrase, selectedOtherNetwork, selectedNetworkKey, selectedNetwork]);
 
   const prepareTransfer = async () => {
     setTxBusy(true);
@@ -299,7 +320,7 @@ export default function App() {
       const draft = importWalletDraft(phrase);
       const encrypted = await draft.wallet.encrypt(password);
       await writeKeystore(encrypted);
-      setAddress(draft.address); setUnlockedWallet(draft.wallet); setKeystoreExists(true); closeModal();
+      setAddress(draft.address); setUnlockedWallet(draft.wallet); setActiveMnemonicPhrase(draft.phrase); setKeystoreExists(true); closeModal();
       setNotice('Wallet encrypted and saved on this device.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not securely save the wallet.');
@@ -327,7 +348,7 @@ export default function App() {
       const encrypted = await readKeystore();
       if (!encrypted) throw new Error('No saved wallet was found in this browser.');
       const wallet = await unlockWallet(encrypted, password);
-      setAddress(wallet.address); setUnlockedWallet(wallet); closeModal(); setNotice('Wallet unlocked for this session.');
+      setAddress(wallet.address); setUnlockedWallet(wallet); setActiveMnemonicPhrase(('mnemonic' in wallet && wallet.mnemonic) ? wallet.mnemonic.phrase : ''); closeModal(); setNotice('Wallet unlocked for this session.');
     } catch {
       setError('Incorrect password or the saved wallet could not be opened.');
     } finally { setBusy(false); }
@@ -347,27 +368,27 @@ export default function App() {
       <div className={`page-wrap ${activeTab === 'Overview' ? 'overview-page-wrap' : ''}`}>
         {activeTab === 'Market' ? <section className="panel activity-panel"><div className="panel-heading"><div><h2>Market</h2><p>Market data will be connected in a separate, verified phase.</p></div><span className="market-placeholder-tag">PLANNED</span></div><div className="market-empty">No external market feeds are connected in this clean foundation build.</div></section> : activeTab === 'Activity' ? <section className="panel activity-panel activity-page"><div className="panel-heading"><div><h2>History</h2><p>Wallet activity</p></div><span className="market-placeholder-tag">ACTIVITY</span></div><div className="market-empty">Transaction history is not connected yet.</div></section> : activeTab === 'Wallet' ? <section className="panel activity-panel"><div className="panel-heading"><div><h2>Your wallet</h2><p>Manage your local self-custody wallet.</p></div></div><p className="modal-description">{address ? address : 'No wallet is currently unlocked.'}</p><button className="primary-button" onClick={() => setModal('wallet')}>{address ? 'Wallet options' : keystoreExists ? 'Unlock wallet' : 'Create or import wallet'} <ArrowRight size={16}/></button></section> : <>
           <div className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-line"/> YOUR WEB3 HOME</div><h1>Your crypto, clearly.</h1><p className="page-subtitle">One calm place to see and manage your digital assets.</p></div><button className="refresh-button" onClick={() => address ? setNotice('Balance lookup is not enabled yet; no balance is being estimated.') : setModal('wallet')}><span>{address ? 'Refresh' : 'Get started'}</span><ArrowUpRight size={15}/></button></div>
-          <section className="sire-home-value-card" aria-label="Total account value"><div className="sire-home-value-main"><div className="sire-home-value-copy"><div className="sire-home-value-card-top"><span>NATIVE BALANCE</span><button type="button" className="sire-home-value-eye" aria-label={totalValueVisible ? 'Hide balance' : 'Show balance'} onClick={() => setTotalValueVisible(value => !value)}>{totalValueVisible ? <Eye size={17}/> : <EyeOff size={17}/>}</button></div><div className="sire-home-value-amount">{totalValueVisible ? (networkSnapshot && selectedNetwork ? `${formatEthForDisplay(networkSnapshot.balanceEth)} ${selectedNetwork?.symbol ?? '—'}` : networkStatus === 'error' ? 'Unavailable' : registryLoading ? 'Loading networks…' : '—') : '••••••'}</div><div className="page-subtitle">{address ? shortAddress(address) : 'Create or unlock a wallet to get started'}</div></div><div className="sire-home-value-chart" aria-hidden="true"><svg viewBox="0 0 320 100" preserveAspectRatio="none"><defs><linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="currentColor" stopOpacity=".18"/><stop offset="100%" stopColor="currentColor" stopOpacity="0"/></linearGradient></defs><path d="M0 78 C35 75,45 68,72 71 S110 62,132 66 S165 48,188 53 S220 39,242 45 S278 25,320 31 L320 100 L0 100 Z" fill="url(#balanceGradient)"/><path d="M0 78 C35 75,45 68,72 71 S110 62,132 66 S165 48,188 53 S220 39,242 45 S278 25,320 31" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div></div><button type="button" className="sire-home-value-add-funds" onClick={() => setModal('wallet')}>{address ? 'Wallet options' : 'Get started'}</button></section>
+          <section className="sire-home-value-card" aria-label="Total account value"><div className="sire-home-value-main"><div className="sire-home-value-copy"><div className="sire-home-value-card-top"><span>NATIVE BALANCE</span><button type="button" className="sire-home-value-eye" aria-label={totalValueVisible ? 'Hide balance' : 'Show balance'} onClick={() => setTotalValueVisible(value => !value)}>{totalValueVisible ? <Eye size={17}/> : <EyeOff size={17}/>}</button></div><div className="sire-home-value-amount">{totalValueVisible ? (selectedOtherNetwork === 'Solana' && solanaSnapshot ? `${formatEthForDisplay(solanaSnapshot.balanceSol)} SOL` : networkSnapshot && selectedNetwork ? `${formatEthForDisplay(networkSnapshot.balanceEth)} ${selectedNetwork?.symbol ?? '—'}` : networkStatus === 'error' ? 'Unavailable' : registryLoading ? 'Loading networks…' : '—') : '••••••'}</div><div className="page-subtitle">{selectedChainAddress ? shortAddress(selectedChainAddress) : 'Create or unlock a wallet to get started'}</div></div><div className="sire-home-value-chart" aria-hidden="true"><svg viewBox="0 0 320 100" preserveAspectRatio="none"><defs><linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="currentColor" stopOpacity=".18"/><stop offset="100%" stopColor="currentColor" stopOpacity="0"/></linearGradient></defs><path d="M0 78 C35 75,45 68,72 71 S110 62,132 66 S165 48,188 53 S220 39,242 45 S278 25,320 31 L320 100 L0 100 Z" fill="url(#balanceGradient)"/><path d="M0 78 C35 75,45 68,72 71 S110 62,132 66 S165 48,188 53 S220 39,242 45 S278 25,320 31" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div></div><button type="button" className="sire-home-value-add-funds" onClick={() => setModal('wallet')}>{address ? 'Wallet options' : 'Get started'}</button></section>
           <section className="panel activity-panel chain-panel">
             <div className="panel-heading">
               <div><h2>Blockchain connection</h2><p>Live native balance from the selected network</p></div>
-              <button className="panel-action" onClick={() => void refreshNetwork()} disabled={!selectedNetwork || networkStatus === 'loading'}><Activity size={14}/> Refresh</button>
+              <button className="panel-action" onClick={() => void refreshNetwork()} disabled={(!selectedNetwork && selectedOtherNetwork !== 'Solana') || networkStatus === 'loading'}><Activity size={14}/> Refresh</button>
             </div>
             <div className="chain-controls">
               <span className="form-label">Network</span>
               <button type="button" className="network-picker-trigger" onClick={() => { setNetworkDrawerSearch(''); setNetworkDrawerCategory('All'); setNetworkDrawerOpen(true); }} aria-haspopup="dialog" aria-expanded={networkDrawerOpen} disabled={registryLoading || !networks.length}>
                 <span className="network-picker-mark">{(selectedCuratedEntry?.name ?? selectedNetwork?.name ?? 'E').slice(0, 1)}</span>
-                <span className="network-picker-copy"><strong>{selectedCuratedEntry?.name ?? selectedNetwork?.name ?? (registryLoading ? 'Loading networks…' : 'Choose a network')}</strong><small>{selectedNetwork ? `${selectedNetwork.symbol} · Chain ID ${selectedNetwork.chainId}` : 'Choose from Ferra’s network directory'}</small></span>
+                <span className="network-picker-copy"><strong>{selectedCuratedEntry?.name ?? selectedNetwork?.name ?? (registryLoading ? 'Loading networks…' : 'Choose a network')}</strong><small>{selectedOtherNetwork === 'Solana' ? 'SOL · Solana mainnet' : selectedNetwork ? `${selectedNetwork.symbol} · Chain ID ${selectedNetwork.chainId}` : 'Choose from Ferra’s network directory'}</small></span>
                 <ChevronDown size={18}/>
               </button>
               {registryError && <p className="wallet-error" role="alert">{registryError} Refresh the page to retry.</p>}
               <div className={`chain-status ${networkStatus}`} role="status">
                 <span className="chain-status-dot"/>
-                <span>{networkStatus === 'loading' ? 'Connecting to RPC…' : networkStatus === 'connected' ? `Connected · block ${networkSnapshot?.blockNumber ?? '—'}` : networkStatus === 'error' ? 'Connection failed' : address ? 'Waiting for connection' : 'Connected; unlock wallet to check balance'}</span>
+                <span>{networkStatus === 'loading' ? 'Connecting to RPC…' : networkStatus === 'connected' ? `Connected · ${selectedOtherNetwork === 'Solana' ? `slot ${solanaSnapshot?.slot ?? '—'}` : `block ${networkSnapshot?.blockNumber ?? '—'}`}` : networkStatus === 'error' ? 'Connection failed' : address ? 'Waiting for connection' : 'Connected; unlock wallet to check balance'}</span>
               </div>
               {networkStatus === 'error' && <p className="wallet-error" role="alert">{networkError}</p>}
-              <div className="chain-meta"><span>RPC provider</span><strong>{activeRpcUrl || (networkStatus === 'error' ? 'No responding endpoint' : selectedNetwork?.rpcUrl ?? 'Waiting for registry')}</strong></div>
-              <div className="chain-meta"><span>Wallet address</span><strong>{address ? shortAddress(address) : 'Not unlocked'}</strong></div>
+              <div className="chain-meta"><span>RPC provider</span><strong>{activeRpcUrl || (networkStatus === 'error' ? 'No responding endpoint' : selectedNetwork?.rpcUrl ?? (selectedOtherNetwork === 'Solana' ? 'Solana mainnet RPC' : 'Waiting for registry'))}</strong></div>
+              <div className="chain-meta"><span>Wallet address</span><strong>{selectedChainAddress ? shortAddress(selectedChainAddress) : 'Not unlocked'}</strong></div>
               <p className="chain-disclaimer">Read-only connection. Only your public address is queried; recovery phrase and private key are never sent to the RPC provider.</p>
             </div>
           </section>
@@ -418,7 +439,7 @@ export default function App() {
             const unavailable = !network;
             return <button type="button" key={entry.name} className={`network-picker-row ${active ? 'active' : ''} ${unavailable ? 'unavailable' : ''}`} onClick={() => {
               if (!network) { setNotice(`${entry.name} is listed in Ferra’s network directory, but its chain adapter is not integrated yet.`); return; }
-              setSelectedNetworkKey(network.key); setTxEstimate(null); setTxError(''); setNetworkDrawerOpen(false); setNotice(`Switched to ${entry.name}.`);
+              setSelectedOtherNetwork(''); setSelectedNetworkKey(network.key); setSolanaSnapshot(null); setTxEstimate(null); setTxError(''); setNetworkDrawerOpen(false); setNotice(`Switched to ${entry.name}.`);
             }}>
               <span className={`network-picker-icon network-icon-${entry.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`}>{entry.name === 'Ethereum' ? 'Ξ' : entry.name === 'Bitcoin' ? '₿' : entry.name.slice(0, 1).toUpperCase()}</span>
               <span className="network-picker-row-copy"><strong>{entry.name}</strong><small>{network ? `${network.symbol} · Chain ID ${network.chainId}` : entry.family === 'Other' ? 'Non-EVM · integration pending' : 'EVM · integration pending'}</small></span>
@@ -436,7 +457,7 @@ export default function App() {
     {notice && <div className="toast" role="status"><span className="toast-dot"/><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss notification"><X size={16}/></button></div>}
     {modal && <div className="modal-backdrop" onClick={closeModal}><section className="modal-card" onClick={event => event.stopPropagation()}>
       <div className="modal-head"><div><span className="modal-eyebrow">FERRA WALLET</span><h2>{modal === 'wallet' ? 'Your wallet' : modal === 'create' ? 'Create a wallet' : modal === 'import' ? 'Import a wallet' : modal === 'unlock' ? 'Unlock your wallet' : 'Help & security'}</h2></div><button className="icon-button" onClick={closeModal} aria-label="Close dialog"><X size={19}/></button></div>
-      {modal === 'wallet' && <><p className="modal-description">Create a new self-custody wallet or import an existing recovery phrase. Wallet data is encrypted before it is saved in this browser.</p>{!storageReady && <p className="wallet-error" role="status">Checking secure browser storage. If it is unavailable, wallet setup remains disabled.</p>}<div className="wallet-choice-grid"><button type="button" className="wallet-choice" disabled={!storageReady || busy} onClick={() => { setError(''); setPhrase(''); setPassword(''); setModal('create'); void startCreate(); }}><span className="wallet-choice-icon"><Sparkles size={19}/></span><strong>Create new wallet</strong><small>Generate a recovery phrase</small></button><button type="button" className="wallet-choice" disabled={!storageReady || busy} onClick={() => { setError(''); setImportPhrase(''); setPassword(''); setModal('import'); }}><span className="wallet-choice-icon"><ArrowDownLeft size={19}/></span><strong>Import wallet</strong><small>Use an existing recovery phrase</small></button></div>{keystoreExists && <button className="primary-button full-button" onClick={() => { setError(''); setPassword(''); setModal('unlock'); }}>Unlock saved wallet</button>}{unlockedWallet && <button className="primary-button full-button" onClick={() => { setUnlockedWallet(null); setAddress(''); closeModal(); setNotice('Wallet locked for this session. Encrypted data remains saved on this device.'); }}>Lock wallet</button>}<div className="form-warning"><LockKeyhole size={16}/><span>Never share your recovery phrase. Ferra cannot recover it if you lose it.</span></div></>}
+      {modal === 'wallet' && <><p className="modal-description">Create a new self-custody wallet or import an existing recovery phrase. Wallet data is encrypted before it is saved in this browser.</p>{!storageReady && <p className="wallet-error" role="status">Checking secure browser storage. If it is unavailable, wallet setup remains disabled.</p>}<div className="wallet-choice-grid"><button type="button" className="wallet-choice" disabled={!storageReady || busy} onClick={() => { setError(''); setPhrase(''); setPassword(''); setModal('create'); void startCreate(); }}><span className="wallet-choice-icon"><Sparkles size={19}/></span><strong>Create new wallet</strong><small>Generate a recovery phrase</small></button><button type="button" className="wallet-choice" disabled={!storageReady || busy} onClick={() => { setError(''); setImportPhrase(''); setPassword(''); setModal('import'); }}><span className="wallet-choice-icon"><ArrowDownLeft size={19}/></span><strong>Import wallet</strong><small>Use an existing recovery phrase</small></button></div>{keystoreExists && <button className="primary-button full-button" onClick={() => { setError(''); setPassword(''); setModal('unlock'); }}>Unlock saved wallet</button>}{unlockedWallet && <button className="primary-button full-button" onClick={() => { setUnlockedWallet(null); setAddress(''); setActiveMnemonicPhrase(''); setSolanaSnapshot(null); closeModal(); setNotice('Wallet locked for this session. Encrypted data remains saved on this device.'); }}>Lock wallet</button>}<div className="form-warning"><LockKeyhole size={16}/><span>Never share your recovery phrase. Ferra cannot recover it if you lose it.</span></div></>}
       {modal === 'create' && <><p className="modal-description">Your recovery phrase is generated locally. Write it down and store it offline before securing the wallet.</p>{keystoreExists && <label className="form-label"><input type="checkbox" checked={replaceExisting} onChange={event => setReplaceExisting(event.target.checked)}/> I understand this will replace the wallet currently saved in this browser.</label>}{busy && !phrase ? <p className="network-loading">Generating wallet locally…</p> : phrase && <><div className="wallet-recovery-phrase">{phrase.split(' ').map((word,index) => <span key={index}><small>{index+1}</small>{showPhrase ? word : '••••'}</span>)}</div><button className="text-button" onClick={() => setShowPhrase(value => !value)}>{showPhrase ? 'Hide recovery phrase' : 'Reveal recovery phrase'}</button><label className="form-label"><input type="checkbox" checked={confirmedBackup} onChange={event => setConfirmedBackup(event.target.checked)}/> I have written down my recovery phrase and stored it safely.</label><label className="form-label">Encryption password (8+ characters)</label><input className="form-input" type="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} placeholder="Choose a strong password"/><button className="primary-button full-button" disabled={busy || !confirmedBackup || password.length < 8 || (keystoreExists && !replaceExisting)} onClick={() => void saveCreatedWallet()}>{busy ? 'Securing wallet…' : 'Secure wallet and continue'} <ArrowRight size={16}/></button></>}{error && <p className="wallet-error" role="alert">{error}</p>}</>}
       {modal === 'import' && <><p className="modal-description">Import a valid 12- or 24-word recovery phrase. The phrase is processed locally and is never sent to a server.</p>{keystoreExists && <label className="form-label"><input type="checkbox" checked={replaceExisting} onChange={event => setReplaceExisting(event.target.checked)}/> I understand this will replace the wallet currently saved in this browser.</label>}<label className="form-label">Recovery phrase</label><textarea className="form-input wallet-phrase-input" rows={3} autoComplete="off" spellCheck={false} value={importPhrase} onChange={event => setImportPhrase(event.target.value)} placeholder="Enter recovery phrase separated by spaces"/><label className="form-label">Encryption password (8+ characters)</label><input className="form-input" type="password" autoComplete="new-password" value={password} onChange={event => setPassword(event.target.value)} placeholder="Choose a strong password"/><button className="primary-button full-button" disabled={busy} onClick={() => void saveImportedWallet()}>{busy ? 'Importing wallet…' : 'Import and secure wallet'} <ArrowRight size={16}/></button>{error && <p className="wallet-error" role="alert">{error}</p>}</>}
       {modal === 'unlock' && <><p className="modal-description">Enter the password used to encrypt the wallet saved in this browser.</p><label className="form-label">Wallet password</label><input className="form-input" type="password" autoComplete="current-password" value={password} onChange={event => setPassword(event.target.value)} placeholder="Wallet password"/><button className="primary-button full-button" disabled={busy} onClick={() => void unlockSavedWallet()}>{busy ? 'Unlocking…' : 'Unlock wallet'} <ArrowRight size={16}/></button>{error && <p className="wallet-error" role="alert">{error}</p>}</>}
