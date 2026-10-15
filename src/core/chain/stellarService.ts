@@ -1,6 +1,6 @@
 import { Mnemonic } from 'ethers';
 import { derivePath } from 'ed25519-hd-key';
-import { Keypair } from '@stellar/stellar-sdk';
+import { ed25519 } from '@noble/curves/ed25519';
 
 const DEFAULT_HORIZON = 'https://horizon.stellar.org';
 export const STELLAR_DERIVATION_PATH = "m/44'/148'/0'";
@@ -10,6 +10,42 @@ export type StellarSnapshot = {
   balanceXlm: string;
   apiUrl: string;
 };
+
+// Stellar StrKey uses RFC 4648 base32 and CRC16-XModem (checksum bytes are little-endian).
+const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
+function base32Encode(bytes: Uint8Array): string {
+  let bits = 0;
+  let value = 0;
+  let output = '';
+  for (const byte of bytes) {
+    value = (value << 8) | byte;
+    bits += 8;
+    while (bits >= 5) {
+      output += BASE32[(value >>> (bits - 5)) & 31];
+      bits -= 5;
+    }
+  }
+  if (bits > 0) output += BASE32[(value << (5 - bits)) & 31];
+  return output;
+}
+function crc16Xmodem(bytes: Uint8Array): number {
+  let crc = 0;
+  for (const byte of bytes) {
+    crc ^= byte << 8;
+    for (let bit = 0; bit < 8; bit++) crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
+  }
+  return crc;
+}
+function encodeStellarPublicKey(publicKey: Uint8Array): string {
+  if (publicKey.length !== 32) throw new Error('Stellar public key must be 32 bytes.');
+  const payload = new Uint8Array(35);
+  payload[0] = 6 << 3; // Version byte for ed25519 public key (G...)
+  payload.set(publicKey, 1);
+  const checksum = crc16Xmodem(payload.subarray(0, 33));
+  payload[33] = checksum & 0xff;
+  payload[34] = (checksum >>> 8) & 0xff;
+  return base32Encode(payload);
+}
 
 function getHorizonUrl(): string {
   const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
@@ -28,8 +64,8 @@ export function deriveStellarAddress(phraseInput: string): string {
   if (!Mnemonic.isValidMnemonic(phrase)) throw new Error('A valid recovery phrase is required to derive the Stellar account.');
   const seedHex = Mnemonic.fromPhrase(phrase).computeSeed().replace(/^0x/, '');
   const derived = derivePath(STELLAR_DERIVATION_PATH, seedHex);
-  const keypair = Keypair.fromRawEd25519Seed(derived.key);
-  return keypair.publicKey();
+  const publicKey = ed25519.getPublicKey(derived.key);
+  return encodeStellarPublicKey(publicKey);
 }
 
 /** Read-only XLM balance lookup. Only the public Stellar address is sent to Horizon. */
