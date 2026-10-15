@@ -10,7 +10,27 @@ export type SolanaSnapshot = {
   rpcUrl: string;
 };
 
-const SOLANA_RPC_URL = 'https://api.mainnet-beta.solana.com';
+const DEFAULT_SOLANA_RPC_URL = 'https://api.mainnet-beta.solana.com';
+
+/**
+ * Configure VITE_SOLANA_RPC_URL to a dedicated Solana Mainnet RPC provider for
+ * production. The public endpoint is only a development fallback and may block
+ * browser traffic (HTTP 403) or rate-limit requests.
+ */
+function getSolanaRpcUrl(): string {
+  const configured = import.meta.env.VITE_SOLANA_RPC_URL?.trim();
+  const url = configured || DEFAULT_SOLANA_RPC_URL;
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error('Solana RPC URL is invalid. Configure VITE_SOLANA_RPC_URL with a valid HTTPS endpoint.');
+  }
+  if (parsed.protocol !== 'https:' && parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') {
+    throw new Error('Solana RPC must use HTTPS.');
+  }
+  return url;
+}
 
 /** SLIP-0010 Ed25519 hardened derivation using browser-native Web Crypto. */
 async function deriveEd25519Seed(seedHex: string): Promise<Uint8Array> {
@@ -28,7 +48,6 @@ async function deriveEd25519Seed(seedHex: string): Promise<Uint8Array> {
   let digest = await hmac(new TextEncoder().encode('ed25519 seed'), fromHex(seedHex));
   let key = digest.slice(0, 32);
   let chainCode = digest.slice(32);
-  // The selected path is entirely hardened: 44', 501', 0', 0'.
   for (const index of [44, 501, 0, 0]) {
     const data = new Uint8Array(37);
     data[0] = 0;
@@ -45,11 +64,7 @@ async function deriveEd25519Seed(seedHex: string): Promise<Uint8Array> {
   return key;
 }
 
-/**
- * Derive the first Solana account from a BIP-39 phrase using the common
- * Phantom-compatible hardened Ed25519 path. This avoids Node-only crypto
- * shims in browser bundles.
- */
+/** Derive the first Solana account from a BIP-39 phrase using a hardened Ed25519 path. */
 export async function deriveSolanaAddress(phraseInput: string): Promise<string> {
   const phrase = phraseInput.trim().toLowerCase().replace(/\s+/g, ' ');
   if (!Mnemonic.isValidMnemonic(phrase)) {
@@ -65,17 +80,33 @@ export async function deriveSolanaAddress(phraseInput: string): Promise<string> 
 export async function readSolanaSnapshot(phraseInput: string): Promise<SolanaSnapshot> {
   const address = await deriveSolanaAddress(phraseInput);
   const { Connection, PublicKey } = await import('@solana/web3.js');
+  const rpcUrl = getSolanaRpcUrl();
+  const connection = new Connection(rpcUrl, {
+    commitment: 'confirmed',
+    disableRetryOnRateLimit: false,
+    confirmTransactionInitialTimeout: 15_000,
+  });
   const publicKey = new PublicKey(address);
-  const connection = new Connection(SOLANA_RPC_URL, { commitment: 'confirmed', disableRetryOnRateLimit: false });
-  const [balance, slot] = await Promise.all([
-    connection.getBalance(publicKey, 'confirmed'),
-    connection.getSlot('confirmed'),
-  ]);
-  return {
-    address,
-    balanceLamports: String(balance),
-    balanceSol: formatUnits(BigInt(balance), 9),
-    slot,
-    rpcUrl: SOLANA_RPC_URL,
-  };
+  try {
+    const [balance, slot] = await Promise.all([
+      connection.getBalance(publicKey, 'confirmed'),
+      connection.getSlot('confirmed'),
+    ]);
+    return {
+      address,
+      balanceLamports: String(balance),
+      balanceSol: formatUnits(BigInt(balance), 9),
+      slot,
+      rpcUrl,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/403|access forbidden|forbidden/i.test(message)) {
+      throw new Error('Solana RPC access was denied (HTTP 403). Configure a dedicated Solana Mainnet endpoint in VITE_SOLANA_RPC_URL; the shared public endpoint may block browser traffic.');
+    }
+    if (/429|rate.?limit/i.test(message)) {
+      throw new Error('Solana RPC rate limit reached. Wait briefly or configure a dedicated Solana Mainnet endpoint in VITE_SOLANA_RPC_URL.');
+    }
+    throw new Error(`Solana RPC request failed: ${message}`);
+  }
 }
