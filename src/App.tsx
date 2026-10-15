@@ -100,6 +100,9 @@ export default function App() {
   const [networkDrawerOpen, setNetworkDrawerOpen] = useState(false);
   const [networkDrawerSearch, setNetworkDrawerSearch] = useState('');
   const [networkDrawerCategory, setNetworkDrawerCategory] = useState<'All' | 'EVM' | 'Other'>('All');
+  const [networkDrawerOpen, setNetworkDrawerOpen] = useState(false);
+  const [networkDrawerSearch, setNetworkDrawerSearch] = useState('');
+  const [networkDrawerCategory, setNetworkDrawerCategory] = useState<'All' | 'EVM' | 'Other'>('All');
   const [selectedNetworkKey, setSelectedNetworkKey] = useState('');
   const [networkSnapshot, setNetworkSnapshot] = useState<NetworkSnapshot | null>(null);
   const [networkStatus, setNetworkStatus] = useState<'idle' | 'loading' | 'connected' | 'error'>('idle');
