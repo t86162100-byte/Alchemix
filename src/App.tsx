@@ -438,6 +438,7 @@ export default function App() {
             const active = Boolean(network && network.key === selectedNetworkKey);
             const unavailable = !network;
             return <button type="button" key={entry.name} className={`network-picker-row ${active ? 'active' : ''} ${unavailable ? 'unavailable' : ''}`} onClick={() => {
+              if (entry.name === 'Solana') { setSelectedOtherNetwork('Solana'); setNetworkDrawerOpen(false); return; }
               if (!network) { setNotice(`${entry.name} is listed in Ferra’s network directory, but its chain adapter is not integrated yet.`); return; }
               setSelectedOtherNetwork(''); setSelectedNetworkKey(network.key); setSolanaSnapshot(null); setTxEstimate(null); setTxError(''); setNetworkDrawerOpen(false); setNotice(`Switched to ${entry.name}.`);
             }}>
