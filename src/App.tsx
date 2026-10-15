@@ -39,7 +39,7 @@ const CURATED_NETWORKS: CuratedNetwork[] = [
   { name: 'Berachain', aliases: ['berachain'], family: 'EVM' },
   { name: 'MegaETH', aliases: ['megaeth'], family: 'EVM' },
   { name: 'Mova', aliases: ['mova'], family: 'EVM' },
-  { name: 'zkSync Era', aliases: ['zksync era', 'zksync'], family: 'EVM' },
+  { name: 'zkSync Era', aliases: ['zksync era'], family: 'EVM' },
   { name: 'Cosmos', aliases: [], family: 'Other' },
   { name: 'smartBCH', aliases: ['smartbch'], family: 'EVM' },
   { name: 'Ethereum Classic', aliases: ['ethereum classic'], family: 'EVM' },
