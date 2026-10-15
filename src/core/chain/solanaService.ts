@@ -15,9 +15,14 @@ const SOLANA_RPC_URL = 'https://api.mainnet-beta.solana.com';
 /** SLIP-0010 Ed25519 hardened derivation using browser-native Web Crypto. */
 async function deriveEd25519Seed(seedHex: string): Promise<Uint8Array> {
   const fromHex = (hex: string) => Uint8Array.from(hex.match(/.{2}/g) ?? [], (byte) => parseInt(byte, 16));
+  const toArrayBuffer = (bytes: Uint8Array): ArrayBuffer => {
+    const copy = new Uint8Array(bytes.byteLength);
+    copy.set(bytes);
+    return copy.buffer;
+  };
   const hmac = async (keyBytes: Uint8Array, data: Uint8Array): Promise<Uint8Array> => {
-    const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-512' }, false, ['sign']);
-    return new Uint8Array(await crypto.subtle.sign('HMAC', key, data));
+    const key = await crypto.subtle.importKey('raw', toArrayBuffer(keyBytes), { name: 'HMAC', hash: 'SHA-512' }, false, ['sign']);
+    return new Uint8Array(await crypto.subtle.sign('HMAC', key, toArrayBuffer(data)));
   };
 
   let digest = await hmac(new TextEncoder().encode('ed25519 seed'), fromHex(seedHex));
