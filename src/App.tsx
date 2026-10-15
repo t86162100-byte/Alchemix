@@ -16,15 +16,15 @@ const navItems: Array<{name: Tab; label: string; icon: typeof Home}> = [
 
 type CuratedNetwork = { name: string; aliases: string[]; family: 'EVM' | 'Other' };
 const CURATED_NETWORKS: CuratedNetwork[] = [
-  { name: 'BNB Chain', aliases: ['bnb smart chain', 'binance smart chain', 'bnb chain'], family: 'EVM' },
-  { name: 'Ethereum', aliases: ['ethereum mainnet', 'ethereum'], family: 'EVM' },
+  { name: 'BNB Chain', aliases: ['bnb smart chain', 'binance smart chain', 'bnb chain', '56'], family: 'EVM' },
+  { name: 'Ethereum', aliases: ['ethereum mainnet', 'ethereum', '1'], family: 'EVM' },
   { name: 'Arc', aliases: ['arc'], family: 'EVM' },
   { name: 'Solana', aliases: [], family: 'Other' },
   { name: 'Tron', aliases: [], family: 'Other' },
   { name: 'HyperEVM', aliases: ['hyperevm'], family: 'EVM' },
   { name: 'Bitcoin', aliases: [], family: 'Other' },
-  { name: 'Robinhood', aliases: [], family: 'Other' },
-  { name: 'Base', aliases: ['base mainnet', 'base'], family: 'EVM' },
+  { name: 'Robinhood', aliases: ['robinhood chain', '4663'], family: 'EVM' },
+  { name: 'Base', aliases: ['base mainnet', 'base', '8453'], family: 'EVM' },
   { name: 'Polygon(Matic)', aliases: ['polygon mainnet', 'polygon pos', 'matic mainnet', 'polygon'], family: 'EVM' },
   { name: 'Ton', aliases: [], family: 'Other' },
   { name: 'Plasma', aliases: ['plasma'], family: 'EVM' },
@@ -61,10 +61,61 @@ const CURATED_NETWORKS: CuratedNetwork[] = [
   { name: 'Sonic', aliases: ['sonic'], family: 'EVM' },
   { name: 'X Layer', aliases: ['x layer', 'okx x layer'], family: 'EVM' },
   { name: 'Sei EVM', aliases: ['sei evm', 'sei network'], family: 'EVM' },
+  { name: '0G Mainnet', aliases: ['0g mainnet', '16661'], family: 'EVM' },
+  { name: 'Abstract', aliases: ['abstract', '2741'], family: 'EVM' },
+  { name: 'Apechain', aliases: ['apechain', '33139'], family: 'EVM' },
+  { name: 'Arbitrum Nova', aliases: ['arbitrum nova', '42170'], family: 'EVM' },
+  { name: 'Arbitrum Sepolia Testnet', aliases: ['arbitrum sepolia', '421614'], family: 'EVM' },
+  { name: 'Arc Testnet', aliases: ['arc testnet', '5042002'], family: 'EVM' },
+  { name: 'Base Sepolia Testnet', aliases: ['base sepolia', '84532'], family: 'EVM' },
+  { name: 'Blast', aliases: ['blast', '81457'], family: 'EVM' },
+  { name: 'BOB', aliases: ['bob', '60808'], family: 'EVM' },
+  { name: 'Boba', aliases: ['boba', '288'], family: 'EVM' },
+  { name: 'Cronos', aliases: ['cronos', '25'], family: 'EVM' },
+  { name: 'Ethereum Sepolia Testnet', aliases: ['ethereum sepolia', '11155111'], family: 'EVM' },
+  { name: 'Etherlink', aliases: ['etherlink', '42793'], family: 'EVM' },
+  { name: 'Flare', aliases: ['flare', '14'], family: 'EVM' },
+  { name: 'Flow', aliases: ['flow evm', '747'], family: 'EVM' },
+  { name: 'Fraxtal', aliases: ['fraxtal', '252'], family: 'EVM' },
+  { name: 'FUSE', aliases: ['fuse', '122'], family: 'EVM' },
+  { name: 'Gnosis', aliases: ['gnosis', '100'], family: 'EVM' },
+  { name: 'Gravity', aliases: ['gravity', '1625'], family: 'EVM' },
+  { name: 'Hemi', aliases: ['hemi', '43111'], family: 'EVM' },
+  { name: 'Hyperliquid', aliases: ['hyperliquid', '1337'], family: 'EVM' },
+  { name: 'Immutable zkEVM', aliases: ['immutable zkevm', '13371'], family: 'EVM' },
+  { name: 'Injective', aliases: ['injective', '1776'], family: 'EVM' },
+  { name: 'Katana', aliases: ['katana', '747474'], family: 'EVM' },
+  { name: 'Lens', aliases: ['lens', '232'], family: 'EVM' },
+  { name: 'Lighter', aliases: ['lighter', '3586256'], family: 'EVM' },
+  { name: 'Lisk', aliases: ['lisk', '1135'], family: 'EVM' },
+  { name: 'Metis', aliases: ['metis', '1088'], family: 'EVM' },
+  { name: 'Mode', aliases: ['mode', '34443'], family: 'EVM' },
+  { name: 'OP Sepolia Testnet', aliases: ['op sepolia', '11155420'], family: 'EVM' },
+  { name: 'Pharos Mainnet', aliases: ['pharos mainnet', '1672'], family: 'EVM' },
+  { name: 'Plume', aliases: ['plume', '98866'], family: 'EVM' },
+  { name: 'Ronin', aliases: ['ronin', '2020'], family: 'EVM' },
+  { name: 'Rootstock', aliases: ['rootstock', '30'], family: 'EVM' },
+  { name: 'Somnia', aliases: ['somnia', '5031'], family: 'EVM' },
+  { name: 'Soneium', aliases: ['soneium', '1868'], family: 'EVM' },
+  { name: 'Stable', aliases: ['stable', '988'], family: 'EVM' },
+  { name: 'Telos', aliases: ['telos', '40'], family: 'EVM' },
+  { name: 'Tempo', aliases: ['tempo', '4217'], family: 'EVM' },
+  { name: 'Unichain', aliases: ['unichain', '130'], family: 'EVM' },
+  { name: 'Vana', aliases: ['vana', '1480'], family: 'EVM' },
+  { name: 'Viction', aliases: ['viction', '88'], family: 'EVM' },
+  { name: 'World Chain', aliases: ['world chain', '480'], family: 'EVM' },
+  { name: 'XDC', aliases: ['xdc', '50'], family: 'EVM' },
+  { name: 'zkSync', aliases: ['zksync', '324'], family: 'EVM' },
+
 ];
 const networkMatchesEntry = (network: EvmNetwork, entry: CuratedNetwork) => {
-  const candidate = `${network.name} ${network.symbol} ${network.chainId}`.toLowerCase();
-  return entry.aliases.some(alias => candidate.includes(alias.toLowerCase()));
+  const networkName = network.name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const aliases = entry.aliases.map(alias => alias.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim());
+  // Keep testnets distinct from similarly named mainnets (for example Arc vs Arc Testnet).
+  const networkIsTestnet = /\btestnet\b|\bsepolia\b/.test(networkName);
+  const entryIsTestnet = /\btestnet\b|\bsepolia\b/.test(entry.name.toLowerCase());
+  if (networkIsTestnet !== entryIsTestnet) return false;
+  return aliases.some(alias => /^\d+$/.test(alias) ? String(network.chainId) === alias : networkName === alias || networkName.startsWith(`${alias} mainnet`) || networkName.startsWith(`${alias} network`));
 };
 
 
