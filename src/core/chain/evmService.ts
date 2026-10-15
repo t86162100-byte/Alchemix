@@ -77,6 +77,17 @@ export async function loadEvmNetworks(forceRefresh = false): Promise<EvmNetwork[
     });
   }
 
+  // Explicit mainnet profiles keep these networks available even when a public registry
+  // record is missing, stale, or uses a name that does not match Ferra's curated list.
+  const verifiedProfiles: EvmNetwork[] = [
+    { key: '999', name: 'HyperEVM', chainId: 999, symbol: 'HYPE', decimals: 18, rpcUrl: 'https://rpc.hyperliquid.xyz/evm', fallbackRpcUrls: [], explorerUrl: 'https://hyperevmscan.io' },
+    { key: '10000', name: 'smartBCH', chainId: 10000, symbol: 'BCH', decimals: 18, rpcUrl: 'https://rpc-mainnet.smartbch.org', fallbackRpcUrls: ['https://smartbch.greyh.at', 'https://smartbch.fountainhead.cash/mainnet'], explorerUrl: 'https://www.smartscan.cash' },
+    { key: '324', name: 'zkSync Era', chainId: 324, symbol: 'ETH', decimals: 18, rpcUrl: 'https://mainnet.era.zksync.io', fallbackRpcUrls: [], explorerUrl: 'https://explorer.zksync.io' },
+  ];
+  for (const profile of verifiedProfiles) {
+    byChainId.set(profile.chainId, profile);
+  }
+
   const networks = [...byChainId.values()].sort((a, b) => a.name.localeCompare(b.name));
   if (!networks.length) throw new Error('The network registry did not contain any usable EVM mainnets.');
   cachedNetworks = networks;
