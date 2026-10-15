@@ -435,15 +435,15 @@ export default function App() {
         <div className="network-picker-list">
           {visibleCuratedNetworks.map(entry => {
             const network = networkForEntry(entry);
-            const active = Boolean(network && network.key === selectedNetworkKey);
-            const unavailable = !network;
+            const active = entry.name === selectedOtherNetwork || Boolean(network && network.key === selectedNetworkKey);
+            const unavailable = !network && entry.name !== 'Solana';
             return <button type="button" key={entry.name} className={`network-picker-row ${active ? 'active' : ''} ${unavailable ? 'unavailable' : ''}`} onClick={() => {
               if (entry.name === 'Solana') { setSelectedOtherNetwork('Solana'); setNetworkDrawerOpen(false); return; }
               if (!network) { setNotice(`${entry.name} is listed in Ferra’s network directory, but its chain adapter is not integrated yet.`); return; }
               setSelectedOtherNetwork(''); setSelectedNetworkKey(network.key); setSolanaSnapshot(null); setTxEstimate(null); setTxError(''); setNetworkDrawerOpen(false); setNotice(`Switched to ${entry.name}.`);
             }}>
               <span className={`network-picker-icon network-icon-${entry.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`}>{entry.name === 'Ethereum' ? 'Ξ' : entry.name === 'Bitcoin' ? '₿' : entry.name.slice(0, 1).toUpperCase()}</span>
-              <span className="network-picker-row-copy"><strong>{entry.name}</strong><small>{network ? `${network.symbol} · Chain ID ${network.chainId}` : entry.family === 'Other' ? 'Non-EVM · integration pending' : 'EVM · integration pending'}</small></span>
+              <span className="network-picker-row-copy"><strong>{entry.name}</strong><small>{entry.name === 'Solana' ? 'SOL · read-only balance' : network ? `${network.symbol} · Chain ID ${network.chainId}` : entry.family === 'Other' ? 'Non-EVM · integration pending' : 'EVM · integration pending'}</small></span>
               {active ? <span className="network-picker-check">✓</span> : unavailable ? <span className="network-picker-soon">SOON</span> : <ArrowRight size={16} className="network-picker-arrow"/>}
             </button>;
           })}
