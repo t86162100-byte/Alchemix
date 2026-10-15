@@ -59,8 +59,10 @@ function bytesFromHex(hex: string): Uint8Array {
 }
 
 async function hmacSha512(keyBytes: Uint8Array, data: Uint8Array): Promise<Uint8Array> {
-  const key = await crypto.subtle.importKey('raw', keyBytes, { name: 'HMAC', hash: 'SHA-512' }, false, ['sign']);
-  return new Uint8Array(await crypto.subtle.sign('HMAC', key, data));
+  const keyData = new Uint8Array(keyBytes.length); keyData.set(keyBytes);
+  const messageData = new Uint8Array(data.length); messageData.set(data);
+  const key = await crypto.subtle.importKey('raw', keyData.buffer as ArrayBuffer, { name: 'HMAC', hash: 'SHA-512' }, false, ['sign']);
+  return new Uint8Array(await crypto.subtle.sign('HMAC', key, messageData.buffer as ArrayBuffer));
 }
 
 /** SLIP-0010 hardened Ed25519 derivation, implemented with browser Web Crypto. */
