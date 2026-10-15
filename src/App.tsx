@@ -13,6 +13,60 @@ const navItems: Array<{name: Tab; label: string; icon: typeof Home}> = [
   { name: 'Swap', label: 'Swap', icon: ArrowLeftRight },
   { name: 'Explore', label: 'Explore', icon: Globe2 },
 ];
+
+type CuratedNetwork = { name: string; aliases: string[]; family: 'EVM' | 'Other' };
+const CURATED_NETWORKS: CuratedNetwork[] = [
+  { name: 'BNB Chain', aliases: ['bnb smart chain', 'binance smart chain', 'bnb chain'], family: 'EVM' },
+  { name: 'Ethereum', aliases: ['ethereum mainnet', 'ethereum'], family: 'EVM' },
+  { name: 'Arc', aliases: ['arc'], family: 'EVM' },
+  { name: 'Solana', aliases: [], family: 'Other' },
+  { name: 'Tron', aliases: [], family: 'Other' },
+  { name: 'HyperEVM', aliases: ['hyperevm'], family: 'EVM' },
+  { name: 'Bitcoin', aliases: [], family: 'Other' },
+  { name: 'Robinhood', aliases: [], family: 'Other' },
+  { name: 'Base', aliases: ['base mainnet', 'base'], family: 'EVM' },
+  { name: 'Polygon(Matic)', aliases: ['polygon mainnet', 'polygon pos', 'matic mainnet', 'polygon'], family: 'EVM' },
+  { name: 'Ton', aliases: [], family: 'Other' },
+  { name: 'Plasma', aliases: ['plasma'], family: 'EVM' },
+  { name: 'Stellar', aliases: [], family: 'Other' },
+  { name: 'Mantle', aliases: ['mantle'], family: 'EVM' },
+  { name: 'Aptos', aliases: [], family: 'Other' },
+  { name: 'ENI', aliases: ['eni'], family: 'EVM' },
+  { name: 'Optimism', aliases: ['optimism', 'op mainnet'], family: 'EVM' },
+  { name: 'BOT Chain', aliases: ['bot chain'], family: 'EVM' },
+  { name: 'Anubis', aliases: ['anubis'], family: 'EVM' },
+  { name: 'Linea', aliases: ['linea'], family: 'EVM' },
+  { name: 'Berachain', aliases: ['berachain'], family: 'EVM' },
+  { name: 'MegaETH', aliases: ['megaeth'], family: 'EVM' },
+  { name: 'Mova', aliases: ['mova'], family: 'EVM' },
+  { name: 'zkSync Era', aliases: ['zksync era', 'zksync'], family: 'EVM' },
+  { name: 'Cosmos', aliases: [], family: 'Other' },
+  { name: 'smartBCH', aliases: ['smartbch'], family: 'EVM' },
+  { name: 'Ethereum Classic', aliases: ['ethereum classic'], family: 'EVM' },
+  { name: 'Doge', aliases: [], family: 'Other' },
+  { name: 'opBNB', aliases: ['opbnb'], family: 'EVM' },
+  { name: 'Kaia', aliases: ['kaia'], family: 'EVM' },
+  { name: 'Core', aliases: ['core blockchain', 'core dao', 'core'], family: 'EVM' },
+  { name: 'Celo', aliases: ['celo'], family: 'EVM' },
+  { name: 'Scroll', aliases: ['scroll'], family: 'EVM' },
+  { name: 'Morph', aliases: ['morph'], family: 'EVM' },
+  { name: 'XRPL', aliases: [], family: 'Other' },
+  { name: 'Monad', aliases: ['monad'], family: 'EVM' },
+  { name: 'Ink', aliases: ['ink'], family: 'EVM' },
+  { name: 'SUI', aliases: [], family: 'Other' },
+  { name: 'Avalanche-C', aliases: ['avalanche c-chain', 'avalanche mainnet', 'avalanche'], family: 'EVM' },
+  { name: 'Arbitrum', aliases: ['arbitrum one', 'arbitrum'], family: 'EVM' },
+  { name: 'MakaChain', aliases: ['makachain'], family: 'EVM' },
+  { name: 'HyperLiquid L1', aliases: [], family: 'Other' },
+  { name: 'Sonic', aliases: ['sonic'], family: 'EVM' },
+  { name: 'X Layer', aliases: ['x layer', 'okx x layer'], family: 'EVM' },
+  { name: 'Sei EVM', aliases: ['sei evm', 'sei network'], family: 'EVM' },
+];
+const networkMatchesEntry = (network: EvmNetwork, entry: CuratedNetwork) => {
+  const candidate = `${network.name} ${network.symbol} ${network.chainId}`.toLowerCase();
+  return entry.aliases.some(alias => candidate.includes(alias.toLowerCase()));
+};
+
 const shortAddress = (value: string) => value ? value.slice(0, 6) + '…' + value.slice(-4) : '';
 const formatEthForDisplay = (value: string) => {
   const amount = Number(value);
@@ -43,6 +97,9 @@ export default function App() {
   const [registryLoading, setRegistryLoading] = useState(true);
   const [registryError, setRegistryError] = useState('');
   const [networkSearch, setNetworkSearch] = useState('');
+  const [networkDrawerOpen, setNetworkDrawerOpen] = useState(false);
+  const [networkDrawerSearch, setNetworkDrawerSearch] = useState('');
+  const [networkDrawerCategory, setNetworkDrawerCategory] = useState<'All' | 'EVM' | 'Other'>('All');
   const [selectedNetworkKey, setSelectedNetworkKey] = useState('');
   const [networkSnapshot, setNetworkSnapshot] = useState<NetworkSnapshot | null>(null);
   const [networkStatus, setNetworkStatus] = useState<'idle' | 'loading' | 'connected' | 'error'>('idle');
@@ -53,11 +110,14 @@ export default function App() {
   const [txEstimate, setTxEstimate] = useState<TransferEstimate | null>(null);
   const [txError, setTxError] = useState('');
   const [txBusy, setTxBusy] = useState(false);
-  const selectedNetwork = networks.find(network => network.key === selectedNetworkKey); 
-  const matchingNetworks = networks.filter(network => `${network.name} ${network.symbol} ${network.chainId}`.toLowerCase().includes(networkSearch.trim().toLowerCase()));
-  const filteredNetworks = selectedNetwork && !matchingNetworks.some(network => network.key === selectedNetwork.key)
-    ? [selectedNetwork, ...matchingNetworks.slice(0, 149)]
-    : matchingNetworks.slice(0, 150);
+  const selectedNetwork = networks.find(network => network.key === selectedNetworkKey);
+  const selectedCuratedEntry = selectedNetwork ? CURATED_NETWORKS.find(entry => networkMatchesEntry(selectedNetwork, entry)) : undefined;
+  const visibleCuratedNetworks = CURATED_NETWORKS.filter(entry => {
+    const matchesCategory = networkDrawerCategory === 'All' || entry.family === networkDrawerCategory;
+    const matchesSearch = entry.name.toLowerCase().includes(networkDrawerSearch.trim().toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+  const networkForEntry = (entry: CuratedNetwork) => networks.find(network => networkMatchesEntry(network, entry));
 
   useEffect(() => {
     let cancelled = false;
@@ -101,7 +161,8 @@ export default function App() {
     let cancelled = false;
     loadEvmNetworks().then(loaded => {
       if (!cancelled) {
-        setNetworks(loaded);
+        const curatedLoaded = loaded.filter(network => CURATED_NETWORKS.some(entry => entry.family === 'EVM' && networkMatchesEntry(network, entry)));
+        setNetworks(curatedLoaded);
         setSelectedNetworkKey(current => current && loaded.some(network => network.key === current) ? current : (loaded.find(network => network.chainId === 1)?.key ?? loaded[0]?.key ?? ''));
         setRegistryError('');
         setRegistryLoading(false);
@@ -242,13 +303,12 @@ export default function App() {
               <button className="panel-action" onClick={() => void refreshNetwork()} disabled={!selectedNetwork || networkStatus === 'loading'}><Activity size={14}/> Refresh</button>
             </div>
             <div className="chain-controls">
-              <label className="form-label" htmlFor="ferra-network-search">Find a network · {networks.length.toLocaleString()} discovered</label>
-              <input id="ferra-network-search" className="form-input" type="search" autoComplete="off" value={networkSearch} onChange={event => setNetworkSearch(event.target.value)} placeholder="Search by network, ticker, or chain ID" />
-              <select id="ferra-network-select" className="form-input chain-select" value={selectedNetworkKey} onChange={event => { setSelectedNetworkKey(event.target.value); setTxEstimate(null); setTxError(''); }} disabled={registryLoading || !filteredNetworks.length}>
-                {registryLoading && <option value="">Discovering EVM networks…</option>}
-                {!registryLoading && filteredNetworks.length === 0 && <option value="">No matching networks</option>}
-                {filteredNetworks.map(network => <option key={network.key} value={network.key}>{network.name} · {network.symbol} · chain ID {network.chainId}</option>)}
-              </select>
+              <span className="form-label">Network</span>
+              <button type="button" className="network-picker-trigger" onClick={() => { setNetworkDrawerSearch(''); setNetworkDrawerCategory('All'); setNetworkDrawerOpen(true); }} aria-haspopup="dialog" aria-expanded={networkDrawerOpen} disabled={registryLoading || !networks.length}>
+                <span className="network-picker-mark">{(selectedCuratedEntry?.name ?? selectedNetwork?.name ?? 'E').slice(0, 1)}</span>
+                <span className="network-picker-copy"><strong>{selectedCuratedEntry?.name ?? selectedNetwork?.name ?? (registryLoading ? 'Loading networks…' : 'Choose a network')}</strong><small>{selectedNetwork ? `${selectedNetwork.symbol} · Chain ID ${selectedNetwork.chainId}` : 'Choose from Ferra’s network directory'}</small></span>
+                <ChevronDown size={18}/>
+              </button>
               {registryError && <p className="wallet-error" role="alert">{registryError} Refresh the page to retry.</p>}
               <div className={`chain-status ${networkStatus}`} role="status">
                 <span className="chain-status-dot"/>
@@ -288,6 +348,38 @@ export default function App() {
       </div>
     </main>
     <nav className="bottom-navigation" aria-label="Main navigation"><button type="button" className={activeTab === 'Overview' ? 'active' : ''} onClick={() => setActiveTab('Overview')}><Home size={20}/><span>Home</span></button><button type="button" className={activeTab === 'Market' ? 'active' : ''} onClick={() => setActiveTab('Market')}><TrendingUp size={20}/><span>Market</span></button><button type="button" className={activeTab === 'Activity' ? 'active' : ''} onClick={() => setActiveTab('Activity')}><Activity size={20}/><span>History</span></button><button type="button" onClick={() => setModal('wallet')}><Wallet size={20}/><span>Wallet</span></button></nav>
+
+    {networkDrawerOpen && <div className="network-picker-backdrop" onClick={() => setNetworkDrawerOpen(false)}>
+      <section className="network-picker-drawer" role="dialog" aria-modal="true" aria-labelledby="network-picker-title" onClick={event => event.stopPropagation()}>
+        <div className="network-picker-grabber" aria-hidden="true"/>
+        <header className="network-picker-header">
+          <div><span className="network-picker-eyebrow">FERRA WALLET</span><h2 id="network-picker-title">Choose network</h2><p>Find your chain and switch in one tap.</p></div>
+          <button type="button" className="network-picker-close" onClick={() => setNetworkDrawerOpen(false)} aria-label="Close network list"><X size={19}/></button>
+        </header>
+        <label className="network-picker-search"><Search size={17}/><input autoFocus type="search" value={networkDrawerSearch} onChange={event => setNetworkDrawerSearch(event.target.value)} placeholder="Search networks" aria-label="Search networks"/>{networkDrawerSearch && <button type="button" onClick={() => setNetworkDrawerSearch('')} aria-label="Clear search"><X size={15}/></button>}</label>
+        <div className="network-picker-filters" role="group" aria-label="Filter network type">
+          {(['All', 'EVM', 'Other'] as const).map(category => <button type="button" key={category} className={networkDrawerCategory === category ? 'active' : ''} onClick={() => setNetworkDrawerCategory(category)}>{category}<span>{category === 'All' ? CURATED_NETWORKS.length : CURATED_NETWORKS.filter(entry => entry.family === category).length}</span></button>)}
+        </div>
+        <div className="network-picker-list">
+          {visibleCuratedNetworks.map(entry => {
+            const network = networkForEntry(entry);
+            const active = Boolean(network && network.key === selectedNetworkKey);
+            const unavailable = !network;
+            return <button type="button" key={entry.name} className={`network-picker-row ${active ? 'active' : ''} ${unavailable ? 'unavailable' : ''}`} onClick={() => {
+              if (!network) { setNotice(`${entry.name} is listed in Ferra’s network directory, but its chain adapter is not integrated yet.`); return; }
+              setSelectedNetworkKey(network.key); setTxEstimate(null); setTxError(''); setNetworkDrawerOpen(false); setNotice(`Switched to ${entry.name}.`);
+            }}>
+              <span className={`network-picker-icon network-icon-${entry.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`}>{entry.name === 'Ethereum' ? 'Ξ' : entry.name === 'Bitcoin' ? '₿' : entry.name.slice(0, 1).toUpperCase()}</span>
+              <span className="network-picker-row-copy"><strong>{entry.name}</strong><small>{network ? `${network.symbol} · Chain ID ${network.chainId}` : entry.family === 'Other' ? 'Non-EVM · integration pending' : 'EVM · integration pending'}</small></span>
+              {active ? <span className="network-picker-check">✓</span> : unavailable ? <span className="network-picker-soon">SOON</span> : <ArrowRight size={16} className="network-picker-arrow"/>}
+            </button>;
+          })}
+          {!visibleCuratedNetworks.length && <div className="network-picker-empty">No networks match “{networkDrawerSearch}”. Try another name.</div>}
+        </div>
+        <footer className="network-picker-footer"><span className="network-picker-footer-dot"/><span>{networks.length} curated EVM networks currently have a usable registry match. Unsupported chains are shown honestly and won’t be selected until their adapters are implemented.</span></footer>
+      </section>
+    </div>}
+
     {notice && <div className="toast" role="status"><span className="toast-dot"/><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss notification"><X size={16}/></button></div>}
     {modal && <div className="modal-backdrop" onClick={closeModal}><section className="modal-card" onClick={event => event.stopPropagation()}>
       <div className="modal-head"><div><span className="modal-eyebrow">FERRA WALLET</span><h2>{modal === 'wallet' ? 'Your wallet' : modal === 'create' ? 'Create a wallet' : modal === 'import' ? 'Import a wallet' : modal === 'unlock' ? 'Unlock your wallet' : 'Help & security'}</h2></div><button className="icon-button" onClick={closeModal} aria-label="Close dialog"><X size={19}/></button></div>
