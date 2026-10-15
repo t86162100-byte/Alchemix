@@ -181,7 +181,7 @@ async function suiTokens(): Promise<RawToken[]> {
   return coingeckoPlatformTokens('sui');
 }
 
-async function loadRawTokens(network: string): Promise<{ tokens: RawToken[]; source: string }> {
+async function loadRawTokens(network: string): Promise<{ tokens: RawToken[]; source: string; warning?: string }> {
   switch (network) {
     case 'Solana': return await solanaTokens();
     case 'Tron': return { tokens: await tronTokens(), source: 'TronScan public token directory' };
