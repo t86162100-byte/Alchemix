@@ -575,7 +575,7 @@ export default function App() {
               <span className="form-label">Network</span>
               <button type="button" className="network-picker-trigger" onClick={() => { setNetworkDrawerSearch(''); setNetworkDrawerCategory('All'); setNetworkDrawerOpen(true); }} aria-haspopup="dialog" aria-expanded={networkDrawerOpen} disabled={registryLoading || !networks.length}>
                 <span className="network-picker-mark">{(selectedCuratedEntry?.name ?? selectedNetwork?.name ?? 'E').slice(0, 1)}</span>
-                <span className="network-picker-copy"><strong>{selectedCuratedEntry?.name ?? selectedNetwork?.name ?? (registryLoading ? 'Loading networks…' : 'Choose a network')}</strong><small>{selectedOtherNetwork === 'Solana' ? 'SOL · Solana mainnet' : selectedOtherNetwork === 'Tron' ? 'TRX · Tron mainnet' : selectedNetwork ? `${selectedNetwork.symbol} · Chain ID ${selectedNetwork.chainId}` : 'Choose from Ferra’s network directory'}</small></span>
+                <span className="network-picker-copy"><strong>{selectedCuratedEntry?.name ?? selectedNetwork?.name ?? (registryLoading ? 'Loading networks…' : 'Choose a network')}</strong><small>{selectedOtherNetwork === 'Solana' ? 'SOL · Solana mainnet' : selectedOtherNetwork === 'Tron' ? 'TRX · Tron mainnet' : selectedOtherNetwork === 'Lighter' ? 'Read-only exchange account' : selectedOtherNetwork === 'HyperLiquid L1' ? 'HYPE · read-only spot balance' : selectedNetwork ? `${selectedNetwork.symbol} · Chain ID ${selectedNetwork.chainId}` : 'Choose from Ferra’s network directory'}</small></span>
                 <ChevronDown size={18}/>
               </button>
               {registryError && <p className="wallet-error" role="alert">{registryError} Refresh the page to retry.</p>}
