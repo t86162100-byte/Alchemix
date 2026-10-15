@@ -195,9 +195,17 @@ export async function sendSolanaTransfer(
   recipientInput: string,
   amountInput: string,
   userConfirmed: boolean,
+  reviewedPreview?: SolanaTransferPreview,
 ): Promise<{ signature: string; preview: SolanaTransferPreview }> {
   if (!userConfirmed) throw new Error('Review the transfer and confirm before signing.');
   const preview = await previewSolanaTransfer(phraseInput, recipientInput, amountInput);
+  if (reviewedPreview && (
+    reviewedPreview.from !== preview.from || reviewedPreview.to !== preview.to ||
+    reviewedPreview.amountLamports !== preview.amountLamports ||
+    reviewedPreview.estimatedFeeLamports !== preview.estimatedFeeLamports
+  )) {
+    throw new Error('The transfer details or estimated fee changed. Review the updated transfer before signing.');
+  }
   const { Connection, SystemProgram, Transaction } = await import('@solana/web3.js');
   const keypair = await deriveSolanaKeypair(phraseInput);
   if (keypair.publicKey.toBase58() !== preview.from) throw new Error('The active wallet changed. Review the transfer again.');
