@@ -160,7 +160,7 @@ export async function readSolanaTokenHoldings(phraseInput: string): Promise<Sola
         amountRaw,
         balance: formatUnits(BigInt(amountRaw), decimals),
         decimals,
-        programId: item.account.owner.toBase58(),
+        programId: item.account.owner,
       });
     }
   }
