@@ -182,7 +182,7 @@ export async function estimateNativeTransfer(
   if (!isAddress(fromAddress)) throw new Error('Unlock your wallet to use its public address.');
   if (!isAddress(recipientInput.trim())) throw new Error('Enter a valid recipient EVM address.');
   if (!amountInput.trim() || !/^\d+(?:\.\d+)?$/.test(amountInput.trim()) || (amountInput.trim().split('.')[1]?.length ?? 0) > network.decimals) {
-    throw new Error('Enter a valid native-coin amount with no more than this network's supported decimal places.');
+    throw new Error("Enter a valid native-coin amount with no more than this network-supported decimal places.");
   }
   const value = parseUnits(amountInput.trim(), network.decimals);
   if (value <= 0n) throw new Error('The transfer amount must be greater than zero.');
