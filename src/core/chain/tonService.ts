@@ -1,4 +1,5 @@
 import { Mnemonic } from 'ethers';
+import { Buffer } from 'buffer';
 import { keyPairFromSeed } from '@ton/crypto';
 import { WalletContractV4 } from '@ton/ton';
 
@@ -44,7 +45,7 @@ export async function deriveTonAddress(phraseInput: string): Promise<{ address: 
   const seedHex = Mnemonic.fromPhrase(phrase).computeSeed().replace(/^0x/, '');
   const seed = Uint8Array.from(seedHex.match(/.{2}/g) ?? [], byte => parseInt(byte, 16));
   const privateSeed = await deriveEd25519Seed(seed);
-  const keyPair = keyPairFromSeed(privateSeed);
+  const keyPair = keyPairFromSeed(Buffer.from(privateSeed));
   const wallet = WalletContractV4.create({ workchain: 0, publicKey: keyPair.publicKey });
   return { address: wallet.address.toString({ bounceable: false, urlSafe: true }), publicKey: keyPair.publicKey };
 }
