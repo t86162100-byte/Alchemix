@@ -26,7 +26,8 @@
     "@aptos-labs/ts-sdk": "^7.4.0",
     "@cosmjs/proto-signing": "^0.36.0",
     "ripple-address-codec": "^5.0.0",
-    "@mysten/sui": "^1.45.2"
+    "@mysten/sui": "^1.45.2",
+    "@noble/curves": "^1.9.7"
   },
   "devDependencies": {
     "typescript": "^5.7.2",
