@@ -25,7 +25,8 @@
     "@stellar/stellar-sdk": "^13.3.0",
     "@aptos-labs/ts-sdk": "^7.4.0",
     "@cosmjs/proto-signing": "^0.36.0",
-    "ripple-address-codec": "^5.0.0"
+    "ripple-address-codec": "^5.0.0",
+    "@mysten/sui": "^1.45.2"
   },
   "devDependencies": {
     "typescript": "^5.7.2",
