@@ -137,14 +137,7 @@ async function hyperliquidTokens(): Promise<RawToken[]> {
 }
 
 async function suiTokens(): Promise<RawToken[]> {
-  const payload = await fetchJson('https://sui-rpc.publicnode.com', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'suix_getCoinMetadata', params: ['0x2::sui::SUI'] }),
-  });
-  const result = (payload as any)?.result;
-  if (!result?.symbol) throw new Error('Sui RPC returned no native coin metadata');
-  return [token('0x2::sui::SUI', result.name ?? 'Sui', result.symbol, result.decimals ?? 9, result.iconUrl, 'Sui public RPC metadata')].filter((item): item is RawToken => Boolean(item));
+  return coingeckoPlatformTokens('sui');
 }
 
 async function loadRawTokens(network: string): Promise<{ tokens: RawToken[]; source: string }> {
@@ -175,7 +168,9 @@ export async function loadNonEvmMarketTokenCatalog(network: string, forceRefresh
     const result = await loadRawTokens(network);
     rawTokens = result.tokens;
     source = result.source;
-    if (!rawTokens.length) warning = `The public directory returned no listed assets for ${network}; showing its native asset only.`;
+    if (!rawTokens.length) warning = ['Bitcoin', 'Doge', 'XRPL', 'Lighter'].includes(network)
+      ? `${network} currently has no general global token registry configured here; showing the native asset or collateral entry only.`
+      : `The public directory returned no listed assets for ${network}; showing its native asset only.`;
   } catch (error) {
     warning = `Could not load the live ${network} token registry (${error instanceof Error ? error.message : 'request failed'}). Showing the native asset where the network has one.`;
   }
