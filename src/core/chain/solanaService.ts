@@ -149,7 +149,7 @@ function parseSolAmount(amountInput: string): bigint {
 export async function previewSolanaTransfer(phraseInput: string, recipientInput: string, amountInput: string): Promise<SolanaTransferPreview> {
   const { Connection, PublicKey, SystemProgram, Transaction } = await import('@solana/web3.js');
   const keypair = await deriveSolanaKeypair(phraseInput);
-  let recipient;
+  let recipient: InstanceType<typeof PublicKey>;
   try { recipient = new PublicKey(recipientInput.trim()); } catch { throw new Error('Enter a valid Solana recipient address.'); }
   if (!recipient.toBase58()) {
     throw new Error('The recipient address is invalid.');
