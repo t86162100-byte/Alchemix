@@ -6,6 +6,7 @@ import { loadEvmNetworks, estimateNativeTransfer, readNetworkHealth, readNetwork
 import { sendNativeTransfer } from './core/chain/evmTransactionService';
 import { previewTokenTransfer, sendTokenTransfer, type TokenTransferPreview } from './core/chain/evmTokenTransactionService';
 import { discoverEvmTokenHoldings, readCommonTokenBalances, type EvmTokenHolding } from './core/chain/evmTokenPortfolioService';
+import { loadEvmMarketTokenCatalog, clearEvmMarketTokenCache, type EvmMarketToken } from './core/chain/evmMarketTokenService';
 import { readSolanaSnapshot, type SolanaSnapshot } from './core/chain/solanaService';
 import { readTronSnapshot, type TronSnapshot } from './core/chain/tronService';
 import { readBitcoinSnapshot, type BitcoinSnapshot } from './core/chain/bitcoinService';
@@ -195,6 +196,14 @@ export default function App() {
   const [tokenPortfolioError, setTokenPortfolioError] = useState('');
   const [tokenPortfolioUpdatedAt, setTokenPortfolioUpdatedAt] = useState('');
   const [tokenSearch, setTokenSearch] = useState('');
+  const [marketTokens, setMarketTokens] = useState<EvmMarketToken[]>([]);
+  const [marketSearch, setMarketSearch] = useState('');
+  const [marketLoading, setMarketLoading] = useState(false);
+  const [marketError, setMarketError] = useState('');
+  const [marketUpdatedAt, setMarketUpdatedAt] = useState('');
+  const [marketVisibleCount, setMarketVisibleCount] = useState(60);
+  const [swapInputToken, setSwapInputToken] = useState<EvmMarketToken | null>(null);
+  const [swapOutputToken, setSwapOutputToken] = useState<EvmMarketToken | null>(null);
   const [networkStatus, setNetworkStatus] = useState<'idle' | 'loading' | 'connected' | 'error'>('idle');
   const [networkError, setNetworkError] = useState('');
   const [activeRpcUrl, setActiveRpcUrl] = useState('');
@@ -261,6 +270,37 @@ export default function App() {
   useEffect(() => {
     if (address && selectedNetwork) void discoverTokens();
   }, [address, selectedNetwork, discoverTokens]);
+
+  const loadMarketCatalog = useCallback(async (forceRefresh = false) => {
+    if (!selectedNetwork) {
+      setMarketTokens([]);
+      setMarketError('Choose a supported EVM network to load its token directory.');
+      return;
+    }
+    setMarketLoading(true);
+    setMarketError('');
+    try {
+      if (forceRefresh) clearEvmMarketTokenCache(selectedNetwork.chainId);
+      const tokens = await loadEvmMarketTokenCatalog(selectedNetwork.chainId, selectedNetwork.name);
+      setMarketTokens(tokens);
+      setMarketUpdatedAt(new Date().toISOString());
+      setMarketVisibleCount(60);
+    } catch (e) {
+      setMarketTokens([]);
+      setMarketError(e instanceof Error ? e.message : 'Could not load the live token directory.');
+    } finally {
+      setMarketLoading(false);
+    }
+  }, [selectedNetwork]);
+
+  useEffect(() => {
+    if (activeTab === 'Market' && selectedNetwork) void loadMarketCatalog();
+  }, [activeTab, selectedNetwork, loadMarketCatalog]);
+
+  const filteredMarketTokens = marketTokens.filter(token => (
+    `${token.name} ${token.symbol} ${token.address}`.toLowerCase().includes(marketSearch.trim().toLowerCase())
+  ));
+  const visibleMarketTokens = filteredMarketTokens.slice(0, marketVisibleCount);
 
   const refreshNetwork = async () => {
     if (selectedOtherNetwork === 'HyperLiquid L1') {
@@ -626,7 +666,7 @@ export default function App() {
     <aside className={`sidebar ${mobileNav ? 'sidebar-open' : ''}`}>
       <div className="brand"><div className="brand-mark"><Sparkles size={21} strokeWidth={2.4}/></div><span>ferra<span className="brand-light">wallet</span></span><button className="mobile-close icon-button" onClick={() => setMobileNav(false)} aria-label="Close menu"><X size={19}/></button></div>
       <div className="workspace-label">WALLET</div>
-      <nav className="main-nav">{navItems.map(item => <button key={item.name} className={`nav-item ${activeTab === item.name ? 'active' : ''}`} onClick={() => { setActiveTab(item.name); setMobileNav(false); if (item.name === 'Swap' || item.name === 'Explore') setNotice('This feature is not enabled in the clean wallet foundation yet.'); }}><item.icon size={19}/><span>{item.label}</span>{item.name === 'Swap' && <span className="soon-tag">SOON</span>}</button>)}</nav>
+      <nav className="main-nav">{navItems.map(item => <button key={item.name} className={`nav-item ${activeTab === item.name ? 'active' : ''}`} onClick={() => { setActiveTab(item.name); setMobileNav(false); }}><item.icon size={19}/><span>{item.label}</span>{item.name === 'Swap' && <span className="soon-tag">SOON</span>}</button>)}</nav>
       <div className="sidebar-bottom"><div className="security-card"><div className="security-icon"><ShieldCheck size={19}/></div><div><strong>Your keys, your control</strong><p>Encrypted wallet data stays in this browser.</p></div></div><button className="nav-item" onClick={() => setModal('help')}><CircleHelp size={19}/><span>Help & security</span></button><button className="nav-item" onClick={() => setNotice('Settings are not part of this foundation phase.')}><Settings2 size={19}/><span>Settings</span></button><div className="profile-row"><div className="profile-avatar">F</div><div className="profile-info"><strong>Ferra Wallet</strong><span>{address ? shortAddress(address) : 'Self-custody foundation'}</span></div><button className="icon-button" onClick={() => setModal('wallet')} aria-label="Wallet options"><ChevronDown size={17}/></button></div></div>
     </aside>
     {mobileNav && <button className="mobile-overlay" onClick={() => setMobileNav(false)} aria-label="Close navigation"/>}
@@ -634,7 +674,34 @@ export default function App() {
       {activeTab === 'Overview' && <header className="sire-home-header"><button type="button" className="sire-home-icon sire-home-profile-button" aria-label="Wallet profile" onClick={() => setModal('wallet')}><Wallet size={22}/></button><div className="sire-home-header-actions"><button type="button" className="sire-home-icon" aria-label="Search" onClick={() => setNotice('Search will be added in a later phase.')}><Search size={21}/></button><button type="button" className="sire-home-icon" aria-label="Notifications" onClick={() => setNotice('You’re all caught up.')}><Bell size={21}/></button><button type="button" className="sire-home-icon" aria-label="Help" onClick={() => setModal('help')}><CircleHelp size={22}/></button></div></header>}
       {activeTab !== 'Overview' && <div className="home-wallet-controls"><div className="breadcrumb">Ferra Wallet <span>/</span> <strong>{activeTab}</strong></div><div className="topbar-actions">{address ? <button className="connect-button connected" onClick={() => setNotice('Wallet is unlocked in this session: ' + shortAddress(address))}><span className="connected-dot"/>{shortAddress(address)}<ChevronDown size={15}/></button> : <button className="connect-button" onClick={() => setModal('wallet')}><Wallet size={16}/>{keystoreExists ? 'Unlock wallet' : 'Create / import'}</button>}</div></div>}
       <div className={`page-wrap ${activeTab === 'Overview' ? 'overview-page-wrap' : ''}`}>
-        {activeTab === 'Market' ? <section className="panel activity-panel"><div className="panel-heading"><div><h2>Market</h2><p>Market data will be connected in a separate, verified phase.</p></div><span className="market-placeholder-tag">PLANNED</span></div><div className="market-empty">No external market feeds are connected in this clean foundation build.</div></section> : activeTab === 'Activity' ? <section className="panel activity-panel activity-page"><div className="panel-heading"><div><h2>History</h2><p>Wallet activity</p></div><span className="market-placeholder-tag">ACTIVITY</span></div><div className="market-empty">Transaction history is not connected yet.</div></section> : activeTab === 'Wallet' ? <section className="panel activity-panel"><div className="panel-heading"><div><h2>Your wallet</h2><p>Manage your local self-custody wallet.</p></div></div><p className="modal-description">{address ? address : 'No wallet is currently unlocked.'}</p><button className="primary-button" onClick={() => setModal('wallet')}>{address ? 'Wallet options' : keystoreExists ? 'Unlock wallet' : 'Create or import wallet'} <ArrowRight size={16}/></button></section> : <>
+        {activeTab === 'Market' ? <section className="panel activity-panel dynamic-market-panel">
+            <div className="panel-heading">
+              <div><h2>Token market</h2><p>Live token directory loaded from a public token-list registry for the selected EVM chain.</p></div>
+              <button type="button" className="panel-action" onClick={() => void loadMarketCatalog(true)} disabled={marketLoading || !selectedNetwork}>{marketLoading ? 'Loading…' : 'Refresh directory'} <Activity size={13}/></button>
+            </div>
+            <div className="market-network-bar">
+              <div><span className="form-label">Network</span><strong>{selectedNetwork ? `${selectedNetwork.name} · chain ${selectedNetwork.chainId}` : 'Choose an EVM network'}</strong></div>
+              <button type="button" className="panel-action" onClick={() => { setNetworkDrawerSearch(''); setNetworkDrawerCategory('EVM'); setNetworkDrawerOpen(true); }}><Globe2 size={14}/> Change network</button>
+            </div>
+            <label className="evm-assets-search market-search"><Search size={16}/><input type="search" value={marketSearch} onChange={event => { setMarketSearch(event.target.value); setMarketVisibleCount(60); }} placeholder="Search token name, symbol or contract" aria-label="Search market tokens"/></label>
+            <div className="market-registry-note"><ShieldCheck size={14}/><span>Token metadata is fetched dynamically and cached for 30 minutes. Listing a token does not mean it is safe, liquid, or tradable. Prices and executable swap routes are not supplied by this token-list feed.</span></div>
+            {marketError && <p className="wallet-error" role="alert">{marketError}</p>}
+            {marketLoading && <div className="empty-inline">Loading token directory for {selectedNetwork?.name ?? 'selected network'}…</div>}
+            {!selectedNetwork && !marketLoading && <div className="empty-inline">Select an EVM network to discover its token directory.</div>}
+            {selectedNetwork && !marketLoading && !marketError && <>
+              <div className="market-list-header"><span>{filteredMarketTokens.length.toLocaleString()} token(s) {marketSearch.trim() ? 'matching search' : 'in directory'}</span><span>{marketUpdatedAt ? `Updated ${new Date(marketUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Cached registry'}</span></div>
+              <div className="market-token-list">
+                {visibleMarketTokens.map(token => <div className="market-token-row" key={`${token.chainId}:${token.address.toLowerCase()}`}>
+                  <span className="market-token-logo">{token.logoURI ? <img src={token.logoURI} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }}/> : token.symbol.slice(0, 2).toUpperCase()}</span>
+                  <span className="market-token-main"><strong>{token.name}</strong><small>{token.symbol} · {token.decimals} decimals</small><small className="market-token-address">{token.address}</small></span>
+                  <span className="market-token-actions"><button type="button" className="evm-token-send" onClick={() => { setTxKind('token'); setTxTokenAddress(token.address); setTxAmount(''); setTxEstimate(null); setTokenPreview(null); setTxConfirmed(false); setTxHash(''); setTxError(''); setActiveTab('Overview'); setNotice(`${token.symbol} selected on ${selectedNetwork.name}. Verify the contract before sending.`); }}>Send</button><button type="button" className="market-use-button" onClick={() => { setSwapInputToken(token); setActiveTab('Swap'); setNotice(`${token.symbol} selected as the swap input token. A live quote provider is required before trades can be executed.`); }}>Use in swap</button></span>
+                </div>)}
+                {!visibleMarketTokens.length && <div className="empty-inline">{marketSearch.trim() ? 'No tokens match this search. Try the full contract address or a different spelling.' : 'The registry returned no tokens for this chain.'}</div>}
+              </div>
+              {visibleMarketTokens.length < filteredMarketTokens.length && <button type="button" className="market-load-more" onClick={() => setMarketVisibleCount(count => count + 60)}>Load more tokens ({filteredMarketTokens.length - visibleMarketTokens.length} remaining)</button>}
+            </>}
+            <div className="asset-footer"><span>Source: CoinGecko token-list registry</span><span>Chain-specific directory · not a wallet balance list</span></div>
+          </section> : activeTab === 'Swap' ? <section className="panel activity-panel dynamic-market-panel"><div className="panel-heading"><div><h2>Swap tokens</h2><p>Select tokens from the live directory. Execution remains disabled until a secure quote and transaction provider is configured.</p></div><span className="market-placeholder-tag">ROUTING REQUIRED</span></div><div className="swap-selection-card"><div><span className="form-label">From token</span><strong>{swapInputToken ? `${swapInputToken.name} (${swapInputToken.symbol})` : 'Select an input token from Market'}</strong>{swapInputToken && <small>{swapInputToken.address} · chain {swapInputToken.chainId}</small>}</div><div><span className="form-label">To token</span><strong>{swapOutputToken ? `${swapOutputToken.name} (${swapOutputToken.symbol})` : 'Choose a token below'}</strong>{swapOutputToken && <small>{swapOutputToken.address} · chain {swapOutputToken.chainId}</small>}</div></div><label className="form-label" htmlFor="ferra-swap-output">Output token from current network directory</label><select id="ferra-swap-output" className="form-input" value={swapOutputToken?.address ?? ''} onChange={event => setSwapOutputToken(marketTokens.find(token => token.address.toLowerCase() === event.target.value.toLowerCase()) ?? null)}><option value="">Choose output token</option>{marketTokens.filter(token => token.address.toLowerCase() !== swapInputToken?.address.toLowerCase()).map(token => <option key={token.address} value={token.address}>{token.name} ({token.symbol})</option>)}</select><p className="chain-disclaimer">Token selection is connected to the dynamic market directory. No swap will be quoted or submitted until Ferra has a configured routing provider, approval checks, simulation, and a verified signing flow. Never enter a seed phrase or private key into a trading service.</p><button type="button" className="primary-button" onClick={() => setActiveTab('Market')}>Browse market tokens <ArrowRight size={16}/></button></section> : activeTab === 'Activity' ? <section className="panel activity-panel activity-page"><div className="panel-heading"><div><h2>History</h2><p>Wallet activity</p></div><span className="market-placeholder-tag">ACTIVITY</span></div><div className="market-empty">Transaction history is not connected yet.</div></section> : activeTab === 'Wallet' ? <section className="panel activity-panel"><div className="panel-heading"><div><h2>Your wallet</h2><p>Manage your local self-custody wallet.</p></div></div><p className="modal-description">{address ? address : 'No wallet is currently unlocked.'}</p><button className="primary-button" onClick={() => setModal('wallet')}>{address ? 'Wallet options' : keystoreExists ? 'Unlock wallet' : 'Create or import wallet'} <ArrowRight size={16}/></button></section> : <>
           <div className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-line"/> YOUR WEB3 HOME</div><h1>Your crypto, clearly.</h1><p className="page-subtitle">One calm place to see and manage your digital assets.</p></div><button className="refresh-button" onClick={() => address ? document.getElementById('evm-assets-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) : setModal('wallet')}><span>{address ? 'View assets' : 'Get started'}</span><ArrowUpRight size={15}/></button></div>
           <section className="sire-home-value-card" aria-label="Total account value"><div className="sire-home-value-main"><div className="sire-home-value-copy"><div className="sire-home-value-card-top"><span>NATIVE BALANCE</span><button type="button" className="sire-home-value-eye" aria-label={totalValueVisible ? 'Hide balance' : 'Show balance'} onClick={() => setTotalValueVisible(value => !value)}>{totalValueVisible ? <Eye size={17}/> : <EyeOff size={17}/>}</button></div><div className="sire-home-value-amount">{totalValueVisible ? (selectedOtherNetwork === 'Solana' && solanaSnapshot ? `${formatEthForDisplay(solanaSnapshot.balanceSol)} SOL` : selectedOtherNetwork === 'Tron' && tronSnapshot ? `${formatEthForDisplay(tronSnapshot.balanceTrx)} TRX` : selectedOtherNetwork === 'Bitcoin' && bitcoinSnapshot ? `${formatEthForDisplay(bitcoinSnapshot.balanceBtc)} BTC` : selectedOtherNetwork === 'Ton' && tonSnapshot ? `${formatEthForDisplay(tonSnapshot.balanceTon)} TON` : selectedOtherNetwork === 'Stellar' && stellarSnapshot ? `${formatEthForDisplay(stellarSnapshot.balanceXlm)} XLM` : selectedOtherNetwork === 'Aptos' && aptosSnapshot ? `${formatEthForDisplay(aptosSnapshot.balanceApt)} APT` : selectedOtherNetwork === 'Cosmos' && cosmosSnapshot ? `${formatEthForDisplay(cosmosSnapshot.balanceAtom)} ATOM` : selectedOtherNetwork === 'Doge' && dogeSnapshot ? `${formatEthForDisplay(dogeSnapshot.balanceDoge)} DOGE` : selectedOtherNetwork === 'XRPL' && xrplSnapshot ? `${formatEthForDisplay(xrplSnapshot.balanceXrp)} XRP` : selectedOtherNetwork === 'SUI' && suiSnapshot ? `${formatEthForDisplay(suiSnapshot.balanceSui)} SUI` : selectedOtherNetwork === 'HyperLiquid L1' && hyperLiquidSnapshot ? `${formatEthForDisplay(hyperLiquidSnapshot.balanceHype)} HYPE` : selectedOtherNetwork === 'Lighter' && lighterSnapshot ? `${Number(lighterSnapshot.collateralUsd).toLocaleString('en-US', { maximumFractionDigits: 2 })} collateral` : networkSnapshot && selectedNetwork ? `${formatEthForDisplay(networkSnapshot.balanceEth)} ${selectedNetwork?.symbol ?? '—'}` : networkStatus === 'error' ? 'Unavailable' : registryLoading ? 'Loading networks…' : '—') : '••••••'}</div><div className="page-subtitle">{selectedChainAddress ? shortAddress(selectedChainAddress) : 'Create or unlock a wallet to get started'}</div></div><div className="sire-home-value-chart" aria-hidden="true"><svg viewBox="0 0 320 100" preserveAspectRatio="none"><defs><linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="currentColor" stopOpacity=".18"/><stop offset="100%" stopColor="currentColor" stopOpacity="0"/></linearGradient></defs><path d="M0 78 C35 75,45 68,72 71 S110 62,132 66 S165 48,188 53 S220 39,242 45 S278 25,320 31 L320 100 L0 100 Z" fill="url(#balanceGradient)"/><path d="M0 78 C35 75,45 68,72 71 S110 62,132 66 S165 48,188 53 S220 39,242 45 S278 25,320 31" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div></div><button type="button" className="sire-home-value-add-funds" onClick={() => setModal('wallet')}>{address ? 'Wallet options' : 'Get started'}</button></section>
           <section className="panel activity-panel chain-panel">
