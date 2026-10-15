@@ -16,8 +16,8 @@ export const EVM_NETWORKS: EvmNetwork[] = [
     name: 'Ethereum Mainnet',
     chainId: 1,
     symbol: 'ETH',
-    rpcUrl: 'https://rpc.ankr.com/eth',
-    fallbackRpcUrls: ['https://1rpc.io/eth', 'https://cloudflare-eth.com'],
+    rpcUrl: 'https://public.1rpc.io/eth',
+    fallbackRpcUrls: ['https://ethereum-rpc.publicnode.com', 'https://cloudflare-eth.com'],
     explorerUrl: 'https://etherscan.io',
   },
   {
@@ -128,7 +128,7 @@ export async function estimateNativeTransfer(
 ): Promise<TransferEstimate> {
   if (!isAddress(fromAddress)) throw new Error('Unlock your wallet to use its public address.');
   if (!isAddress(recipientInput.trim())) throw new Error('Enter a valid recipient EVM address.');
-  if (!amountInput.trim() || !/^\\d+(?:\\.\\d{1,18})?$/.test(amountInput.trim())) {
+  if (!amountInput.trim() || !/^\d+(?:\.\d{1,18})?$/.test(amountInput.trim())) {
     throw new Error('Enter a valid ETH amount with up to 18 decimal places.');
   }
   const value = parseEther(amountInput.trim());
