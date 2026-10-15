@@ -1,5 +1,8 @@
 export type EvmMarketToken = {
   chainId: number;
+  networkKey?: string;
+  networkName?: string;
+  networkType?: 'EVM' | 'Other';
   address: string;
   name: string;
   symbol: string;
