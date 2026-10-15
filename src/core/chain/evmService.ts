@@ -74,10 +74,6 @@ export type TransferEstimate = {
   totalRequiredEth: string;
 };
 
-function cleanDecimal(value: string): string {
-  return Number(value).toLocaleString('en-US', { maximumFractionDigits: 8, useGrouping: false });
-}
-
 /**
  * Prepares and estimates a native ETH transfer without signing or broadcasting it.
  * No wallet object or private key is accepted by this function.
@@ -118,7 +114,7 @@ export async function estimateNativeTransfer(
     const fee = gasLimit * feePerGas;
     return {
       to: recipientInput.trim(),
-      amountEth: cleanDecimal(amountInput.trim()),
+      amountEth: amountInput.trim(),
       chainId: network.chainId,
       gasLimit: gasLimit.toString(),
       maxFeePerGasWei: feeData.maxFeePerGas?.toString() ?? null,
