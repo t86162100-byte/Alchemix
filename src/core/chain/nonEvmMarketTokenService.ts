@@ -209,6 +209,7 @@ export async function loadNonEvmMarketTokenCatalog(network: string, forceRefresh
     const result = await loadRawTokens(network);
     rawTokens = result.tokens;
     source = result.source;
+    warning = result.warning ?? '';
     if (!rawTokens.length) warning = ['Bitcoin', 'Doge', 'XRPL', 'Lighter'].includes(network)
       ? `${network} currently has no general global token registry configured here; showing the native asset or collateral entry only.`
       : `The public directory returned no listed assets for ${network}; showing its native asset only.`;
