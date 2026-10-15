@@ -63,12 +63,53 @@ function token(address: unknown, name: unknown, symbol: unknown, decimals: unkno
   return validRawToken(candidate) ? candidate : null;
 }
 
-async function solanaTokens(): Promise<RawToken[]> {
-  const payload = await fetchJson('https://tokens.jup.ag/tokens?tags=verified');
-  if (!Array.isArray(payload)) throw new Error('Jupiter returned an unexpected token list');
-  return payload.map((item: any) => token(item?.address, item?.name, item?.symbol, item?.decimals, item?.logoURI, 'Jupiter verified token list')).filter((item): item is RawToken => Boolean(item));
+async function geckoTerminalSolanaTokens(): Promise<RawToken[]> {
+  const discovered: RawToken[] = [];
+  const seen = new Set<string>();
+  // GeckoTerminal is a public fallback with no API key. Load several pages so
+  // the directory remains useful even if Jupiter's legacy list endpoint is unavailable.
+  for (let page = 1; page <= 5; page += 1) {
+    const payload = await fetchJson(`https://api.geckoterminal.com/api/v2/networks/solana/tokens?page=${page}`);
+    const records = (payload as any)?.data;
+    if (!Array.isArray(records)) throw new Error('GeckoTerminal returned an unexpected Solana token list');
+    for (const item of records) {
+      const attrs = item?.attributes;
+      const address = typeof attrs?.address === 'string'
+        ? attrs.address
+        : typeof item?.id === 'string' ? item.id.replace(/^solana_/, '') : '';
+      const candidate = token(address, attrs?.name, attrs?.symbol, attrs?.decimals, attrs?.image_url, 'GeckoTerminal Solana token directory');
+      if (!candidate || seen.has(candidate.address)) continue;
+      seen.add(candidate.address);
+      discovered.push(candidate);
+    }
+    if (records.length === 0) break;
+  }
+  if (!discovered.length) throw new Error('GeckoTerminal returned no usable Solana token metadata');
+  return discovered;
 }
 
+async function solanaTokens(): Promise<{ tokens: RawToken[]; source: string; warning?: string }> {
+  try {
+    const payload = await fetchJson('https://tokens.jup.ag/tokens?tags=verified');
+    if (!Array.isArray(payload)) throw new Error('Jupiter returned an unexpected token list');
+    const tokens = payload.map((item: any) => token(item?.address, item?.name, item?.symbol, item?.decimals, item?.logoURI, 'Jupiter verified token list')).filter((item): item is RawToken => Boolean(item));
+    if (tokens.length < 2) throw new Error('Jupiter legacy endpoint returned too few tokens');
+    return { tokens, source: 'Jupiter verified token list' };
+  } catch (jupiterError) {
+    try {
+      const tokens = await geckoTerminalSolanaTokens();
+      return {
+        tokens,
+        source: 'GeckoTerminal Solana token directory (public fallback)',
+        warning: `Jupiter's legacy token list was unavailable; showing assets discovered from GeckoTerminal instead. Token metadata is not a safety guarantee.`,
+      };
+    } catch (fallbackError) {
+      const primaryMessage = jupiterError instanceof Error ? jupiterError.message : 'Jupiter request failed';
+      const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : 'GeckoTerminal request failed';
+      throw new Error(`Jupiter token list failed (${primaryMessage}); public fallback failed (${fallbackMessage}).`);
+    }
+  }
+}
 async function tronTokens(): Promise<RawToken[]> {
   const payload = await fetchJson('https://apilist.tronscanapi.com/api/token?sort=-marketcap&limit=200&start=0');
   const records = (payload as any)?.data;
@@ -142,7 +183,7 @@ async function suiTokens(): Promise<RawToken[]> {
 
 async function loadRawTokens(network: string): Promise<{ tokens: RawToken[]; source: string }> {
   switch (network) {
-    case 'Solana': return { tokens: await solanaTokens(), source: 'Jupiter verified token list' };
+    case 'Solana': return await solanaTokens();
     case 'Tron': return { tokens: await tronTokens(), source: 'TronScan public token directory' };
     case 'Stellar': return { tokens: await stellarTokens(), source: 'Stellar Horizon issued-asset directory' };
     case 'Ton': return { tokens: await tonTokens(), source: 'TON API jetton directory' };
