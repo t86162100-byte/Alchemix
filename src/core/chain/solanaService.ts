@@ -1,4 +1,9 @@
 import { Mnemonic, formatUnits } from 'ethers';
+import process from 'process';
+
+// Some Solana transitive dependencies still reference Node's process global.
+// Install the browser-safe shim before importing those libraries dynamically.
+(globalThis as typeof globalThis & { process?: typeof process }).process ??= process;
 
 export const SOLANA_DERIVATION_PATH = "m/44'/501'/0'/0'";
 
