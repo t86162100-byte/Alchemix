@@ -61,7 +61,7 @@ export async function loadEvmNetworks(forceRefresh = false): Promise<EvmNetwork[
     const explorerUrl = (raw.explorers ?? []).map(item => item?.url?.trim() ?? '')
       .find(url => /^https:\/\//i.test(url)) ?? existing?.explorerUrl ?? '';
     if (existing) {
-      existing.fallbackRpcUrls = [...new Set([...existing.fallbackRpcUrls, ...uniqueUrls])].filter(url => url !== existing.rpcUrl);
+      existing.fallbackRpcUrls = [...new Set([...existing.fallbackRpcUrls, ...uniqueUrls])].filter(url => url !== existing.rpcUrl).slice(0, 3);
       if (!existing.explorerUrl && explorerUrl) existing.explorerUrl = explorerUrl;
       continue;
     }
@@ -72,7 +72,7 @@ export async function loadEvmNetworks(forceRefresh = false): Promise<EvmNetwork[
       symbol,
       decimals,
       rpcUrl: uniqueUrls[0],
-      fallbackRpcUrls: uniqueUrls.slice(1),
+      fallbackRpcUrls: uniqueUrls.slice(1, 4),
       explorerUrl,
     });
   }
@@ -172,7 +172,7 @@ export type TransferEstimate = {
   rpcUrl: string;
 };
 
-/** Estimate a native ETH transfer. This never signs or broadcasts a transaction. */
+/** Estimate a native-coin transfer. This never signs or broadcasts a transaction. */
 export async function estimateNativeTransfer(
   network: EvmNetwork,
   fromAddress: string,
