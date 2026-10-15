@@ -1,4 +1,4 @@
-import { Mnemonic, formatUnits } from 'ethers';
+import { Mnemonic, formatUnits, parseUnits } from 'ethers';
 
 export const SOLANA_DERIVATION_PATH = "m/44'/501'/0'/0'";
 
@@ -68,15 +68,20 @@ async function deriveEd25519Seed(seedHex: string): Promise<Uint8Array> {
 }
 
 /** Derive the first Solana account from a BIP-39 phrase using a hardened Ed25519 path. */
-export async function deriveSolanaAddress(phraseInput: string): Promise<string> {
-  const phrase = phraseInput.trim().toLowerCase().replace(/\s+/g, ' ');
+export async function deriveSolanaKeypair(phraseInput: string) {
+  const phrase = phraseInput.trim().toLowerCase().replace(/\\s+/g, ' ');
   if (!Mnemonic.isValidMnemonic(phrase)) {
     throw new Error('A valid recovery phrase is required to derive the Solana account.');
   }
-  const [{ Keypair }] = await Promise.all([import('@solana/web3.js')]);
+  const { Keypair } = await import('@solana/web3.js');
   const seedHex = Mnemonic.fromPhrase(phrase).computeSeed().replace(/^0x/, '');
   const derivedSeed = await deriveEd25519Seed(seedHex);
-  return Keypair.fromSeed(derivedSeed).publicKey.toBase58();
+  return Keypair.fromSeed(derivedSeed);
+}
+
+export async function deriveSolanaAddress(phraseInput: string): Promise<string> {
+  const keypair = await deriveSolanaKeypair(phraseInput);
+  return keypair.publicKey.toBase58();
 }
 
 /** Read-only SOL balance lookup. Only the derived public address is sent to RPC. */
@@ -112,4 +117,113 @@ export async function readSolanaSnapshot(phraseInput: string): Promise<SolanaSna
     }
     throw new Error(`Solana RPC request failed: ${message}`);
   }
+}
+
+
+export type SolanaTransferPreview = {
+  from: string;
+  to: string;
+  amountSol: string;
+  amountLamports: string;
+  estimatedFeeSol: string;
+  estimatedFeeLamports: string;
+  totalRequiredSol: string;
+  totalRequiredLamports: string;
+  balanceSol: string;
+  rpcUrl: string;
+  blockhash: string;
+  lastValidBlockHeight: number;
+};
+
+function parseSolAmount(amountInput: string): bigint {
+  const value = amountInput.trim();
+  if (!/^\\d+(?:\\.\\d{1,9})?$/.test(value)) {
+    throw new Error('Enter a positive SOL amount with no more than 9 decimal places.');
+  }
+  let amount: bigint;
+  try { amount = parseUnits(value, 9); } catch { throw new Error('Enter a valid SOL amount.'); }
+  if (amount <= 0n) throw new Error('The transfer amount must be greater than zero.');
+  return amount;
+}
+
+export async function previewSolanaTransfer(phraseInput: string, recipientInput: string, amountInput: string): Promise<SolanaTransferPreview> {
+  const { Connection, PublicKey, SystemProgram, Transaction } = await import('@solana/web3.js');
+  const keypair = await deriveSolanaKeypair(phraseInput);
+  let recipient;
+  try { recipient = new PublicKey(recipientInput.trim()); } catch { throw new Error('Enter a valid Solana recipient address.'); }
+  if (!recipient.toBase58() || !PublicKey.isOnCurve(recipient.toBytes()) && recipient.equals(keypair.publicKey)) {
+    throw new Error('The recipient address is invalid.');
+  }
+  if (recipient.equals(keypair.publicKey)) throw new Error('Sending SOL to the same wallet address is not allowed.');
+  const amountLamports = parseSolAmount(amountInput);
+  const rpcUrl = getSolanaRpcUrl();
+  const connection = new Connection(rpcUrl, { commitment: 'confirmed', confirmTransactionInitialTimeout: 30_000 });
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash('confirmed');
+  const transaction = new Transaction({
+    feePayer: keypair.publicKey,
+    recentBlockhash: blockhash,
+  }).add(SystemProgram.transfer({
+    fromPubkey: keypair.publicKey,
+    toPubkey: recipient,
+    lamports: amountLamports,
+  }));
+  const fee = await connection.getFeeForMessage(transaction.compileMessage(), 'confirmed');
+  if (fee.value === null) throw new Error('Solana RPC could not estimate the transaction fee. Try again shortly.');
+  const balance = BigInt(await connection.getBalance(keypair.publicKey, 'confirmed'));
+  const totalRequired = amountLamports + BigInt(fee.value);
+  if (balance < totalRequired) {
+    throw new Error(`Insufficient SOL. This transfer requires ${formatUnits(totalRequired, 9)} SOL including the estimated network fee; the available balance is ${formatUnits(balance, 9)} SOL.`);
+  }
+  return {
+    from: keypair.publicKey.toBase58(),
+    to: recipient.toBase58(),
+    amountSol: formatUnits(amountLamports, 9),
+    amountLamports: amountLamports.toString(),
+    estimatedFeeSol: formatUnits(BigInt(fee.value), 9),
+    estimatedFeeLamports: String(fee.value),
+    totalRequiredSol: formatUnits(totalRequired, 9),
+    totalRequiredLamports: totalRequired.toString(),
+    balanceSol: formatUnits(balance, 9),
+    rpcUrl,
+    blockhash,
+    lastValidBlockHeight,
+  };
+}
+
+export async function sendSolanaTransfer(
+  phraseInput: string,
+  recipientInput: string,
+  amountInput: string,
+  userConfirmed: boolean,
+): Promise<{ signature: string; preview: SolanaTransferPreview }> {
+  if (!userConfirmed) throw new Error('Review the transfer and confirm before signing.');
+  const preview = await previewSolanaTransfer(phraseInput, recipientInput, amountInput);
+  const { Connection, SystemProgram, Transaction } = await import('@solana/web3.js');
+  const keypair = await deriveSolanaKeypair(phraseInput);
+  if (keypair.publicKey.toBase58() !== preview.from) throw new Error('The active wallet changed. Review the transfer again.');
+  const connection = new Connection(preview.rpcUrl, { commitment: 'confirmed', confirmTransactionInitialTimeout: 30_000 });
+  const transaction = new Transaction({
+    feePayer: keypair.publicKey,
+    recentBlockhash: preview.blockhash,
+  }).add(SystemProgram.transfer({
+    fromPubkey: keypair.publicKey,
+    toPubkey: (await import('@solana/web3.js')).PublicKey.fromBase58(preview.to),
+    lamports: BigInt(preview.amountLamports),
+  }));
+  const signature = await connection.sendTransaction(transaction, [keypair], {
+    skipPreflight: false,
+    preflightCommitment: 'confirmed',
+    maxRetries: 3,
+  });
+  // Submission is reported separately from finality; never automatically retry a timed-out send.
+  try {
+    await connection.confirmTransaction({
+      signature,
+      blockhash: preview.blockhash,
+      lastValidBlockHeight: preview.lastValidBlockHeight,
+    }, 'confirmed');
+  } catch {
+    // The signature is still returned so the user can inspect the explorer and avoid duplicate sends.
+  }
+  return { signature, preview };
 }
