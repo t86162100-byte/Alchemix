@@ -302,6 +302,11 @@ export default function App() {
   ));
   const visibleMarketTokens = filteredMarketTokens.slice(0, marketVisibleCount);
 
+  useEffect(() => {
+    if (swapInputToken && swapInputToken.chainId !== selectedNetwork?.chainId) setSwapInputToken(null);
+    if (swapOutputToken && swapOutputToken.chainId !== selectedNetwork?.chainId) setSwapOutputToken(null);
+  }, [selectedNetwork?.chainId, swapInputToken, swapOutputToken]);
+
   const refreshNetwork = async () => {
     if (selectedOtherNetwork === 'HyperLiquid L1') {
       if (!address) { setNetworkStatus('error'); setNetworkError('Unlock the wallet to load its HyperLiquid L1 account.'); return; }
