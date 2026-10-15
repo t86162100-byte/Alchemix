@@ -1354,3 +1354,25 @@ button:active, a:active, [role="button"]:active {
   font-size: 10px;
   font-weight: 700;
 }
+
+
+/* Live EVM RPC and native balance panels; preserve the existing dashboard visual system. */
+.chain-panel { display:flex; flex-direction:column; gap:11px; }
+.chain-controls { display:flex; flex-direction:column; gap:9px; }
+.chain-select { appearance:auto; }
+.chain-select option { color:#111; background:#fff; }
+.chain-status { display:flex; align-items:center; gap:8px; min-height:34px; color:rgba(255,255,255,.58); font-size:11px; }
+.chain-status-dot { width:7px; height:7px; flex:0 0 7px; border-radius:50%; background:#777; }
+.chain-status.connected .chain-status-dot { background:#65d6a0; box-shadow:0 0 9px rgba(101,214,160,.25); }
+.chain-status.error .chain-status-dot { background:#ff7777; }
+.chain-status.loading .chain-status-dot { background:#e5c36c; }
+.chain-meta { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:10px 0; border-top:1px solid rgba(255,255,255,.08); font-size:11px; }
+.chain-meta span { color:rgba(255,255,255,.45); }
+.chain-meta strong { max-width:68%; overflow-wrap:anywhere; color:rgba(255,255,255,.78); text-align:right; font-weight:600; }
+.chain-disclaimer { margin:2px 0 0; color:rgba(255,255,255,.4); font-size:10px; line-height:1.65; }
+.tx-estimate { display:flex; flex-direction:column; gap:0; margin-top:6px; padding:12px; border:1px solid rgba(255,255,255,.1); border-radius:13px; background:rgba(255,255,255,.025); }
+.tx-estimate > div { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; padding:9px 0; border-bottom:1px solid rgba(255,255,255,.07); font-size:11px; }
+.tx-estimate > div span { color:rgba(255,255,255,.45); }
+.tx-estimate > div strong { max-width:62%; color:rgba(255,255,255,.88); text-align:right; overflow-wrap:anywhere; font-weight:650; }
+.tx-estimate .chain-disclaimer { padding-top:7px; }
+.chain-panel .panel-action:disabled { opacity:.45; cursor:wait; }
