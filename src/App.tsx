@@ -181,6 +181,7 @@ export default function App() {
   const [solanaSnapshot, setSolanaSnapshot] = useState<SolanaSnapshot | null>(null);
   const [solanaTransferPreview, setSolanaTransferPreview] = useState<SolanaTransferPreview | null>(null);
   const [solanaTokenHoldings, setSolanaTokenHoldings] = useState<SolanaTokenHolding[]>([]);
+  const [solanaTokenCatalog, setSolanaTokenCatalog] = useState<EvmMarketToken[]>([]);
   const [solanaTokensLoading, setSolanaTokensLoading] = useState(false);
   const [solanaTokensError, setSolanaTokensError] = useState('');
   const [solanaTokensUpdatedAt, setSolanaTokensUpdatedAt] = useState('');
@@ -611,12 +612,7 @@ export default function App() {
       // the public directory is temporarily unavailable.
       try {
         const catalog = await loadNonEvmMarketTokenCatalog('Solana');
-        setMarketTokens(current => {
-          const merged = new Map(current.map(token => [token.address.toLowerCase(), token]));
-          for (const token of catalog.tokens) merged.set(token.address.toLowerCase(), token);
-          return [...merged.values()];
-        });
-        setMarketSource(catalog.source);
+        setSolanaTokenCatalog(catalog.tokens);
       } catch {
         // Mint addresses and on-chain balances remain visible without metadata.
       }
@@ -840,7 +836,7 @@ export default function App() {
               <div className="market-list-header"><span>{solanaTokenHoldings.length} non-zero token balance(s)</span><span>Updated {new Date(solanaTokensUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
               <div className="market-token-list">
                 {solanaTokenHoldings.map(holding => {
-                  const metadata = marketTokens.find(token => token.address === holding.mint);
+                  const metadata = solanaTokenCatalog.find(token => token.address === holding.mint);
                   return <div className="market-token-row" key={holding.mint}>
                     <span className="market-token-logo">{metadata?.logoURI ? <img src={metadata.logoURI} alt="" loading="lazy" onError={event => { event.currentTarget.style.display = 'none'; }}/> : (metadata?.symbol ?? 'SPL').slice(0, 2).toUpperCase()}</span>
                     <span className="market-token-main"><strong>{metadata?.name ?? 'Unknown token'}</strong><small>{metadata?.symbol ?? 'SPL token'} · {holding.decimals} decimals · {holding.programId === 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb' ? 'Token-2022' : 'SPL Token'}</small><small className="market-token-address">{holding.mint}</small></span>
