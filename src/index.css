@@ -1469,3 +1469,13 @@ button:active, a:active, [role="button"]:active {
   .evm-token-copy small,.evm-token-balance small { font-size:8px; }
   .evm-token-send { padding:5px 8px; }
 }
+
+
+.evm-token-group-title {
+  margin: 14px 0 8px;
+  color: var(--muted, #8b95a7);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
