@@ -6,6 +6,7 @@ export type EvmNetwork = {
   chainId: number;
   symbol: 'ETH';
   rpcUrl: string;
+  fallbackRpcUrls: string[];
   explorerUrl: string;
 };
 
@@ -15,7 +16,8 @@ export const EVM_NETWORKS: EvmNetwork[] = [
     name: 'Ethereum Mainnet',
     chainId: 1,
     symbol: 'ETH',
-    rpcUrl: 'https://cloudflare-eth.com',
+    rpcUrl: 'https://rpc.ankr.com/eth',
+    fallbackRpcUrls: ['https://1rpc.io/eth', 'https://cloudflare-eth.com'],
     explorerUrl: 'https://etherscan.io',
   },
   {
@@ -24,6 +26,7 @@ export const EVM_NETWORKS: EvmNetwork[] = [
     chainId: 8453,
     symbol: 'ETH',
     rpcUrl: 'https://mainnet.base.org',
+    fallbackRpcUrls: ['https://base-rpc.publicnode.com'],
     explorerUrl: 'https://basescan.org',
   },
 ];
@@ -31,38 +34,61 @@ export const EVM_NETWORKS: EvmNetwork[] = [
 export type NetworkHealth = {
   chainId: number;
   blockNumber: number;
+  rpcUrl: string;
 };
-
-/** Verify RPC connectivity without requiring or transmitting a wallet address. */
-export async function readNetworkHealth(network: EvmNetwork): Promise<NetworkHealth> {
-  const provider = providerFor(network);
-  try {
-    const [chain, blockNumber] = await Promise.all([provider.getNetwork(), provider.getBlockNumber()]);
-    if (Number(chain.chainId) !== network.chainId) {
-      throw new Error(`RPC network mismatch: expected chain ID ${network.chainId}, received ${chain.chainId.toString()}.`);
-    }
-    return { chainId: Number(chain.chainId), blockNumber };
-  } finally {
-    provider.destroy();
-  }
-}
 
 export type NetworkSnapshot = {
   chainId: number;
   blockNumber: number;
   balanceWei: string;
   balanceEth: string;
+  rpcUrl: string;
 };
 
-function providerFor(network: EvmNetwork): JsonRpcProvider {
-  return new JsonRpcProvider(network.rpcUrl, network.chainId, { staticNetwork: true });
+function providerFor(network: EvmNetwork, rpcUrl: string): JsonRpcProvider {
+  return new JsonRpcProvider(rpcUrl, network.chainId, { staticNetwork: true });
+}
+
+function rpcUrlsFor(network: EvmNetwork): string[] {
+  return [...new Set([network.rpcUrl, ...network.fallbackRpcUrls])];
+}
+
+/** Retry read-only requests against alternate public RPCs if one is unavailable. */
+async function withRpcFallback<T>(
+  network: EvmNetwork,
+  operation: (provider: JsonRpcProvider) => Promise<T>,
+): Promise<{ value: T; rpcUrl: string }> {
+  const errors: string[] = [];
+  for (const rpcUrl of rpcUrlsFor(network)) {
+    const provider = providerFor(network, rpcUrl);
+    try {
+      const value = await operation(provider);
+      return { value, rpcUrl };
+    } catch (error) {
+      errors.push(`${rpcUrl}: ${error instanceof Error ? error.message : String(error)}`);
+    } finally {
+      provider.destroy();
+    }
+  }
+  throw new Error(`All public RPC endpoints failed for ${network.name}. ${errors.join(' | ')}`);
+}
+
+/** Verify network connectivity without requiring or transmitting a wallet address. */
+export async function readNetworkHealth(network: EvmNetwork): Promise<NetworkHealth> {
+  const result = await withRpcFallback(network, async provider => {
+    const [chain, blockNumber] = await Promise.all([provider.getNetwork(), provider.getBlockNumber()]);
+    if (Number(chain.chainId) !== network.chainId) {
+      throw new Error(`RPC network mismatch: expected chain ID ${network.chainId}, received ${chain.chainId.toString()}.`);
+    }
+    return { chainId: Number(chain.chainId), blockNumber };
+  });
+  return { ...result.value, rpcUrl: result.rpcUrl };
 }
 
 /** Read-only RPC calls. Only the public address is sent to the RPC endpoint. */
 export async function readNetworkSnapshot(network: EvmNetwork, address: string): Promise<NetworkSnapshot> {
   if (!isAddress(address)) throw new Error('The wallet address is not a valid EVM address.');
-  const provider = providerFor(network);
-  try {
+  const result = await withRpcFallback(network, async provider => {
     const [chain, blockNumber, balance] = await Promise.all([
       provider.getNetwork(),
       provider.getBlockNumber(),
@@ -77,9 +103,8 @@ export async function readNetworkSnapshot(network: EvmNetwork, address: string):
       balanceWei: balance.toString(),
       balanceEth: formatEther(balance),
     };
-  } finally {
-    provider.destroy();
-  }
+  });
+  return { ...result.value, rpcUrl: result.rpcUrl };
 }
 
 export type TransferEstimate = {
@@ -91,12 +116,10 @@ export type TransferEstimate = {
   gasPriceWei: string | null;
   estimatedFeeEth: string;
   totalRequiredEth: string;
+  rpcUrl: string;
 };
 
-/**
- * Prepares and estimates a native ETH transfer without signing or broadcasting it.
- * No wallet object or private key is accepted by this function.
- */
+/** Estimate a native ETH transfer. This never signs or broadcasts a transaction. */
 export async function estimateNativeTransfer(
   network: EvmNetwork,
   fromAddress: string,
@@ -111,8 +134,7 @@ export async function estimateNativeTransfer(
   const value = parseEther(amountInput.trim());
   if (value <= 0n) throw new Error('The transfer amount must be greater than zero.');
 
-  const provider = providerFor(network);
-  try {
+  const result = await withRpcFallback(network, async provider => {
     const chain = await provider.getNetwork();
     if (Number(chain.chainId) !== network.chainId) {
       throw new Error('The RPC provider returned the wrong network. No transaction was prepared.');
@@ -123,7 +145,6 @@ export async function estimateNativeTransfer(
       : feeData.gasPrice != null ? { gasPrice: feeData.gasPrice } : {};
     const feePerGas = feeData.maxFeePerGas ?? feeData.gasPrice;
     if (feePerGas == null) throw new Error('The network did not return usable fee data. Try again later.');
-
     const gasLimit = await provider.estimateGas({
       from: fromAddress,
       to: recipientInput.trim(),
@@ -141,7 +162,6 @@ export async function estimateNativeTransfer(
       estimatedFeeEth: formatEther(fee),
       totalRequiredEth: formatEther(value + fee),
     };
-  } finally {
-    provider.destroy();
-  }
+  });
+  return { ...result.value, rpcUrl: result.rpcUrl };
 }
