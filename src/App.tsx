@@ -3,6 +3,8 @@ import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell
 import { createWalletDraft, importWalletDraft, unlockWallet } from './core/wallet/walletService';
 import { readKeystore, writeKeystore } from './core/wallet/secureStore';
 import { loadEvmNetworks, estimateNativeTransfer, readNetworkHealth, readNetworkSnapshot, type EvmNetwork, type NetworkSnapshot, type TransferEstimate } from './core/chain/evmService';
+import { sendNativeTransfer } from './core/chain/evmTransactionService';
+import { previewTokenTransfer, sendTokenTransfer, type TokenTransferPreview } from './core/chain/evmTokenTransactionService';
 import { readSolanaSnapshot, type SolanaSnapshot } from './core/chain/solanaService';
 import { readTronSnapshot, type TronSnapshot } from './core/chain/tronService';
 import { readBitcoinSnapshot, type BitcoinSnapshot } from './core/chain/bitcoinService';
@@ -184,6 +186,11 @@ export default function App() {
   const [txRecipient, setTxRecipient] = useState('');
   const [txAmount, setTxAmount] = useState('');
   const [txEstimate, setTxEstimate] = useState<TransferEstimate | null>(null);
+  const [txKind, setTxKind] = useState<'native' | 'token'>('native');
+  const [txTokenAddress, setTxTokenAddress] = useState('');
+  const [tokenPreview, setTokenPreview] = useState<TokenTransferPreview | null>(null);
+  const [txConfirmed, setTxConfirmed] = useState(false);
+  const [txHash, setTxHash] = useState('');
   const [txError, setTxError] = useState('');
   const [txBusy, setTxBusy] = useState(false);
   const selectedNetwork = selectedOtherNetwork ? undefined : networks.find(network => network.key === selectedNetworkKey);
@@ -477,19 +484,31 @@ export default function App() {
   }, [address, activeMnemonicPhrase, selectedOtherNetwork, selectedNetworkKey, selectedNetwork]);
 
   const prepareTransfer = async () => {
-    setTxBusy(true);
-    setTxError('');
-    setTxEstimate(null);
+    setTxBusy(true); setTxError(''); setTxEstimate(null); setTokenPreview(null); setTxConfirmed(false); setTxHash('');
     try {
-      if (!address) throw new Error('Unlock your wallet before preparing a transfer.');
-      if (!selectedNetwork) throw new Error('Wait for the network registry to load.');
-      const estimate = await estimateNativeTransfer(selectedNetwork, address, txRecipient, txAmount);
-      setTxEstimate(estimate);
-    } catch (e) {
-      setTxError(e instanceof Error ? e.message : 'Could not estimate this transfer.');
-    } finally {
-      setTxBusy(false);
-    }
+      if (!address || !unlockedWallet) throw new Error('Unlock your wallet before preparing a transfer.');
+      if (!selectedNetwork) throw new Error('Select a supported EVM network first.');
+      if (txKind === 'token') setTokenPreview(await previewTokenTransfer(selectedNetwork, unlockedWallet, txTokenAddress, txRecipient, txAmount));
+      else setTxEstimate(await estimateNativeTransfer(selectedNetwork, address, txRecipient, txAmount));
+    } catch (e) { setTxError(e instanceof Error ? e.message : 'Could not prepare this transfer.'); }
+    finally { setTxBusy(false); }
+  };
+
+  const submitTransfer = async () => {
+    if (!txConfirmed) { setTxError('Review the details and confirm before sending.'); return; }
+    if (!unlockedWallet || !selectedNetwork) { setTxError('Unlock your wallet and select an EVM network first.'); return; }
+    if (txKind === 'token' && !tokenPreview) { setTxError('Validate the token transfer before sending.'); return; }
+    if (txKind === 'native' && !txEstimate) { setTxError('Estimate the native transfer before sending.'); return; }
+    setTxBusy(true); setTxError('');
+    try {
+      const result = txKind === 'token'
+        ? await sendTokenTransfer(selectedNetwork, unlockedWallet, txTokenAddress, txRecipient, txAmount, true)
+        : await sendNativeTransfer(selectedNetwork, unlockedWallet, txRecipient, txAmount, true);
+      setTxHash(result.hash); setTxEstimate(null); setTokenPreview(null); setTxConfirmed(false);
+      setNotice('Transaction submitted. Wait for confirmation before assuming the transfer is complete.');
+      void refreshNetwork();
+    } catch (e) { setTxError(e instanceof Error ? e.message : 'The transaction could not be submitted. If the RPC timed out, check the transaction hash/history before retrying.'); }
+    finally { setTxBusy(false); }
   };
 
   const closeModal = () => {
@@ -589,29 +608,23 @@ export default function App() {
               <p className="chain-disclaimer">Read-only connection. Only your public address is queried; recovery phrase and private key are never sent to the RPC provider.</p>
             </div>
           </section>
-          <section className="panel activity-panel chain-panel">
-            <div className="panel-heading"><div><h2>Prepare a transfer</h2><p>Validate details and estimate network fees — no transaction will be sent.</p></div><span className="market-placeholder-tag">NO SIGNING</span></div>
-            {selectedOtherNetwork && <p className="chain-disclaimer">Transfer fee estimation is currently available for EVM networks only. Solana sending is disabled.</p>}
-            <label className="form-label" htmlFor="ferra-recipient">Recipient address</label>
-            <input id="ferra-recipient" className="form-input" inputMode="text" autoComplete="off" spellCheck={false} value={txRecipient} onChange={event => { setTxRecipient(event.target.value); setTxEstimate(null); setTxError(''); }} placeholder="0x… recipient address"/>
-            <label className="form-label" htmlFor="ferra-amount">Amount ({selectedNetwork?.symbol ?? 'native coin'})</label>
-            <input id="ferra-amount" className="form-input" inputMode="decimal" autoComplete="off" value={txAmount} onChange={event => { setTxAmount(event.target.value); setTxEstimate(null); setTxError(''); }} placeholder="0.01"/>
-            <button className="primary-button full-button" disabled={!address || Boolean(selectedOtherNetwork) || txBusy || networkStatus !== 'connected'} onClick={() => void prepareTransfer()}>{txBusy ? 'Estimating fees…' : 'Validate & estimate fees'} <ArrowRight size={16}/></button>
-            {!address && <p className="chain-disclaimer">Unlock your wallet to use its public address as the sender. The private key is not used for fee estimation.</p>}
+          <section className="panel activity-panel chain-panel" id="transfer-panel">
+            <div className="panel-heading"><div><h2>Send crypto</h2><p>Review the recipient, network, amount and estimated fee before signing locally.</p></div><span className="market-placeholder-tag">EVM SEND</span></div>
+            {selectedOtherNetwork && <p className="chain-disclaimer">Sending is currently available only on EVM networks. Non-EVM adapters remain read-only until their transaction flows are integrated and tested.</p>}
+            <div className="network-picker-filters" role="group" aria-label="Transfer type"><button type="button" className={txKind === 'native' ? 'active' : ''} onClick={() => { setTxKind('native'); setTxEstimate(null); setTokenPreview(null); setTxConfirmed(false); setTxHash(''); setTxError(''); }}>Native coin</button><button type="button" className={txKind === 'token' ? 'active' : ''} onClick={() => { setTxKind('token'); setTxEstimate(null); setTokenPreview(null); setTxConfirmed(false); setTxHash(''); setTxError(''); }}>ERC-20 token</button></div>
+            {txKind === 'token' && <><label className="form-label" htmlFor="ferra-token-address">Token contract address</label><input id="ferra-token-address" className="form-input" inputMode="text" autoComplete="off" spellCheck={false} value={txTokenAddress} onChange={event => { setTxTokenAddress(event.target.value); setTokenPreview(null); setTxConfirmed(false); setTxHash(''); setTxError(''); }} placeholder="0x… ERC-20 contract address"/><p className="chain-disclaimer">Only use a token contract address verified for the currently selected network. Token names and symbols can be impersonated.</p></>}
+            <label className="form-label" htmlFor="ferra-recipient">Recipient address</label><input id="ferra-recipient" className="form-input" inputMode="text" autoComplete="off" spellCheck={false} value={txRecipient} onChange={event => { setTxRecipient(event.target.value); setTxEstimate(null); setTokenPreview(null); setTxConfirmed(false); setTxHash(''); setTxError(''); }} placeholder="0x… recipient address"/>
+            <label className="form-label" htmlFor="ferra-amount">Amount ({txKind === 'native' ? selectedNetwork?.symbol ?? 'native coin' : tokenPreview?.tokenSymbol ?? 'token units'})</label><input id="ferra-amount" className="form-input" inputMode="decimal" autoComplete="off" value={txAmount} onChange={event => { setTxAmount(event.target.value); setTxEstimate(null); setTokenPreview(null); setTxConfirmed(false); setTxHash(''); setTxError(''); }} placeholder="0.01"/>
+            <button className="primary-button full-button" disabled={!unlockedWallet || Boolean(selectedOtherNetwork) || !selectedNetwork || txBusy || networkStatus !== 'connected'} onClick={() => void prepareTransfer()}>{txBusy ? 'Preparing transfer…' : 'Review transfer'} <ArrowRight size={16}/></button>
+            {!address && <p className="chain-disclaimer">Unlock your wallet to prepare a transaction. Signing happens locally in your browser; the RPC receives only the transaction needed to broadcast.</p>}
             {txError && <p className="wallet-error" role="alert">{txError}</p>}
-            {txEstimate && <div className="tx-estimate" role="status">
-              <div><span>Network</span><strong>{selectedNetwork?.name ?? 'EVM network'} · chain {txEstimate.chainId}</strong></div>
-              <div><span>Recipient</span><strong>{shortAddress(txEstimate.to)}</strong></div>
-              <div><span>Amount</span><strong>{txEstimate.amountEth} {selectedNetwork?.symbol ?? 'native coin'}</strong></div>
-              <div><span>Estimated gas limit</span><strong>{txEstimate.gasLimit}</strong></div>
-              <div><span>Estimated network fee</span><strong>{Number(txEstimate.estimatedFeeEth).toLocaleString('en-US', { maximumFractionDigits: 8 })} {selectedNetwork?.symbol ?? 'native coin'}</strong></div>
-              <div><span>Estimated total required</span><strong>{Number(txEstimate.totalRequiredEth).toLocaleString('en-US', { maximumFractionDigits: 8 })} {selectedNetwork?.symbol ?? 'native coin'}</strong></div>
-              <p className="chain-disclaimer">Estimate only. Fees can change before submission. This does not sign or broadcast a transaction, and sending remains disabled.</p>
-            </div>}
+            {txEstimate && <div className="tx-estimate" role="status"><div><span>Network</span><strong>{selectedNetwork?.name} · chain {txEstimate.chainId}</strong></div><div><span>From</span><strong>{shortAddress(address)}</strong></div><div><span>Recipient</span><strong>{txEstimate.to}</strong></div><div><span>Amount</span><strong>{txEstimate.amountEth} {selectedNetwork?.symbol}</strong></div><div><span>Estimated gas limit</span><strong>{txEstimate.gasLimit}</strong></div><div><span>Estimated network fee</span><strong>{Number(txEstimate.estimatedFeeEth).toLocaleString('en-US', { maximumFractionDigits: 8 })} {selectedNetwork?.symbol}</strong></div><div><span>Estimated total required</span><strong>{Number(txEstimate.totalRequiredEth).toLocaleString('en-US', { maximumFractionDigits: 8 })} {selectedNetwork?.symbol}</strong></div><label className="form-label"><input type="checkbox" checked={txConfirmed} onChange={event => setTxConfirmed(event.target.checked)}/> I have checked the network, recipient address, amount and estimated fee.</label><button className="primary-button full-button" disabled={!txConfirmed || txBusy} onClick={() => void submitTransfer()}>{txBusy ? 'Submitting…' : `Send ${txEstimate.amountEth} ${selectedNetwork?.symbol}`} <ArrowUpRight size={16}/></button><p className="chain-disclaimer">Fees can change between review and submission. Confirm the address and chain carefully; blockchain transfers are generally irreversible.</p></div>}
+            {tokenPreview && <div className="tx-estimate" role="status"><div><span>Network</span><strong>{selectedNetwork?.name} · chain {tokenPreview.chainId}</strong></div><div><span>Token contract</span><strong>{tokenPreview.tokenAddress}</strong></div><div><span>Token</span><strong>{tokenPreview.tokenSymbol} · {tokenPreview.tokenDecimals} decimals</strong></div><div><span>From</span><strong>{shortAddress(tokenPreview.from)}</strong></div><div><span>Recipient</span><strong>{tokenPreview.to}</strong></div><div><span>Amount</span><strong>{tokenPreview.amount} {tokenPreview.tokenSymbol}</strong></div><div><span>Token balance</span><strong>{tokenPreview.tokenBalance} {tokenPreview.tokenSymbol}</strong></div><div><span>Estimated network fee</span><strong>{Number(tokenPreview.estimatedFee).toLocaleString('en-US', { maximumFractionDigits: 8 })} {tokenPreview.nativeSymbol}</strong></div><label className="form-label"><input type="checkbox" checked={txConfirmed} onChange={event => setTxConfirmed(event.target.checked)}/> I verified this token contract, network, recipient, amount and fee.</label><button className="primary-button full-button" disabled={!txConfirmed || txBusy} onClick={() => void submitTransfer()}>{txBusy ? 'Submitting…' : `Send ${tokenPreview.amount} ${tokenPreview.tokenSymbol}`} <ArrowUpRight size={16}/></button><p className="chain-disclaimer">Only transfer tokens whose contract you trust. Fees are paid in the network's native coin; transfers are generally irreversible.</p></div>}
+            {txHash && <div className="tx-estimate" role="status"><div><span>Submitted transaction</span><strong>{txHash}</strong></div>{selectedNetwork?.explorerUrl && <a className="panel-action" href={`${selectedNetwork.explorerUrl.replace(/\/$/, '')}/tx/${txHash}`} target="_blank" rel="noreferrer">View in block explorer <ArrowUpRight size={14}/></a>}<p className="chain-disclaimer">Submitted does not mean confirmed. Check the explorer for the final status. If submission timed out, check this hash/history before retrying.</p></div>}
           </section>
           <section className="network-marquee" aria-label="Discovered EVM networks"><div className="network-marquee-track"><div className="network-marquee-group">{networks.slice(0, 8).map(network => <div className="network-marquee-pill" key={network.key}><span className="network-marquee-logo"><span>{network.symbol.slice(0, 5)}</span></span><span>{network.name}</span></div>)}</div></div></section>
-          <nav className="wallet-quick-actions" aria-label="Wallet actions"><button type="button" className="wallet-quick-action" onClick={() => setNotice('Sending is disabled until transaction review and signing are implemented.')}><span className="wallet-quick-icon"><ArrowUpRight size={20}/></span><span>Send</span></button><button type="button" className="wallet-quick-action" onClick={() => setNotice(address ? 'Your public address: ' + address : 'Create or unlock a wallet first.')}><span className="wallet-quick-icon"><ArrowDownLeft size={20}/></span><span>Receive</span></button><button type="button" className="wallet-quick-action" onClick={() => setActiveTab('Activity')}><span className="wallet-quick-icon"><Activity size={20}/></span><span>History</span></button></nav>
-          <section className="panel activity-panel"><div className="panel-heading"><div><h2>Quick actions</h2><p>Common wallet tasks, made simple</p></div></div><div className="quick-actions"><button className="quick-action" onClick={() => setNotice('Transaction signing is intentionally not enabled yet.')}><span className="quick-icon send"><ArrowUpRight size={19}/></span><span><strong>Send</strong><small>Transfer crypto</small></span><ArrowRight size={15} className="quick-arrow"/></button><button className="quick-action" onClick={() => setNotice(address ? 'Public address: ' + address : 'Create or unlock a wallet first.')}><span className="quick-icon receive"><ArrowDownLeft size={19}/></span><span><strong>Receive</strong><small>Share your address</small></span><ArrowUpRight size={15} className="quick-arrow"/></button><button className="quick-action" onClick={() => setNotice('Swaps are not implemented in this foundation build.')}><span className="quick-icon swap"><ArrowLeftRight size={19}/></span><span><strong>Swap tokens</strong><small>Coming soon</small></span><span className="soon-tag">SOON</span></button><button className="quick-action" onClick={() => { if (networks.length) { const index = networks.findIndex(network => network.key === selectedNetworkKey); setSelectedNetworkKey(networks[(index + 1) % networks.length].key); setNotice('Switched to another discovered EVM network.'); setActiveTab('Overview'); } }}><span className="quick-icon network"><Globe2 size={19}/></span><span><strong>Change network</strong><small>Explore supported chains</small></span><ArrowUpRight size={15} className="quick-arrow"/></button></div><div className="quick-note"><LockKeyhole size={15}/><span>Transaction features stay disabled until their safety checks are implemented.</span></div></section>
+          <nav className="wallet-quick-actions" aria-label="Wallet actions"><button type="button" className="wallet-quick-action" onClick={() => { setActiveTab('Overview'); document.getElementById('transfer-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}><span className="wallet-quick-icon"><ArrowUpRight size={20}/></span><span>Send</span></button><button type="button" className="wallet-quick-action" onClick={() => setNotice(address ? 'Your public address: ' + address : 'Create or unlock a wallet first.')}><span className="wallet-quick-icon"><ArrowDownLeft size={20}/></span><span>Receive</span></button><button type="button" className="wallet-quick-action" onClick={() => setActiveTab('Activity')}><span className="wallet-quick-icon"><Activity size={20}/></span><span>History</span></button></nav>
+          <section className="panel activity-panel"><div className="panel-heading"><div><h2>Quick actions</h2><p>Common wallet tasks, made simple</p></div></div><div className="quick-actions"><button className="quick-action" onClick={() => { setActiveTab('Overview'); document.getElementById('transfer-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}><span className="quick-icon send"><ArrowUpRight size={19}/></span><span><strong>Send</strong><small>Transfer crypto</small></span><ArrowRight size={15} className="quick-arrow"/></button><button className="quick-action" onClick={() => setNotice(address ? 'Public address: ' + address : 'Create or unlock a wallet first.')}><span className="quick-icon receive"><ArrowDownLeft size={19}/></span><span><strong>Receive</strong><small>Share your address</small></span><ArrowUpRight size={15} className="quick-arrow"/></button><button className="quick-action" onClick={() => setNotice('Swaps are not implemented in this foundation build.')}><span className="quick-icon swap"><ArrowLeftRight size={19}/></span><span><strong>Swap tokens</strong><small>Coming soon</small></span><span className="soon-tag">SOON</span></button><button className="quick-action" onClick={() => { if (networks.length) { const index = networks.findIndex(network => network.key === selectedNetworkKey); setSelectedNetworkKey(networks[(index + 1) % networks.length].key); setNotice('Switched to another discovered EVM network.'); setActiveTab('Overview'); } }}><span className="quick-icon network"><Globe2 size={19}/></span><span><strong>Change network</strong><small>Explore supported chains</small></span><ArrowUpRight size={15} className="quick-arrow"/></button></div><div className="quick-note"><LockKeyhole size={15}/><span>EVM native-coin and ERC-20 transfers use local signing and explicit confirmation. Other chain families remain read-only.</span></div></section>
           <section className="panel activity-panel"><div className="panel-heading"><div><h2>Recent activity</h2><p>Your wallet transactions</p></div><button className="panel-action" onClick={() => setActiveTab('Activity')}>View all <ArrowUpRight size={14}/></button></div><div className="activity-empty"><div className="activity-empty-icon"><Activity size={20}/></div><div><strong>No activity yet</strong><p>Transaction history will appear after verified transaction support is added.</p></div></div></section>
         </>}
         <footer className="footer"><div><span className="footer-logo"><Sparkles size={14}/> ferra wallet</span><span>Built for clarity. Designed for you.</span></div><div className="footer-right"><span><span className="status-dot"/> Wallet foundation</span><button onClick={() => setModal('help')}>Security first <ShieldCheck size={13}/></button></div></footer>
