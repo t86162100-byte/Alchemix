@@ -1,51 +1,12 @@
-import { Mnemonic } from 'ethers';
-import { derivePath } from 'ed25519-hd-key';
-import { ed25519 } from '@noble/curves/ed25519';
+import StellarHDWallet from 'stellar-hd-wallet';
 
 const DEFAULT_HORIZON = 'https://horizon.stellar.org';
-export const STELLAR_DERIVATION_PATH = "m/44'/148'/0'";
 
 export type StellarSnapshot = {
   address: string;
   balanceXlm: string;
   apiUrl: string;
 };
-
-// Stellar StrKey uses RFC 4648 base32 and CRC16-XModem (checksum bytes are little-endian).
-const BASE32 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567';
-function base32Encode(bytes: Uint8Array): string {
-  let bits = 0;
-  let value = 0;
-  let output = '';
-  for (const byte of bytes) {
-    value = (value << 8) | byte;
-    bits += 8;
-    while (bits >= 5) {
-      output += BASE32[(value >>> (bits - 5)) & 31];
-      bits -= 5;
-    }
-  }
-  if (bits > 0) output += BASE32[(value << (5 - bits)) & 31];
-  return output;
-}
-function crc16Xmodem(bytes: Uint8Array): number {
-  let crc = 0;
-  for (const byte of bytes) {
-    crc ^= byte << 8;
-    for (let bit = 0; bit < 8; bit++) crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
-  }
-  return crc;
-}
-function encodeStellarPublicKey(publicKey: Uint8Array): string {
-  if (publicKey.length !== 32) throw new Error('Stellar public key must be 32 bytes.');
-  const payload = new Uint8Array(35);
-  payload[0] = 6 << 3; // Version byte for ed25519 public key (G...)
-  payload.set(publicKey, 1);
-  const checksum = crc16Xmodem(payload.subarray(0, 33));
-  payload[33] = checksum & 0xff;
-  payload[34] = (checksum >>> 8) & 0xff;
-  return base32Encode(payload);
-}
 
 function getHorizonUrl(): string {
   const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
@@ -58,14 +19,22 @@ function getHorizonUrl(): string {
   return url;
 }
 
-/** Derives a Stellar Ed25519 account locally from the wallet's BIP-39 phrase. */
+/**
+ * Derives the SEP-0005 primary Stellar account locally from a BIP-39 recovery phrase.
+ * This uses the dedicated Stellar HD wallet implementation rather than composing
+ * Ed25519 and StrKey primitives ourselves.
+ */
 export function deriveStellarAddress(phraseInput: string): string {
   const phrase = phraseInput.trim().toLowerCase().replace(/\s+/g, ' ');
-  if (!Mnemonic.isValidMnemonic(phrase)) throw new Error('A valid recovery phrase is required to derive the Stellar account.');
-  const seedHex = Mnemonic.fromPhrase(phrase).computeSeed().replace(/^0x/, '');
-  const derived = derivePath(STELLAR_DERIVATION_PATH, seedHex);
-  const publicKey = ed25519.getPublicKey(derived.key);
-  return encodeStellarPublicKey(publicKey);
+  if (!StellarHDWallet.validateMnemonic(phrase)) {
+    throw new Error('A valid recovery phrase is required to derive the Stellar account.');
+  }
+  const wallet = StellarHDWallet.fromMnemonic(phrase);
+  const address = wallet.getPublicKey(0);
+  if (!/^G[A-Z2-7]{55}$/.test(address)) {
+    throw new Error('Stellar key derivation returned an invalid public address.');
+  }
+  return address;
 }
 
 /** Read-only XLM balance lookup. Only the public Stellar address is sent to Horizon. */
@@ -81,7 +50,6 @@ export async function readStellarSnapshot(phraseInput: string): Promise<StellarS
   } catch (error) {
     throw new Error(`Stellar Horizon request failed: ${error instanceof Error ? error.message : String(error)}`);
   }
-  // Unfunded Stellar accounts do not exist in Horizon yet; that is a real zero-balance state.
   if (response.status === 404) return { address, balanceXlm: '0', apiUrl };
   if (response.status === 429) throw new Error('Stellar Horizon rate limit reached. Wait briefly and try again.');
   if (response.status === 401 || response.status === 403) throw new Error('Stellar Horizon access was denied.');
