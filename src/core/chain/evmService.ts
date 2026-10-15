@@ -1,35 +1,85 @@
 import { formatEther, isAddress, JsonRpcProvider, parseEther } from 'ethers';
 
 export type EvmNetwork = {
-  key: 'ethereum' | 'base';
+  /** Stable identity comes from the registry chain ID, not a hard-coded network name. */
+  key: string;
   name: string;
   chainId: number;
-  symbol: 'ETH';
+  symbol: string;
   rpcUrl: string;
   fallbackRpcUrls: string[];
   explorerUrl: string;
 };
 
-export const EVM_NETWORKS: EvmNetwork[] = [
-  {
-    key: 'ethereum',
-    name: 'Ethereum Mainnet',
-    chainId: 1,
-    symbol: 'ETH',
-    rpcUrl: 'https://public.1rpc.io/eth',
-    fallbackRpcUrls: ['https://ethereum-rpc.publicnode.com', 'https://cloudflare-eth.com'],
-    explorerUrl: 'https://etherscan.io',
-  },
-  {
-    key: 'base',
-    name: 'Base Mainnet',
-    chainId: 8453,
-    symbol: 'ETH',
-    rpcUrl: 'https://mainnet.base.org',
-    fallbackRpcUrls: ['https://base-rpc.publicnode.com'],
-    explorerUrl: 'https://basescan.org',
-  },
-];
+type RegistryRpc = { url?: string; tracking?: string };
+type RegistryExplorer = { url?: string };
+type RegistryChain = {
+  name?: string;
+  chainId?: number;
+  networkId?: number;
+  nativeCurrency?: { symbol?: string; name?: string; decimals?: number };
+  rpc?: Array<string | RegistryRpc>;
+  explorers?: RegistryExplorer[];
+  testnet?: boolean;
+};
+
+const REGISTRY_URL = 'https://chainlist.org/rpcs.json';
+let cachedNetworks: EvmNetwork[] | null = null;
+let cacheExpiresAt = 0;
+
+/**
+ * Discover EVM networks from Chainlist at runtime. No chain list is baked into
+ * the app bundle. Only mainnets with HTTPS RPC endpoints and valid metadata
+ * are offered; endpoints containing API-key placeholders are skipped.
+ */
+export async function loadEvmNetworks(forceRefresh = false): Promise<EvmNetwork[]> {
+  if (!forceRefresh && cachedNetworks && Date.now() < cacheExpiresAt) return cachedNetworks;
+
+  const response = await fetch(REGISTRY_URL, { headers: { Accept: 'application/json' } });
+  if (!response.ok) throw new Error(`Network registry request failed (HTTP ${response.status}).`);
+  const registry: unknown = await response.json();
+  if (!Array.isArray(registry)) throw new Error('The network registry returned an unexpected response.');
+
+  const byChainId = new Map<number, EvmNetwork>();
+  for (const raw of registry as RegistryChain[]) {
+    const chainId = Number(raw.chainId);
+    const symbol = raw.nativeCurrency?.symbol?.trim();
+    const name = raw.name?.trim();
+    if (!Number.isSafeInteger(chainId) || chainId <= 0 || !name || !symbol || raw.testnet === true) continue;
+
+    const urls = (raw.rpc ?? [])
+      .map(item => typeof item === 'string' ? item : item?.url ?? '')
+      .map(url => url.trim())
+      .filter(url => /^https:\/\//i.test(url) && !/\$\{[^}]+\}|localhost|127\.0\.0\.1/i.test(url));
+    const uniqueUrls = [...new Set(urls)];
+    if (!uniqueUrls.length) continue;
+
+    const existing = byChainId.get(chainId);
+    // Prefer a record with an explorer and then keep the first valid HTTPS RPC.
+    const explorerUrl = (raw.explorers ?? []).map(item => item?.url?.trim() ?? '')
+      .find(url => /^https:\/\//i.test(url)) ?? existing?.explorerUrl ?? '';
+    if (existing) {
+      existing.fallbackRpcUrls = [...new Set([...existing.fallbackRpcUrls, ...uniqueUrls])].filter(url => url !== existing.rpcUrl);
+      if (!existing.explorerUrl && explorerUrl) existing.explorerUrl = explorerUrl;
+      continue;
+    }
+    byChainId.set(chainId, {
+      key: String(chainId),
+      name,
+      chainId,
+      symbol,
+      rpcUrl: uniqueUrls[0],
+      fallbackRpcUrls: uniqueUrls.slice(1),
+      explorerUrl,
+    });
+  }
+
+  const networks = [...byChainId.values()].sort((a, b) => a.name.localeCompare(b.name));
+  if (!networks.length) throw new Error('The network registry did not contain any usable EVM mainnets.');
+  cachedNetworks = networks;
+  cacheExpiresAt = Date.now() + 30 * 60 * 1000;
+  return networks;
+}
 
 export type NetworkHealth = {
   chainId: number;
