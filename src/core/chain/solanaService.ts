@@ -18,7 +18,10 @@ const DEFAULT_SOLANA_RPC_URL = 'https://api.mainnet-beta.solana.com';
  * browser traffic (HTTP 403) or rate-limit requests.
  */
 function getSolanaRpcUrl(): string {
-  const configured = import.meta.env.VITE_SOLANA_RPC_URL?.trim();
+  // Type this locally so the service still typechecks if Vite's ImportMeta
+  // declarations are not included by the project's TypeScript configuration.
+  const env = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env;
+  const configured = env?.VITE_SOLANA_RPC_URL?.trim();
   const url = configured || DEFAULT_SOLANA_RPC_URL;
   let parsed: URL;
   try {
@@ -102,10 +105,10 @@ export async function readSolanaSnapshot(phraseInput: string): Promise<SolanaSna
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     if (/403|access forbidden|forbidden/i.test(message)) {
-      throw new Error('Solana RPC access was denied (HTTP 403). Configure a dedicated Solana Mainnet endpoint in VITE_SOLANA_RPC_URL; the shared public endpoint may block browser traffic.');
+      throw new Error('Solana RPC access was denied (HTTP 403). Check the configured provider endpoint and API key; the shared public endpoint may block browser traffic.');
     }
     if (/429|rate.?limit/i.test(message)) {
-      throw new Error('Solana RPC rate limit reached. Wait briefly or configure a dedicated Solana Mainnet endpoint in VITE_SOLANA_RPC_URL.');
+      throw new Error('Solana RPC rate limit reached. Wait briefly or check your provider plan and request limits.');
     }
     throw new Error(`Solana RPC request failed: ${message}`);
   }
