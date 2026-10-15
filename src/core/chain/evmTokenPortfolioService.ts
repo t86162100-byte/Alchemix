@@ -58,7 +58,7 @@ const COMMON_TOKENS: Record<number, KnownToken[]> = {
   ],
   137: [
     { tokenAddress: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359', tokenName: 'USD Coin', tokenSymbol: 'USDC', tokenDecimals: 6 },
-    { tokenAddress: '0xc2132D05D31c914a87C6611C10748AaCBaBcf', tokenName: 'Tether USD', tokenSymbol: 'USDT', tokenDecimals: 6 },
+    { tokenAddress: '0xc2132D05D31c914a87C6611C10748AEb04B58e8F', tokenName: 'Tether USD', tokenSymbol: 'USDT', tokenDecimals: 6 },
     { tokenAddress: '0x53E0bca35eC356BD5ddDFebBD1Fc0fD03FaBad39', tokenName: 'Chainlink', tokenSymbol: 'LINK', tokenDecimals: 18 },
   ],
   42161: [
