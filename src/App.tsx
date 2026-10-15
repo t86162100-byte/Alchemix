@@ -335,7 +335,7 @@ export default function App() {
       const draft = importWalletDraft(importPhrase);
       const encrypted = await draft.wallet.encrypt(password);
       await writeKeystore(encrypted);
-      setAddress(draft.address); setUnlockedWallet(draft.wallet); setKeystoreExists(true); closeModal();
+      setAddress(draft.address); setUnlockedWallet(draft.wallet); setActiveMnemonicPhrase(draft.phrase); setKeystoreExists(true); closeModal();
       setNotice('Wallet imported, encrypted and saved on this device.');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not import this recovery phrase.');
