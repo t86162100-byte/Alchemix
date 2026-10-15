@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, CircleHelp, Eye, EyeOff, Globe2, Home, LockKeyhole, Search, Settings2, ShieldCheck, Sparkles, TrendingUp, Wallet, X } from 'lucide-react';
 import { createWalletDraft, importWalletDraft, unlockWallet } from './core/wallet/walletService';
 import { readKeystore, writeKeystore } from './core/wallet/secureStore';
-import { EVM_NETWORKS, estimateNativeTransfer, readNetworkSnapshot, type NetworkSnapshot, type TransferEstimate } from './core/chain/evmService';
+import { EVM_NETWORKS, estimateNativeTransfer, readNetworkHealth, readNetworkSnapshot, type NetworkSnapshot, type TransferEstimate } from './core/chain/evmService';
 
 type Tab = 'Overview' | 'Market' | 'Activity' | 'Wallet' | 'Swap' | 'Explore';
 type Modal = 'wallet' | 'create' | 'import' | 'unlock' | 'help' | null;
@@ -60,8 +60,15 @@ export default function App() {
   const refreshNetwork = async () => {
     if (!address) {
       setNetworkSnapshot(null);
-      setNetworkStatus('idle');
+      setNetworkStatus('loading');
       setNetworkError('');
+      try {
+        await readNetworkHealth(selectedNetwork);
+        setNetworkStatus('connected');
+      } catch (e) {
+        setNetworkStatus('error');
+        setNetworkError(e instanceof Error ? e.message : 'Could not connect to the selected blockchain RPC.');
+      }
       return;
     }
     setNetworkStatus('loading');
@@ -79,26 +86,32 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-    if (!address) {
-      setNetworkSnapshot(null);
-      setNetworkStatus('idle');
-      setNetworkError('');
-      return () => { cancelled = true; };
-    }
     setNetworkStatus('loading');
     setNetworkError('');
-    readNetworkSnapshot(selectedNetwork, address).then(snapshot => {
-      if (!cancelled) {
-        setNetworkSnapshot(snapshot);
-        setNetworkStatus('connected');
-      }
-    }).catch(e => {
-      if (!cancelled) {
-        setNetworkSnapshot(null);
-        setNetworkStatus('error');
-        setNetworkError(e instanceof Error ? e.message : 'Could not connect to the selected blockchain RPC.');
-      }
-    });
+    if (!address) {
+      setNetworkSnapshot(null);
+      readNetworkHealth(selectedNetwork).then(() => {
+        if (!cancelled) setNetworkStatus('connected');
+      }).catch(e => {
+        if (!cancelled) {
+          setNetworkStatus('error');
+          setNetworkError(e instanceof Error ? e.message : 'Could not connect to the selected blockchain RPC.');
+        }
+      });
+    } else {
+      readNetworkSnapshot(selectedNetwork, address).then(snapshot => {
+        if (!cancelled) {
+          setNetworkSnapshot(snapshot);
+          setNetworkStatus('connected');
+        }
+      }).catch(e => {
+        if (!cancelled) {
+          setNetworkSnapshot(null);
+          setNetworkStatus('error');
+          setNetworkError(e instanceof Error ? e.message : 'Could not connect to the selected blockchain RPC.');
+        }
+      });
+    }
     return () => { cancelled = true; };
   }, [address, selectedNetworkKey]);
 
@@ -203,7 +216,7 @@ export default function App() {
               </select>
               <div className={`chain-status ${networkStatus}`} role="status">
                 <span className="chain-status-dot"/>
-                <span>{networkStatus === 'loading' ? 'Connecting to RPC…' : networkStatus === 'connected' ? `Connected · block ${networkSnapshot?.blockNumber ?? '—'}` : networkStatus === 'error' ? 'Connection failed' : address ? 'Waiting for connection' : 'Unlock wallet to check balance'}</span>
+                <span>{networkStatus === 'loading' ? 'Connecting to RPC…' : networkStatus === 'connected' ? `Connected · block ${networkSnapshot?.blockNumber ?? '—'}` : networkStatus === 'error' ? 'Connection failed' : address ? 'Waiting for connection' : 'Connected; unlock wallet to check balance'}</span>
               </div>
               {networkStatus === 'error' && <p className="wallet-error" role="alert">{networkError}</p>}
               <div className="chain-meta"><span>RPC provider</span><strong>{selectedNetwork.rpcUrl}</strong></div>
