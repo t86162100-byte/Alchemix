@@ -6,7 +6,7 @@ import { loadEvmNetworks, estimateNativeTransfer, readNetworkHealth, readNetwork
 import { readSolanaSnapshot, type SolanaSnapshot } from './core/chain/solanaService';
 import { readTronSnapshot, type TronSnapshot } from './core/chain/tronService';
 import { readBitcoinSnapshot, type BitcoinSnapshot } from './core/chain/bitcoinService';
-import { readTonSnapshot, type TonSnapshot } from './core/chain/tonService';
+import type { TonSnapshot } from './core/chain/tonService';
 
 type Tab = 'Overview' | 'Market' | 'Activity' | 'Wallet' | 'Swap' | 'Explore';
 type Modal = 'wallet' | 'create' | 'import' | 'unlock' | 'help' | null;
@@ -192,7 +192,7 @@ export default function App() {
     if (selectedOtherNetwork === 'Ton') {
       if (!activeMnemonicPhrase) { setNetworkStatus('error'); setNetworkError('Unlock the wallet with its recovery phrase to derive the TON account.'); return; }
       setNetworkStatus('loading'); setNetworkError('');
-      try { const snapshot = await readTonSnapshot(activeMnemonicPhrase); setTonSnapshot(snapshot); setActiveRpcUrl(snapshot.apiUrl); setNetworkStatus('connected'); }
+      try { const snapshot = (await import('./core/chain/tonService')).readTonSnapshot(activeMnemonicPhrase); setTonSnapshot(snapshot); setActiveRpcUrl(snapshot.apiUrl); setNetworkStatus('connected'); }
       catch (e) { setTonSnapshot(null); setNetworkStatus('error'); setNetworkError(e instanceof Error ? e.message : 'Could not read the TON balance.'); }
       return;
     }
