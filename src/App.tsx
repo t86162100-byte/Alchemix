@@ -294,7 +294,7 @@ export default function App() {
   }, [selectedNetwork]);
 
   useEffect(() => {
-    if (activeTab === 'Market' && selectedNetwork) void loadMarketCatalog();
+    if ((activeTab === 'Market' || activeTab === 'Swap') && selectedNetwork) void loadMarketCatalog();
   }, [activeTab, selectedNetwork, loadMarketCatalog]);
 
   const filteredMarketTokens = marketTokens.filter(token => (
