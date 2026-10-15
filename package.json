@@ -23,7 +23,8 @@
     "@ton/crypto": "^3.3.0",
     "buffer": "^6.0.3",
     "@stellar/stellar-sdk": "^13.3.0",
-    "@aptos-labs/ts-sdk": "^7.4.0"
+    "@aptos-labs/ts-sdk": "^7.4.0",
+    "@cosmjs/proto-signing": "^0.36.0"
   },
   "devDependencies": {
     "typescript": "^5.7.2",
