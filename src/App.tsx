@@ -59,6 +59,7 @@ export default function App() {
   }, []);
 
   const refreshNetwork = async () => {
+    setActiveRpcUrl('');
     if (!address) {
       setNetworkSnapshot(null);
       setNetworkStatus('loading');
@@ -91,6 +92,7 @@ export default function App() {
     let cancelled = false;
     setNetworkStatus('loading');
     setNetworkError('');
+    setActiveRpcUrl('');
     if (!address) {
       setNetworkSnapshot(null);
       readNetworkHealth(selectedNetwork).then(health => {
@@ -223,7 +225,7 @@ export default function App() {
                 <span>{networkStatus === 'loading' ? 'Connecting to RPC…' : networkStatus === 'connected' ? `Connected · block ${networkSnapshot?.blockNumber ?? '—'}` : networkStatus === 'error' ? 'Connection failed' : address ? 'Waiting for connection' : 'Connected; unlock wallet to check balance'}</span>
               </div>
               {networkStatus === 'error' && <p className="wallet-error" role="alert">{networkError}</p>}
-              <div className="chain-meta"><span>RPC provider</span><strong>{activeRpcUrl || selectedNetwork.rpcUrl}</strong></div>
+              <div className="chain-meta"><span>RPC provider</span><strong>{activeRpcUrl || (networkStatus === 'error' ? 'No responding endpoint' : selectedNetwork.rpcUrl)}</strong></div>
               <div className="chain-meta"><span>Wallet address</span><strong>{address ? shortAddress(address) : 'Not unlocked'}</strong></div>
               <p className="chain-disclaimer">Read-only connection. Only your public address is queried; recovery phrase and private key are never sent to the RPC provider.</p>
             </div>
