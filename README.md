@@ -1,24 +1,24 @@
 # Ferra Wallet
 
-Ferra Wallet is a clean self-custody wallet foundation. The existing dashboard appearance is retained as a visual reference; application behavior is being rebuilt separately.
+Ferra Wallet is a self-custody EVM wallet foundation. The original dashboard visual design is retained while wallet behavior is rebuilt in isolated modules.
 
-## Current phase: local wallet foundation
+## Implemented
 
-Implemented:
-- Generate a new EVM wallet locally with ethers.
-- Reveal the generated recovery phrase in the setup flow and require a backup confirmation before saving.
-- Import a valid BIP-39 recovery phrase locally.
-- Encrypt wallet JSON with the user's password.
-- Persist only the encrypted keystore in IndexedDB.
-- Unlock the encrypted keystore for the current browser session.
+- Generate a new EVM wallet locally and import a valid BIP-39 recovery phrase.
+- Encrypt wallet JSON with the user's password and persist only the encrypted keystore in IndexedDB.
+- Unlock and lock the wallet for the current browser session.
+- Read real native ETH balances over public RPC for Ethereum Mainnet and Base Mainnet.
+- Display selected network, chain ID, latest block number, RPC connection status, and clear connection errors.
+- Validate recipient addresses and estimate native ETH transfer gas/fees using live RPC data.
+- Keep transfer preparation read-only: the app does not sign or broadcast transactions.
 
-Not implemented and intentionally disabled:
-- Live native/token balances and price feeds.
-- Network switching and RPC-based asset discovery.
-- Transaction signing or broadcasting, send flows, QR receive, swaps, dApp connections, or transaction history.
-- Security audit or production readiness.
+## Not yet implemented
 
-The UI must not fabricate balances or claim a transaction succeeded. These capabilities will be added in separate phases with tests before they are enabled.
+- Transaction signing, broadcasting, sending, replacement/cancellation, or transaction receipt tracking.
+- Token balances, token prices, swaps, dApp connections, or complete transaction history.
+- Automated end-to-end/browser tests, external security audit, and production readiness.
+
+The app must not fabricate balances or claim a transaction succeeded. Transfer estimates are indicative only and can change before a future submission.
 
 ## Development
 
@@ -33,4 +33,4 @@ npm run build
 
 This is not an independently audited production wallet. Browser-based storage is exposed to risks from compromised devices, malicious extensions, and same-origin script injection. Use a strong unique password, store the recovery phrase offline, and do not use significant funds until threat modeling, automated testing, and independent security review are complete.
 
-The recovery phrase and plaintext private key must never be sent to a server, analytics system, crash report, or support agent. Future market-data and blockchain-read services must never receive wallet secrets.
+The recovery phrase and plaintext private key must never be sent to a server, analytics system, crash report, or support agent. Blockchain RPC requests in this phase use only the public wallet address and public transaction fields for read-only balance/fee estimation.
