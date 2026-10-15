@@ -153,7 +153,7 @@ export async function readSolanaTokenHoldings(phraseInput: string): Promise<Sola
       const tokenAmount = parsed?.tokenAmount;
       const amountRaw = typeof tokenAmount?.amount === 'string' ? tokenAmount.amount : '';
       const decimals = tokenAmount?.decimals;
-      if (typeof mint !== 'string' || !amountRaw || !/^\\d+$/.test(amountRaw)
+      if (typeof mint !== 'string' || !amountRaw || !/^\d+$/.test(amountRaw)
         || !Number.isInteger(decimals) || decimals < 0 || decimals > 255 || BigInt(amountRaw) === 0n) continue;
       holdings.push({
         mint,
