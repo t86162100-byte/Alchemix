@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Activity, ArrowDownLeft, ArrowLeftRight, ArrowRight, ArrowUpRight, Bell, ChevronDown, CircleHelp, Eye, EyeOff, Globe2, Home, LockKeyhole, Search, Settings2, ShieldCheck, Sparkles, TrendingUp, Wallet, X } from 'lucide-react';
 import { createWalletDraft, importWalletDraft, unlockWallet } from './core/wallet/walletService';
 import { readKeystore, writeKeystore } from './core/wallet/secureStore';
+import { EVM_NETWORKS, estimateNativeTransfer, readNetworkSnapshot, type NetworkSnapshot, type TransferEstimate } from './core/chain/evmService';
 
 type Tab = 'Overview' | 'Market' | 'Activity' | 'Wallet' | 'Swap' | 'Explore';
 type Modal = 'wallet' | 'create' | 'import' | 'unlock' | 'help' | null;
@@ -32,6 +33,16 @@ export default function App() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [totalValueVisible, setTotalValueVisible] = useState(true);
+  const [selectedNetworkKey, setSelectedNetworkKey] = useState<'ethereum' | 'base'>('ethereum');
+  const [networkSnapshot, setNetworkSnapshot] = useState<NetworkSnapshot | null>(null);
+  const [networkStatus, setNetworkStatus] = useState<'idle' | 'loading' | 'connected' | 'error'>('idle');
+  const [networkError, setNetworkError] = useState('');
+  const [txRecipient, setTxRecipient] = useState('');
+  const [txAmount, setTxAmount] = useState('');
+  const [txEstimate, setTxEstimate] = useState<TransferEstimate | null>(null);
+  const [txError, setTxError] = useState('');
+  const [txBusy, setTxBusy] = useState(false);
+  const selectedNetwork = EVM_NETWORKS.find(network => network.key === selectedNetworkKey) ?? EVM_NETWORKS[0];
 
   useEffect(() => {
     let cancelled = false;
@@ -39,6 +50,66 @@ export default function App() {
       .catch(() => { if (!cancelled) setNotice('Secure browser storage is unavailable. Wallet setup cannot continue until storage is available.'); });
     return () => { cancelled = true; };
   }, []);
+
+  const refreshNetwork = async () => {
+    if (!address) {
+      setNetworkSnapshot(null);
+      setNetworkStatus('idle');
+      setNetworkError('');
+      return;
+    }
+    setNetworkStatus('loading');
+    setNetworkError('');
+    try {
+      const snapshot = await readNetworkSnapshot(selectedNetwork, address);
+      setNetworkSnapshot(snapshot);
+      setNetworkStatus('connected');
+    } catch (e) {
+      setNetworkSnapshot(null);
+      setNetworkStatus('error');
+      setNetworkError(e instanceof Error ? e.message : 'Could not connect to the selected blockchain RPC.');
+    }
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!address) {
+      setNetworkSnapshot(null);
+      setNetworkStatus('idle');
+      setNetworkError('');
+      return () => { cancelled = true; };
+    }
+    setNetworkStatus('loading');
+    setNetworkError('');
+    readNetworkSnapshot(selectedNetwork, address).then(snapshot => {
+      if (!cancelled) {
+        setNetworkSnapshot(snapshot);
+        setNetworkStatus('connected');
+      }
+    }).catch(e => {
+      if (!cancelled) {
+        setNetworkSnapshot(null);
+        setNetworkStatus('error');
+        setNetworkError(e instanceof Error ? e.message : 'Could not connect to the selected blockchain RPC.');
+      }
+    });
+    return () => { cancelled = true; };
+  }, [address, selectedNetworkKey]);
+
+  const prepareTransfer = async () => {
+    setTxBusy(true);
+    setTxError('');
+    setTxEstimate(null);
+    try {
+      if (!address) throw new Error('Unlock your wallet before preparing a transfer.');
+      const estimate = await estimateNativeTransfer(selectedNetwork, address, txRecipient, txAmount);
+      setTxEstimate(estimate);
+    } catch (e) {
+      setTxError(e instanceof Error ? e.message : 'Could not estimate this transfer.');
+    } finally {
+      setTxBusy(false);
+    }
+  };
 
   const closeModal = () => {
     setModal(null); setError(''); setPassword(''); setPhrase(''); setImportPhrase('');
@@ -113,7 +184,46 @@ export default function App() {
       <div className={`page-wrap ${activeTab === 'Overview' ? 'overview-page-wrap' : ''}`}>
         {activeTab === 'Market' ? <section className="panel activity-panel"><div className="panel-heading"><div><h2>Market</h2><p>Market data will be connected in a separate, verified phase.</p></div><span className="market-placeholder-tag">PLANNED</span></div><div className="market-empty">No external market feeds are connected in this clean foundation build.</div></section> : activeTab === 'Activity' ? <section className="panel activity-panel activity-page"><div className="panel-heading"><div><h2>History</h2><p>Wallet activity</p></div><span className="market-placeholder-tag">ACTIVITY</span></div><div className="market-empty">Transaction history is not connected yet.</div></section> : activeTab === 'Wallet' ? <section className="panel activity-panel"><div className="panel-heading"><div><h2>Your wallet</h2><p>Manage your local self-custody wallet.</p></div></div><p className="modal-description">{address ? address : 'No wallet is currently unlocked.'}</p><button className="primary-button" onClick={() => setModal('wallet')}>{address ? 'Wallet options' : keystoreExists ? 'Unlock wallet' : 'Create or import wallet'} <ArrowRight size={16}/></button></section> : <>
           <div className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-line"/> YOUR WEB3 HOME</div><h1>Your crypto, clearly.</h1><p className="page-subtitle">One calm place to see and manage your digital assets.</p></div><button className="refresh-button" onClick={() => address ? setNotice('Balance lookup is not enabled yet; no balance is being estimated.') : setModal('wallet')}><span>{address ? 'Refresh' : 'Get started'}</span><ArrowUpRight size={15}/></button></div>
-          <section className="sire-home-value-card" aria-label="Total account value"><div className="sire-home-value-main"><div className="sire-home-value-copy"><div className="sire-home-value-card-top"><span>NATIVE BALANCE</span><button type="button" className="sire-home-value-eye" aria-label={totalValueVisible ? 'Hide balance' : 'Show balance'} onClick={() => setTotalValueVisible(value => !value)}>{totalValueVisible ? <Eye size={17}/> : <EyeOff size={17}/>}</button></div><div className="sire-home-value-amount">{totalValueVisible ? '—' : '••••••'}</div><div className="page-subtitle">{address ? shortAddress(address) : 'Create or unlock a wallet to get started'}</div></div><div className="sire-home-value-chart" aria-hidden="true"><svg viewBox="0 0 320 100" preserveAspectRatio="none"><defs><linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="currentColor" stopOpacity=".18"/><stop offset="100%" stopColor="currentColor" stopOpacity="0"/></linearGradient></defs><path d="M0 78 C35 75,45 68,72 71 S110 62,132 66 S165 48,188 53 S220 39,242 45 S278 25,320 31 L320 100 L0 100 Z" fill="url(#balanceGradient)"/><path d="M0 78 C35 75,45 68,72 71 S110 62,132 66 S165 48,188 53 S220 39,242 45 S278 25,320 31" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div></div><button type="button" className="sire-home-value-add-funds" onClick={() => setModal('wallet')}>{address ? 'Wallet options' : 'Get started'}</button></section>
+          <section className="sire-home-value-card" aria-label="Total account value"><div className="sire-home-value-main"><div className="sire-home-value-copy"><div className="sire-home-value-card-top"><span>NATIVE BALANCE</span><button type="button" className="sire-home-value-eye" aria-label={totalValueVisible ? 'Hide balance' : 'Show balance'} onClick={() => setTotalValueVisible(value => !value)}>{totalValueVisible ? <Eye size={17}/> : <EyeOff size={17}/>}</button></div><div className="sire-home-value-amount">{totalValueVisible ? (networkSnapshot ? `${Number(networkSnapshot.balanceEth).toLocaleString('en-US', { maximumFractionDigits: 8 })} ${selectedNetwork.symbol}` : networkStatus === 'error' ? 'Unavailable' : '—') : '••••••'}</div><div className="page-subtitle">{address ? shortAddress(address) : 'Create or unlock a wallet to get started'}</div></div><div className="sire-home-value-chart" aria-hidden="true"><svg viewBox="0 0 320 100" preserveAspectRatio="none"><defs><linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="currentColor" stopOpacity=".18"/><stop offset="100%" stopColor="currentColor" stopOpacity="0"/></linearGradient></defs><path d="M0 78 C35 75,45 68,72 71 S110 62,132 66 S165 48,188 53 S220 39,242 45 S278 25,320 31 L320 100 L0 100 Z" fill="url(#balanceGradient)"/><path d="M0 78 C35 75,45 68,72 71 S110 62,132 66 S165 48,188 53 S220 39,242 45 S278 25,320 31" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div></div><button type="button" className="sire-home-value-add-funds" onClick={() => setModal('wallet')}>{address ? 'Wallet options' : 'Get started'}</button></section>
+          <section className="panel activity-panel chain-panel">
+            <div className="panel-heading">
+              <div><h2>Blockchain connection</h2><p>Live native balance from the selected network</p></div>
+              <button className="panel-action" onClick={() => void refreshNetwork()} disabled={!address || networkStatus === 'loading'}><Activity size={14}/> Refresh</button>
+            </div>
+            <div className="chain-controls">
+              <label className="form-label" htmlFor="ferra-network-select">Network</label>
+              <select id="ferra-network-select" className="form-input chain-select" value={selectedNetworkKey} onChange={event => { setSelectedNetworkKey(event.target.value as 'ethereum' | 'base'); setTxEstimate(null); setTxError(''); }}>
+                {EVM_NETWORKS.map(network => <option key={network.key} value={network.key}>{network.name} · chain ID {network.chainId}</option>)}
+              </select>
+              <div className={`chain-status ${networkStatus}`} role="status">
+                <span className="chain-status-dot"/>
+                <span>{networkStatus === 'loading' ? 'Connecting to RPC…' : networkStatus === 'connected' ? `Connected · block ${networkSnapshot?.blockNumber ?? '—'}` : networkStatus === 'error' ? 'Connection failed' : address ? 'Waiting for connection' : 'Unlock wallet to check balance'}</span>
+              </div>
+              {networkStatus === 'error' && <p className="wallet-error" role="alert">{networkError}</p>}
+              <div className="chain-meta"><span>RPC provider</span><strong>{selectedNetwork.rpcUrl}</strong></div>
+              <div className="chain-meta"><span>Wallet address</span><strong>{address ? shortAddress(address) : 'Not unlocked'}</strong></div>
+              <p className="chain-disclaimer">Read-only connection. Only your public address is queried; recovery phrase and private key are never sent to the RPC provider.</p>
+            </div>
+          </section>
+          <section className="panel activity-panel chain-panel">
+            <div className="panel-heading"><div><h2>Prepare a transfer</h2><p>Validate details and estimate network fees — no transaction will be sent.</p></div><span className="market-placeholder-tag">NO SIGNING</span></div>
+            <label className="form-label" htmlFor="ferra-recipient">Recipient address</label>
+            <input id="ferra-recipient" className="form-input" inputMode="text" autoComplete="off" spellCheck={false} value={txRecipient} onChange={event => { setTxRecipient(event.target.value); setTxEstimate(null); setTxError(''); }} placeholder="0x… recipient address"/>
+            <label className="form-label" htmlFor="ferra-amount">Amount (ETH)</label>
+            <input id="ferra-amount" className="form-input" inputMode="decimal" autoComplete="off" value={txAmount} onChange={event => { setTxAmount(event.target.value); setTxEstimate(null); setTxError(''); }} placeholder="0.01"/>
+            <button className="primary-button full-button" disabled={!address || txBusy || networkStatus !== 'connected'} onClick={() => void prepareTransfer()}>{txBusy ? 'Estimating fees…' : 'Validate & estimate fees'} <ArrowRight size={16}/></button>
+            {!address && <p className="chain-disclaimer">Unlock your wallet to use its public address as the sender. The private key is not used for fee estimation.</p>}
+            {txError && <p className="wallet-error" role="alert">{txError}</p>}
+            {txEstimate && <div className="tx-estimate" role="status">
+              <div><span>Network</span><strong>{selectedNetwork.name} · chain {txEstimate.chainId}</strong></div>
+              <div><span>Recipient</span><strong>{shortAddress(txEstimate.to)}</strong></div>
+              <div><span>Amount</span><strong>{txEstimate.amountEth} ETH</strong></div>
+              <div><span>Estimated gas limit</span><strong>{txEstimate.gasLimit}</strong></div>
+              <div><span>Estimated network fee</span><strong>{Number(txEstimate.estimatedFeeEth).toLocaleString('en-US', { maximumFractionDigits: 8 })} ETH</strong></div>
+              <div><span>Estimated total required</span><strong>{Number(txEstimate.totalRequiredEth).toLocaleString('en-US', { maximumFractionDigits: 8 })} ETH</strong></div>
+              <p className="chain-disclaimer">Estimate only. Fees can change before submission. This does not sign or broadcast a transaction, and sending remains disabled.</p>
+            </div>}
+          </section>
           <section className="network-marquee" aria-label="Supported blockchain networks"><div className="network-marquee-track"><div className="network-marquee-group">{[['Ethereum','ETH'],['BNB Chain','BNB'],['Base','ETH'],['Polygon','POL'],['Arbitrum','ETH'],['Optimism','ETH']].map(([name,symbol]) => <div className="network-marquee-pill" key={name}><span className="network-marquee-logo"><span>{symbol}</span></span><span>{name}</span></div>)}</div></div></section>
           <nav className="wallet-quick-actions" aria-label="Wallet actions"><button type="button" className="wallet-quick-action" onClick={() => setNotice('Sending is disabled until transaction review and signing are implemented.')}><span className="wallet-quick-icon"><ArrowUpRight size={20}/></span><span>Send</span></button><button type="button" className="wallet-quick-action" onClick={() => setNotice(address ? 'Your public address: ' + address : 'Create or unlock a wallet first.')}><span className="wallet-quick-icon"><ArrowDownLeft size={20}/></span><span>Receive</span></button><button type="button" className="wallet-quick-action" onClick={() => setActiveTab('Activity')}><span className="wallet-quick-icon"><Activity size={20}/></span><span>History</span></button></nav>
           <section className="panel activity-panel"><div className="panel-heading"><div><h2>Quick actions</h2><p>Common wallet tasks, made simple</p></div></div><div className="quick-actions"><button className="quick-action" onClick={() => setNotice('Transaction signing is intentionally not enabled yet.')}><span className="quick-icon send"><ArrowUpRight size={19}/></span><span><strong>Send</strong><small>Transfer crypto</small></span><ArrowRight size={15} className="quick-arrow"/></button><button className="quick-action" onClick={() => setNotice(address ? 'Public address: ' + address : 'Create or unlock a wallet first.')}><span className="quick-icon receive"><ArrowDownLeft size={19}/></span><span><strong>Receive</strong><small>Share your address</small></span><ArrowUpRight size={15} className="quick-arrow"/></button><button className="quick-action" onClick={() => setNotice('Swaps are not implemented in this foundation build.')}><span className="quick-icon swap"><ArrowLeftRight size={19}/></span><span><strong>Swap tokens</strong><small>Coming soon</small></span><span className="soon-tag">SOON</span></button><button className="quick-action" onClick={() => setNotice('Network selection will be added after wallet core verification.')}><span className="quick-icon network"><Globe2 size={19}/></span><span><strong>Change network</strong><small>Explore supported chains</small></span><ArrowUpRight size={15} className="quick-arrow"/></button></div><div className="quick-note"><LockKeyhole size={15}/><span>Transaction features stay disabled until their safety checks are implemented.</span></div></section>
