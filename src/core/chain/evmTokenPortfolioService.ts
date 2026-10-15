@@ -15,6 +15,7 @@ export type EvmTokenHolding = {
   balance: string;
   tokenValueUsd: string | null;
   updatedAtBlock: number | null;
+  category?: 'common' | 'detected';
 };
 
 type RoutescanHolding = {
@@ -97,10 +98,10 @@ export async function readCommonTokenBalances(addressInput: string, chainId: num
         const contract = new Contract(token.tokenAddress, ERC20_READ_ABI, provider);
         const raw = (await contract.balanceOf(address)) as bigint;
         const rawBalance = raw.toString();
-        return { ...token, chainId, rawBalance, balance: safeBalance(rawBalance, token.tokenDecimals), tokenValueUsd: null, updatedAtBlock: null };
+        return { ...token, chainId, rawBalance, balance: safeBalance(rawBalance, token.tokenDecimals), tokenValueUsd: null, updatedAtBlock: null, category: 'common' };
       } catch {
         // Keep the token visible when an RPC does not implement a call; do not pretend its balance is zero.
-        return { ...token, chainId, rawBalance: '0', balance: '—', tokenValueUsd: null, updatedAtBlock: null };
+        return { ...token, chainId, rawBalance: '0', balance: '—', tokenValueUsd: null, updatedAtBlock: null, category: 'common' };
       }
     }));
   } finally {
@@ -151,7 +152,7 @@ export async function discoverEvmTokenHoldings(addressInput: string): Promise<Ev
       if (seen.has(key)) continue;
       seen.add(key);
       holdings.push({
-        chainId, tokenAddress,
+        chainId, tokenAddress, category: 'detected',
         tokenName: String(item.tokenName ?? '').trim().slice(0, 100) || 'Unknown token',
         tokenSymbol: String(item.tokenSymbol ?? '').trim().slice(0, 32) || 'TOKEN',
         tokenDecimals: decimals, rawBalance, balance: safeBalance(rawBalance, decimals),
