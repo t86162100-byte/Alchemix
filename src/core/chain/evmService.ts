@@ -1,4 +1,4 @@
-import { formatEther, isAddress, JsonRpcProvider, parseEther } from 'ethers';
+import { formatUnits, isAddress, JsonRpcProvider, parseUnits } from 'ethers';
 
 export type EvmNetwork = {
   /** Stable identity comes from the registry chain ID, not a hard-coded network name. */
@@ -6,6 +6,7 @@ export type EvmNetwork = {
   name: string;
   chainId: number;
   symbol: string;
+  decimals: number;
   rpcUrl: string;
   fallbackRpcUrls: string[];
   explorerUrl: string;
@@ -44,8 +45,9 @@ export async function loadEvmNetworks(forceRefresh = false): Promise<EvmNetwork[
   for (const raw of registry as RegistryChain[]) {
     const chainId = Number(raw.chainId);
     const symbol = raw.nativeCurrency?.symbol?.trim();
+    const decimals = Number(raw.nativeCurrency?.decimals ?? 18);
     const name = raw.name?.trim();
-    if (!Number.isSafeInteger(chainId) || chainId <= 0 || !name || !symbol || raw.testnet === true) continue;
+    if (!Number.isSafeInteger(chainId) || chainId <= 0 || !name || !symbol || !Number.isInteger(decimals) || decimals < 0 || decimals > 36 || raw.testnet === true) continue;
 
     const urls = (raw.rpc ?? [])
       .map(item => typeof item === 'string' ? item : item?.url ?? '')
@@ -68,6 +70,7 @@ export async function loadEvmNetworks(forceRefresh = false): Promise<EvmNetwork[
       name,
       chainId,
       symbol,
+      decimals,
       rpcUrl: uniqueUrls[0],
       fallbackRpcUrls: uniqueUrls.slice(1),
       explorerUrl,
@@ -151,7 +154,7 @@ export async function readNetworkSnapshot(network: EvmNetwork, address: string):
       chainId: Number(chain.chainId),
       blockNumber,
       balanceWei: balance.toString(),
-      balanceEth: formatEther(balance),
+      balanceEth: formatUnits(balance, network.decimals),
     };
   });
   return { ...result.value, rpcUrl: result.rpcUrl };
@@ -179,9 +182,9 @@ export async function estimateNativeTransfer(
   if (!isAddress(fromAddress)) throw new Error('Unlock your wallet to use its public address.');
   if (!isAddress(recipientInput.trim())) throw new Error('Enter a valid recipient EVM address.');
   if (!amountInput.trim() || !/^\d+(?:\.\d{1,18})?$/.test(amountInput.trim())) {
-    throw new Error('Enter a valid ETH amount with up to 18 decimal places.');
+    throw new Error('Enter a valid native-coin amount with no more than this network's supported decimal places.');
   }
-  const value = parseEther(amountInput.trim());
+  const value = parseUnits(amountInput.trim(), network.decimals);
   if (value <= 0n) throw new Error('The transfer amount must be greater than zero.');
 
   const result = await withRpcFallback(network, async provider => {
@@ -209,8 +212,8 @@ export async function estimateNativeTransfer(
       gasLimit: gasLimit.toString(),
       maxFeePerGasWei: feeData.maxFeePerGas?.toString() ?? null,
       gasPriceWei: feeData.gasPrice?.toString() ?? null,
-      estimatedFeeEth: formatEther(fee),
-      totalRequiredEth: formatEther(value + fee),
+      estimatedFeeEth: formatUnits(fee, network.decimals),
+      totalRequiredEth: formatUnits(value + fee, network.decimals),
     };
   });
   return { ...result.value, rpcUrl: result.rpcUrl };
