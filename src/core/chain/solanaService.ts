@@ -206,7 +206,7 @@ export async function sendSolanaTransfer(
   )) {
     throw new Error('The transfer details or estimated fee changed. Review the updated transfer before signing.');
   }
-  const { Connection, SystemProgram, Transaction } = await import('@solana/web3.js');
+  const { Connection, PublicKey, SystemProgram, Transaction } = await import('@solana/web3.js');
   const keypair = await deriveSolanaKeypair(phraseInput);
   if (keypair.publicKey.toBase58() !== preview.from) throw new Error('The active wallet changed. Review the transfer again.');
   const connection = new Connection(preview.rpcUrl, { commitment: 'confirmed', confirmTransactionInitialTimeout: 30_000 });
@@ -215,7 +215,7 @@ export async function sendSolanaTransfer(
     recentBlockhash: preview.blockhash,
   }).add(SystemProgram.transfer({
     fromPubkey: keypair.publicKey,
-    toPubkey: new (await import('@solana/web3.js')).PublicKey(preview.to),
+    toPubkey: new PublicKey(preview.to),
     lamports: BigInt(preview.amountLamports),
   }));
   const signature = await connection.sendTransaction(transaction, [keypair], {
