@@ -618,7 +618,7 @@ export default function App() {
       if (!activeMnemonicPhrase || !solanaTransferPreview) { setTxError('Review a SOL transfer before sending.'); return; }
       setTxBusy(true); setTxError('');
       try {
-        const result = await sendSolanaTransfer(activeMnemonicPhrase, txRecipient, txAmount, true);
+        const result = await sendSolanaTransfer(activeMnemonicPhrase, txRecipient, txAmount, true, solanaTransferPreview);
         setTxHash(result.signature); setSolanaTransferPreview(null); setTxConfirmed(false);
         setNotice('SOL transaction submitted. Check the Solana explorer for confirmation before assuming it is complete.');
         void refreshNetwork();
