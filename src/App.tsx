@@ -5,6 +5,7 @@ import { readKeystore, writeKeystore } from './core/wallet/secureStore';
 import { loadEvmNetworks, estimateNativeTransfer, readNetworkHealth, readNetworkSnapshot, type EvmNetwork, type NetworkSnapshot, type TransferEstimate } from './core/chain/evmService';
 import { sendNativeTransfer } from './core/chain/evmTransactionService';
 import { previewTokenTransfer, sendTokenTransfer, type TokenTransferPreview } from './core/chain/evmTokenTransactionService';
+import { discoverEvmTokenHoldings, type EvmTokenHolding } from './core/chain/evmTokenPortfolioService';
 import { readSolanaSnapshot, type SolanaSnapshot } from './core/chain/solanaService';
 import { readTronSnapshot, type TronSnapshot } from './core/chain/tronService';
 import { readBitcoinSnapshot, type BitcoinSnapshot } from './core/chain/bitcoinService';
@@ -180,6 +181,12 @@ export default function App() {
   const [hyperLiquidSnapshot, setHyperLiquidSnapshot] = useState<HyperLiquidSnapshot | null>(null);
   const [lighterSnapshot, setLighterSnapshot] = useState<LighterSnapshot | null>(null);
   const [networkSnapshot, setNetworkSnapshot] = useState<NetworkSnapshot | null>(null);
+  const [tokenHoldings, setTokenHoldings] = useState<EvmTokenHolding[]>([]);
+  const [tokenPortfolioAddress, setTokenPortfolioAddress] = useState('');
+  const [tokenPortfolioLoading, setTokenPortfolioLoading] = useState(false);
+  const [tokenPortfolioError, setTokenPortfolioError] = useState('');
+  const [tokenPortfolioUpdatedAt, setTokenPortfolioUpdatedAt] = useState('');
+  const [tokenSearch, setTokenSearch] = useState('');
   const [networkStatus, setNetworkStatus] = useState<'idle' | 'loading' | 'connected' | 'error'>('idle');
   const [networkError, setNetworkError] = useState('');
   const [activeRpcUrl, setActiveRpcUrl] = useState('');
@@ -209,6 +216,20 @@ export default function App() {
       .catch(() => { if (!cancelled) setNotice('Secure browser storage is unavailable. Wallet setup cannot continue until storage is available.'); });
     return () => { cancelled = true; };
   }, []);
+
+  const discoverTokens = async () => {
+    if (!address) { setNotice('Create or unlock a wallet before discovering token balances.'); setModal('wallet'); return; }
+    setTokenPortfolioLoading(true); setTokenPortfolioError('');
+    try {
+      const holdings = await discoverEvmTokenHoldings(address);
+      setTokenHoldings(holdings);
+      setTokenPortfolioAddress(address);
+      setTokenPortfolioUpdatedAt(new Date().toISOString());
+      setNotice(holdings.length ? `Found ${holdings.length} ERC-20 holding(s) across indexed EVM networks.` : 'No non-zero ERC-20 holdings were returned by the indexer.');
+    } catch (e) {
+      setTokenPortfolioError(e instanceof Error ? e.message : 'Could not discover token holdings.');
+    } finally { setTokenPortfolioLoading(false); }
+  };
 
   const refreshNetwork = async () => {
     if (selectedOtherNetwork === 'HyperLiquid L1') {
@@ -583,7 +604,7 @@ export default function App() {
       {activeTab !== 'Overview' && <div className="home-wallet-controls"><div className="breadcrumb">Ferra Wallet <span>/</span> <strong>{activeTab}</strong></div><div className="topbar-actions">{address ? <button className="connect-button connected" onClick={() => setNotice('Wallet is unlocked in this session: ' + shortAddress(address))}><span className="connected-dot"/>{shortAddress(address)}<ChevronDown size={15}/></button> : <button className="connect-button" onClick={() => setModal('wallet')}><Wallet size={16}/>{keystoreExists ? 'Unlock wallet' : 'Create / import'}</button>}</div></div>}
       <div className={`page-wrap ${activeTab === 'Overview' ? 'overview-page-wrap' : ''}`}>
         {activeTab === 'Market' ? <section className="panel activity-panel"><div className="panel-heading"><div><h2>Market</h2><p>Market data will be connected in a separate, verified phase.</p></div><span className="market-placeholder-tag">PLANNED</span></div><div className="market-empty">No external market feeds are connected in this clean foundation build.</div></section> : activeTab === 'Activity' ? <section className="panel activity-panel activity-page"><div className="panel-heading"><div><h2>History</h2><p>Wallet activity</p></div><span className="market-placeholder-tag">ACTIVITY</span></div><div className="market-empty">Transaction history is not connected yet.</div></section> : activeTab === 'Wallet' ? <section className="panel activity-panel"><div className="panel-heading"><div><h2>Your wallet</h2><p>Manage your local self-custody wallet.</p></div></div><p className="modal-description">{address ? address : 'No wallet is currently unlocked.'}</p><button className="primary-button" onClick={() => setModal('wallet')}>{address ? 'Wallet options' : keystoreExists ? 'Unlock wallet' : 'Create or import wallet'} <ArrowRight size={16}/></button></section> : <>
-          <div className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-line"/> YOUR WEB3 HOME</div><h1>Your crypto, clearly.</h1><p className="page-subtitle">One calm place to see and manage your digital assets.</p></div><button className="refresh-button" onClick={() => address ? setNotice('Balance lookup is not enabled yet; no balance is being estimated.') : setModal('wallet')}><span>{address ? 'Refresh' : 'Get started'}</span><ArrowUpRight size={15}/></button></div>
+          <div className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-line"/> YOUR WEB3 HOME</div><h1>Your crypto, clearly.</h1><p className="page-subtitle">One calm place to see and manage your digital assets.</p></div><button className="refresh-button" onClick={() => address ? void discoverTokens() : setModal('wallet')} disabled={tokenPortfolioLoading}><span>{address ? (tokenPortfolioLoading ? 'Scanning…' : 'Discover assets') : 'Get started'}</span><ArrowUpRight size={15}/></button></div>
           <section className="sire-home-value-card" aria-label="Total account value"><div className="sire-home-value-main"><div className="sire-home-value-copy"><div className="sire-home-value-card-top"><span>NATIVE BALANCE</span><button type="button" className="sire-home-value-eye" aria-label={totalValueVisible ? 'Hide balance' : 'Show balance'} onClick={() => setTotalValueVisible(value => !value)}>{totalValueVisible ? <Eye size={17}/> : <EyeOff size={17}/>}</button></div><div className="sire-home-value-amount">{totalValueVisible ? (selectedOtherNetwork === 'Solana' && solanaSnapshot ? `${formatEthForDisplay(solanaSnapshot.balanceSol)} SOL` : selectedOtherNetwork === 'Tron' && tronSnapshot ? `${formatEthForDisplay(tronSnapshot.balanceTrx)} TRX` : selectedOtherNetwork === 'Bitcoin' && bitcoinSnapshot ? `${formatEthForDisplay(bitcoinSnapshot.balanceBtc)} BTC` : selectedOtherNetwork === 'Ton' && tonSnapshot ? `${formatEthForDisplay(tonSnapshot.balanceTon)} TON` : selectedOtherNetwork === 'Stellar' && stellarSnapshot ? `${formatEthForDisplay(stellarSnapshot.balanceXlm)} XLM` : selectedOtherNetwork === 'Aptos' && aptosSnapshot ? `${formatEthForDisplay(aptosSnapshot.balanceApt)} APT` : selectedOtherNetwork === 'Cosmos' && cosmosSnapshot ? `${formatEthForDisplay(cosmosSnapshot.balanceAtom)} ATOM` : selectedOtherNetwork === 'Doge' && dogeSnapshot ? `${formatEthForDisplay(dogeSnapshot.balanceDoge)} DOGE` : selectedOtherNetwork === 'XRPL' && xrplSnapshot ? `${formatEthForDisplay(xrplSnapshot.balanceXrp)} XRP` : selectedOtherNetwork === 'SUI' && suiSnapshot ? `${formatEthForDisplay(suiSnapshot.balanceSui)} SUI` : selectedOtherNetwork === 'HyperLiquid L1' && hyperLiquidSnapshot ? `${formatEthForDisplay(hyperLiquidSnapshot.balanceHype)} HYPE` : selectedOtherNetwork === 'Lighter' && lighterSnapshot ? `${Number(lighterSnapshot.collateralUsd).toLocaleString('en-US', { maximumFractionDigits: 2 })} collateral` : networkSnapshot && selectedNetwork ? `${formatEthForDisplay(networkSnapshot.balanceEth)} ${selectedNetwork?.symbol ?? '—'}` : networkStatus === 'error' ? 'Unavailable' : registryLoading ? 'Loading networks…' : '—') : '••••••'}</div><div className="page-subtitle">{selectedChainAddress ? shortAddress(selectedChainAddress) : 'Create or unlock a wallet to get started'}</div></div><div className="sire-home-value-chart" aria-hidden="true"><svg viewBox="0 0 320 100" preserveAspectRatio="none"><defs><linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="currentColor" stopOpacity=".18"/><stop offset="100%" stopColor="currentColor" stopOpacity="0"/></linearGradient></defs><path d="M0 78 C35 75,45 68,72 71 S110 62,132 66 S165 48,188 53 S220 39,242 45 S278 25,320 31 L320 100 L0 100 Z" fill="url(#balanceGradient)"/><path d="M0 78 C35 75,45 68,72 71 S110 62,132 66 S165 48,188 53 S220 39,242 45 S278 25,320 31" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div></div><button type="button" className="sire-home-value-add-funds" onClick={() => setModal('wallet')}>{address ? 'Wallet options' : 'Get started'}</button></section>
           <section className="panel activity-panel chain-panel">
             <div className="panel-heading">
@@ -607,6 +628,24 @@ export default function App() {
               <div className="chain-meta"><span>Wallet address</span><strong>{selectedChainAddress ? shortAddress(selectedChainAddress) : 'Not unlocked'}</strong></div>
               <p className="chain-disclaimer">Read-only connection. Only your public address is queried; recovery phrase and private key are never sent to the RPC provider.</p>
             </div>
+          </section>
+          <section className="panel activity-panel evm-assets-panel" aria-labelledby="evm-assets-title">
+            <div className="panel-heading"><div><h2 id="evm-assets-title">Assets on {selectedNetwork?.name ?? 'this network'}</h2><p>Native coin and discovered ERC-20 balances for the selected chain.</p></div><button type="button" className="panel-action" onClick={() => void discoverTokens()} disabled={!address || tokenPortfolioLoading}>{tokenPortfolioLoading ? 'Scanning…' : tokenPortfolioAddress === address && tokenPortfolioUpdatedAt ? 'Refresh assets' : 'Discover assets'} <Activity size={13}/></button></div>
+            <div className="evm-assets-disclosure"><ShieldCheck size={14}/><span>Discovery uses Routescan’s public indexer and sends your public wallet address to it. Only indexed mainnet chains are covered; token names and symbols are not proof a token is safe.</span></div>
+            {tokenPortfolioError && <p className="wallet-error evm-assets-error" role="alert">{tokenPortfolioError}</p>}
+            {address && tokenPortfolioAddress !== address && !tokenPortfolioLoading && <div className="empty-inline">Choose Discover assets to look up this public address across indexed EVM networks.</div>}
+            {!address && <div className="empty-inline">Unlock your wallet to discover its ERC-20 holdings.</div>}
+            {tokenPortfolioLoading && <div className="empty-inline">Checking indexed token balances…</div>}
+            {tokenPortfolioAddress === address && address && selectedNetwork && <>
+              <label className="evm-assets-search"><Search size={15}/><input type="search" value={tokenSearch} onChange={event => setTokenSearch(event.target.value)} placeholder="Search name, symbol or contract" aria-label="Search assets on selected network"/></label>
+              <div className="evm-token-list">
+                <div className="evm-token-row evm-native-row"><span className="evm-token-icon">{selectedNetwork.symbol.slice(0, 2)}</span><span className="evm-token-copy"><strong>{selectedNetwork.name}</strong><small>{selectedNetwork.symbol} · Native coin · Chain ID {selectedNetwork.chainId}</small></span><span className="evm-token-balance"><strong>{networkSnapshot ? formatEthForDisplay(networkSnapshot.balanceEth) : '—'}</strong><small>{selectedNetwork.symbol}</small></span></div>
+                {tokenHoldings.filter(token => token.chainId === selectedNetwork.chainId && `${token.tokenName} ${token.tokenSymbol} ${token.tokenAddress}`.toLowerCase().includes(tokenSearch.trim().toLowerCase())).map(token => <div className="evm-token-row" key={`${token.chainId}:${token.tokenAddress.toLowerCase()}`}><span className="evm-token-icon evm-erc20-icon">{token.tokenSymbol.slice(0, 2).toUpperCase()}</span><span className="evm-token-copy"><strong>{token.tokenName}</strong><small>{token.tokenSymbol} · ERC-20 · {shortAddress(token.tokenAddress)}</small><small className="evm-token-contract">{token.tokenAddress}</small></span><span className="evm-token-balance"><strong>{formatEthForDisplay(token.balance)}</strong><small>{token.tokenSymbol}</small><button type="button" className="evm-token-send" onClick={() => { setTxKind('token'); setTxTokenAddress(token.tokenAddress); setTxAmount(''); setTxEstimate(null); setTokenPreview(null); setTxConfirmed(false); setTxHash(''); setTxError(''); document.getElementById('transfer-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); setNotice(`Selected ${token.tokenSymbol} on ${selectedNetwork.name}. Enter recipient and amount to review a transfer.`); }}>Send</button></span></div>)}
+                {!tokenHoldings.some(token => token.chainId === selectedNetwork.chainId && `${token.tokenName} ${token.tokenSymbol} ${token.tokenAddress}`.toLowerCase().includes(tokenSearch.trim().toLowerCase())) && <div className="empty-inline">{tokenSearch.trim() ? 'No assets match this search.' : 'No non-zero ERC-20 holdings were found for this network by the indexer.'}</div>}
+              </div>
+              <div className="asset-footer"><span>{tokenHoldings.filter(token => token.chainId === selectedNetwork.chainId).length} ERC-20 holding(s) on this chain</span><span>{tokenPortfolioUpdatedAt ? `Updated ${new Date(tokenPortfolioUpdatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Not refreshed'}</span></div>
+            </>}
+            {tokenPortfolioAddress === address && address && !selectedNetwork && <div className="empty-inline">Choose an EVM network to view its assets.</div>}
           </section>
           <section className="panel activity-panel chain-panel" id="transfer-panel">
             <div className="panel-heading"><div><h2>Send crypto</h2><p>Review the recipient, network, amount and estimated fee before signing locally.</p></div><span className="market-placeholder-tag">EVM SEND</span></div>
