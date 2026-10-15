@@ -63,31 +63,55 @@ function token(address: unknown, name: unknown, symbol: unknown, decimals: unkno
   return validRawToken(candidate) ? candidate : null;
 }
 
-async function geckoTerminalSolanaTokens(): Promise<RawToken[]> {
-  const discovered: RawToken[] = [];
-  const seen = new Set<string>();
-  // GeckoTerminal is a public fallback with no API key. Load several pages so
-  // the directory remains useful even if Jupiter's legacy list endpoint is unavailable.
-  for (let page = 1; page <= 5; page += 1) {
-    const payload = await fetchJson(`https://api.geckoterminal.com/api/v2/networks/solana/tokens?page=${page}`);
-    const records = (payload as any)?.data;
-    if (!Array.isArray(records)) throw new Error('GeckoTerminal returned an unexpected Solana token list');
-    for (const item of records) {
-      const attrs = item?.attributes;
-      const address = typeof attrs?.address === 'string'
-        ? attrs.address
-        : typeof item?.id === 'string' ? item.id.replace(/^solana_/, '') : '';
-      const candidate = token(address, attrs?.name, attrs?.symbol, attrs?.decimals, attrs?.image_url, 'GeckoTerminal Solana token directory');
-      if (!candidate || seen.has(candidate.address)) continue;
-      seen.add(candidate.address);
-      discovered.push(candidate);
+async function communitySolanaRegistryTokens(): Promise<RawToken[]> {
+  // Jupiter's legacy list can be blocked by browser CORS. Try a public
+  // community registry mirror; its metadata is not a safety endorsement.
+  const urls = [
+    'https://cdn.jsdelivr.net/gh/feyfry/Solana-Token-List@main/solana.tokenlist.json',
+    'https://raw.githubusercontent.com/feyfry/Solana-Token-List/main/solana.tokenlist.json',
+  ];
+  const errors: string[] = [];
+  for (const url of urls) {
+    try {
+      const payload = await fetchJson(url);
+      const records = (payload as any)?.tokens;
+      if (!Array.isArray(records)) throw new Error('token registry returned an unexpected payload');
+      const tokens = records
+        .filter((item: any) => item?.chainId === 101 || item?.chainId === undefined)
+        .map((item: any) => token(item?.address, item?.name, item?.symbol, item?.decimals, item?.logoURI, 'Community Solana token registry'))
+        .filter((item: RawToken | null): item is RawToken => Boolean(item));
+      if (tokens.length < 2) throw new Error('token registry returned too few usable tokens');
+      return [...new Map(tokens.map(item => [item.address, item])).values()];
+    } catch (error) {
+      errors.push(error instanceof Error ? error.message : 'request failed');
     }
-    if (records.length === 0) break;
   }
-  if (!discovered.length) throw new Error('GeckoTerminal returned no usable Solana token metadata');
-  return discovered;
+  throw new Error(errors.join('; ') || 'community Solana token registry unavailable');
 }
 
+async function geckoTerminalSolanaTokens(): Promise<RawToken[]> {
+  const discovered = new Map<string, RawToken>();
+  // GeckoTerminal exposes Solana pools (not a /networks/solana/tokens list).
+  // Included base/quote token metadata provides a live, no-key fallback.
+  for (let page = 1; page <= 5; page += 1) {
+    const url = 'https://api.geckoterminal.com/api/v2/networks/solana/pools?page=' + page + '&include=base_token,quote_token';
+    const payload = await fetchJson(url);
+    const included = (payload as any)?.included;
+    if (!Array.isArray(included)) throw new Error('GeckoTerminal returned no included pool-token metadata');
+    for (const item of included) {
+      if (item?.type !== 'token' && !String(item?.id ?? '').startsWith('solana_')) continue;
+      const attrs = item?.attributes;
+      const address = typeof attrs?.address === 'string' ? attrs.address : typeof item?.id === 'string' ? item.id.replace(/^solana_/, '') : '';
+      const candidate = token(address, attrs?.name, attrs?.symbol, attrs?.decimals, attrs?.image_url, 'GeckoTerminal Solana pool metadata');
+      if (candidate && !discovered.has(candidate.address)) discovered.set(candidate.address, candidate);
+    }
+    const pools = (payload as any)?.data;
+    if (!Array.isArray(pools)) throw new Error('GeckoTerminal returned an unexpected Solana pools response');
+    if (pools.length === 0) break;
+  }
+  if (discovered.size < 2) throw new Error('GeckoTerminal returned too few usable Solana token records');
+  return [...discovered.values()];
+}
 async function solanaTokens(): Promise<{ tokens: RawToken[]; source: string; warning?: string }> {
   try {
     const payload = await fetchJson('https://tokens.jup.ag/tokens?tags=verified');
@@ -96,17 +120,27 @@ async function solanaTokens(): Promise<{ tokens: RawToken[]; source: string; war
     if (tokens.length < 2) throw new Error('Jupiter legacy endpoint returned too few tokens');
     return { tokens, source: 'Jupiter verified token list' };
   } catch (jupiterError) {
+    const primaryMessage = jupiterError instanceof Error ? jupiterError.message : 'Jupiter request failed';
     try {
-      const tokens = await geckoTerminalSolanaTokens();
+      const tokens = await communitySolanaRegistryTokens();
       return {
         tokens,
-        source: 'GeckoTerminal Solana token directory (public fallback)',
-        warning: `Jupiter's legacy token list was unavailable; showing assets discovered from GeckoTerminal instead. Token metadata is not a safety guarantee.`,
+        source: 'Community Solana token registry (public fallback)',
+        warning: "Jupiter's legacy token list was unavailable; showing the community registry instead. Token metadata is not a safety guarantee.",
       };
-    } catch (fallbackError) {
-      const primaryMessage = jupiterError instanceof Error ? jupiterError.message : 'Jupiter request failed';
-      const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : 'GeckoTerminal request failed';
-      throw new Error(`Jupiter token list failed (${primaryMessage}); public fallback failed (${fallbackMessage}).`);
+    } catch (registryError) {
+      const registryMessage = registryError instanceof Error ? registryError.message : 'community registry request failed';
+      try {
+        const tokens = await geckoTerminalSolanaTokens();
+        return {
+          tokens,
+          source: 'GeckoTerminal Solana pool metadata (secondary fallback)',
+          warning: 'Jupiter and the community token registry were unavailable; showing tokens found in GeckoTerminal pools. Token metadata is not a safety guarantee.',
+        };
+      } catch (fallbackError) {
+        const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : 'GeckoTerminal request failed';
+        throw new Error(`Jupiter token list failed (${primaryMessage}); community registry failed (${registryMessage}); GeckoTerminal pool fallback failed (${fallbackMessage}).`);
+      }
     }
   }
 }
