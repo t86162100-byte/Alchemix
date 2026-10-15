@@ -381,11 +381,6 @@ export default function App() {
     </div>}
 
 
-    
-        </div>
-        <footer className="network-picker-footer"><span className="network-picker-footer-dot"/><span>{networks.length} curated EVM networks currently have a usable registry match. Other chains are shown honestly and stay unavailable until integrated.</span></footer>
-      </section>
-    </div>}
 
     {notice && <div className="toast" role="status"><span className="toast-dot"/><span>{notice}</span><button onClick={() => setNotice('')} aria-label="Dismiss notification"><X size={16}/></button></div>}
     {modal && <div className="modal-backdrop" onClick={closeModal}><section className="modal-card" onClick={event => event.stopPropagation()}>
