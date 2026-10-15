@@ -8,7 +8,7 @@ import { previewTokenTransfer, sendTokenTransfer, type TokenTransferPreview } fr
 import { discoverEvmTokenHoldings, readCommonTokenBalances, type EvmTokenHolding } from './core/chain/evmTokenPortfolioService';
 import { loadEvmMarketTokenCatalog, clearEvmMarketTokenCache, type EvmMarketToken } from './core/chain/evmMarketTokenService';
 import { loadNonEvmMarketTokenCatalog, clearNonEvmMarketTokenCache } from './core/chain/nonEvmMarketTokenService';
-import { readSolanaSnapshot, type SolanaSnapshot } from './core/chain/solanaService';
+import { readSolanaSnapshot, previewSolanaTransfer, sendSolanaTransfer, type SolanaSnapshot, type SolanaTransferPreview } from './core/chain/solanaService';
 import { readTronSnapshot, type TronSnapshot } from './core/chain/tronService';
 import { readBitcoinSnapshot, type BitcoinSnapshot } from './core/chain/bitcoinService';
 import type { TonSnapshot } from './core/chain/tonService';
@@ -179,6 +179,7 @@ export default function App() {
   const [selectedOtherNetwork, setSelectedOtherNetwork] = useState('');
   const [activeMnemonicPhrase, setActiveMnemonicPhrase] = useState('');
   const [solanaSnapshot, setSolanaSnapshot] = useState<SolanaSnapshot | null>(null);
+  const [solanaTransferPreview, setSolanaTransferPreview] = useState<SolanaTransferPreview | null>(null);
   const [tronSnapshot, setTronSnapshot] = useState<TronSnapshot | null>(null);
   const [bitcoinSnapshot, setBitcoinSnapshot] = useState<BitcoinSnapshot | null>(null);
   const [tonSnapshot, setTonSnapshot] = useState<TonSnapshot | null>(null);
@@ -595,8 +596,14 @@ export default function App() {
   }, [address, activeMnemonicPhrase, selectedOtherNetwork, selectedNetworkKey, selectedNetwork]);
 
   const prepareTransfer = async () => {
-    setTxBusy(true); setTxError(''); setTxEstimate(null); setTokenPreview(null); setTxConfirmed(false); setTxHash('');
+    setTxBusy(true); setTxError(''); setTxEstimate(null); setTokenPreview(null); setSolanaTransferPreview(null); setTxConfirmed(false); setTxHash('');
     try {
+      if (selectedOtherNetwork === 'Solana') {
+        if (!activeMnemonicPhrase) throw new Error('Unlock your wallet before preparing a SOL transfer.');
+        if (txKind !== 'native') throw new Error('Only native SOL transfers are enabled here. SPL-token transfers require their own verified adapter.');
+        setSolanaTransferPreview(await previewSolanaTransfer(activeMnemonicPhrase, txRecipient, txAmount));
+        return;
+      }
       if (!address || !unlockedWallet) throw new Error('Unlock your wallet before preparing a transfer.');
       if (!selectedNetwork) throw new Error('Select a supported EVM network first.');
       if (txKind === 'token') setTokenPreview(await previewTokenTransfer(selectedNetwork, unlockedWallet, txTokenAddress, txRecipient, txAmount));
@@ -607,6 +614,18 @@ export default function App() {
 
   const submitTransfer = async () => {
     if (!txConfirmed) { setTxError('Review the details and confirm before sending.'); return; }
+    if (selectedOtherNetwork === 'Solana') {
+      if (!activeMnemonicPhrase || !solanaTransferPreview) { setTxError('Review a SOL transfer before sending.'); return; }
+      setTxBusy(true); setTxError('');
+      try {
+        const result = await sendSolanaTransfer(activeMnemonicPhrase, txRecipient, txAmount, true);
+        setTxHash(result.signature); setSolanaTransferPreview(null); setTxConfirmed(false);
+        setNotice('SOL transaction submitted. Check the Solana explorer for confirmation before assuming it is complete.');
+        void refreshNetwork();
+      } catch (e) { setTxError(e instanceof Error ? e.message : 'The SOL transfer could not be submitted. Check the signature/history before retrying if the request timed out.'); }
+      finally { setTxBusy(false); }
+      return;
+    }
     if (!unlockedWallet || !selectedNetwork) { setTxError('Unlock your wallet and select an EVM network first.'); return; }
     if (txKind === 'token' && !tokenPreview) { setTxError('Validate the token transfer before sending.'); return; }
     if (txKind === 'native' && !txEstimate) { setTxError('Estimate the native transfer before sending.'); return; }
@@ -768,6 +787,17 @@ export default function App() {
             </>}
             {tokenPortfolioAddress === address && address && !selectedNetwork && <div className="empty-inline">Choose an EVM network to view its assets.</div>}
           </section>
+          {selectedOtherNetwork === 'Solana' && <section className="panel activity-panel chain-panel" id="transfer-panel" style={selectedOtherNetwork ? { display: "none" } : undefined}>
+            <div className="panel-heading"><div><h2>Send crypto</h2><p>Native SOL transfer · locally signed on Solana mainnet.</p></div><span className="market-placeholder-tag">SOL SEND</span></div>
+            <div className="network-picker-filters" role="group" aria-label="Transfer type"><button type="button" className="active" disabled>Native SOL</button><button type="button" disabled title="SPL-token transfers are not enabled yet">SPL tokens · coming soon</button></div>
+            <label className="form-label" htmlFor="ferra-recipient">Recipient Solana address</label><input id="ferra-recipient" className="form-input" inputMode="text" autoComplete="off" spellCheck={false} value={txRecipient} onChange={event => { setTxRecipient(event.target.value); setSolanaTransferPreview(null); setTxConfirmed(false); setTxHash(''); setTxError(''); }} placeholder="Enter a Solana address"/>
+            <label className="form-label" htmlFor="ferra-amount">Amount (SOL)</label><input id="ferra-amount" className="form-input" inputMode="decimal" autoComplete="off" value={txAmount} onChange={event => { setTxAmount(event.target.value); setSolanaTransferPreview(null); setTxConfirmed(false); setTxHash(''); setTxError(''); }} placeholder="0.01"/>
+            <button className="primary-button full-button" disabled={!activeMnemonicPhrase || !solanaSnapshot || txBusy || networkStatus !== 'connected'} onClick={() => void prepareTransfer()}>{txBusy ? 'Preparing transfer…' : 'Review SOL transfer'} <ArrowRight size={16}/></button>
+            {!activeMnemonicPhrase && <p className="chain-disclaimer">Unlock your wallet to prepare a transfer. The recovery phrase stays in this browser; only the signed transaction is broadcast.</p>}
+            {txError && <p className="wallet-error" role="alert">{txError}</p>}
+            {solanaTransferPreview && <div className="tx-estimate" role="status"><div><span>Network</span><strong>Solana Mainnet</strong></div><div><span>From</span><strong>{solanaTransferPreview.from}</strong></div><div><span>Recipient</span><strong>{solanaTransferPreview.to}</strong></div><div><span>Amount</span><strong>{solanaTransferPreview.amountSol} SOL</strong></div><div><span>Available balance</span><strong>{solanaTransferPreview.balanceSol} SOL</strong></div><div><span>Estimated network fee</span><strong>{solanaTransferPreview.estimatedFeeSol} SOL</strong></div><div><span>Estimated total required</span><strong>{solanaTransferPreview.totalRequiredSol} SOL</strong></div><label className="form-label"><input type="checkbox" checked={txConfirmed} onChange={event => setTxConfirmed(event.target.checked)}/> I checked the Solana network, full recipient address, amount and estimated fee.</label><button className="primary-button full-button" disabled={!txConfirmed || txBusy} onClick={() => void submitTransfer()}>{txBusy ? 'Submitting…' : `Send ${solanaTransferPreview.amountSol} SOL`} <ArrowUpRight size={16}/></button><p className="chain-disclaimer">This sends native SOL only. Transfers are generally irreversible. The network fee may change before submission.</p></div>}
+            {txHash && <div className="tx-estimate" role="status"><div><span>Transaction signature</span><strong>{txHash}</strong></div><a className="panel-action" href={`https://explorer.solana.com/tx/${txHash}`} target="_blank" rel="noreferrer">View on Solana Explorer <ArrowUpRight size={14}/></a><p className="chain-disclaimer">If confirmation timed out, inspect this signature before retrying to avoid sending twice.</p></div>}
+          </section>}
           <section className="panel activity-panel chain-panel" id="transfer-panel">
             <div className="panel-heading"><div><h2>Send crypto</h2><p>Review the recipient, network, amount and estimated fee before signing locally.</p></div><span className="market-placeholder-tag">EVM SEND</span></div>
             {selectedOtherNetwork && <p className="chain-disclaimer">Sending is currently available only on EVM networks. Non-EVM adapters remain read-only until their transaction flows are integrated and tested.</p>}
