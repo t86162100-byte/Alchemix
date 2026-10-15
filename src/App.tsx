@@ -8,6 +8,7 @@ import { readTronSnapshot, type TronSnapshot } from './core/chain/tronService';
 import { readBitcoinSnapshot, type BitcoinSnapshot } from './core/chain/bitcoinService';
 import type { TonSnapshot } from './core/chain/tonService';
 import type { StellarSnapshot } from './core/chain/stellarService';
+import type { AptosSnapshot } from './core/chain/aptosService';
 
 type Tab = 'Overview' | 'Market' | 'Activity' | 'Wallet' | 'Swap' | 'Explore';
 type Modal = 'wallet' | 'create' | 'import' | 'unlock' | 'help' | null;
@@ -164,6 +165,7 @@ export default function App() {
   const [bitcoinSnapshot, setBitcoinSnapshot] = useState<BitcoinSnapshot | null>(null);
   const [tonSnapshot, setTonSnapshot] = useState<TonSnapshot | null>(null);
   const [stellarSnapshot, setStellarSnapshot] = useState<StellarSnapshot | null>(null);
+  const [aptosSnapshot, setAptosSnapshot] = useState<AptosSnapshot | null>(null);
   const [networkSnapshot, setNetworkSnapshot] = useState<NetworkSnapshot | null>(null);
   const [networkStatus, setNetworkStatus] = useState<'idle' | 'loading' | 'connected' | 'error'>('idle');
   const [networkError, setNetworkError] = useState('');
@@ -175,7 +177,7 @@ export default function App() {
   const [txBusy, setTxBusy] = useState(false);
   const selectedNetwork = selectedOtherNetwork ? undefined : networks.find(network => network.key === selectedNetworkKey);
   const selectedCuratedEntry = selectedOtherNetwork ? CURATED_NETWORKS.find(entry => entry.name === selectedOtherNetwork) : selectedNetwork ? CURATED_NETWORKS.find(entry => networkMatchesEntry(selectedNetwork, entry)) : undefined;
-  const selectedChainAddress = selectedOtherNetwork === 'Solana' ? (solanaSnapshot?.address ?? '') : selectedOtherNetwork === 'Tron' ? (tronSnapshot?.address ?? '') : selectedOtherNetwork === 'Bitcoin' ? (bitcoinSnapshot?.address ?? '') : selectedOtherNetwork === 'Ton' ? (tonSnapshot?.address ?? '') : selectedOtherNetwork === 'Stellar' ? (stellarSnapshot?.address ?? '') : address;
+  const selectedChainAddress = selectedOtherNetwork === 'Solana' ? (solanaSnapshot?.address ?? '') : selectedOtherNetwork === 'Tron' ? (tronSnapshot?.address ?? '') : selectedOtherNetwork === 'Bitcoin' ? (bitcoinSnapshot?.address ?? '') : selectedOtherNetwork === 'Ton' ? (tonSnapshot?.address ?? '') : selectedOtherNetwork === 'Stellar' ? (stellarSnapshot?.address ?? '') : selectedOtherNetwork === 'Aptos' ? (aptosSnapshot?.address ?? '') : address;
   const visibleCuratedNetworks = CURATED_NETWORKS.filter(entry => {
     const matchesCategory = networkDrawerCategory === 'All' || entry.family === networkDrawerCategory;
     const matchesSearch = entry.name.toLowerCase().includes(networkDrawerSearch.trim().toLowerCase());
@@ -191,6 +193,13 @@ export default function App() {
   }, []);
 
   const refreshNetwork = async () => {
+    if (selectedOtherNetwork === 'Aptos') {
+      if (!activeMnemonicPhrase) { setNetworkStatus('error'); setNetworkError('Unlock the wallet with its recovery phrase to derive the Aptos account.'); return; }
+      setNetworkStatus('loading'); setNetworkError('');
+      try { const snapshot = await (await import('./core/chain/aptosService')).readAptosSnapshot(activeMnemonicPhrase); setAptosSnapshot(snapshot); setActiveRpcUrl(snapshot.apiUrl); setNetworkStatus('connected'); }
+      catch (e) { setAptosSnapshot(null); setNetworkStatus('error'); setNetworkError(e instanceof Error ? e.message : 'Could not read the Aptos balance.'); }
+      return;
+    }
     if (selectedOtherNetwork === 'Stellar') {
       if (!activeMnemonicPhrase) { setNetworkStatus('error'); setNetworkError('Unlock the wallet with its recovery phrase to derive the Stellar account.'); return; }
       setNetworkStatus('loading'); setNetworkError('');
@@ -274,6 +283,15 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
+    if (selectedOtherNetwork === 'Aptos') {
+      setNetworkStatus('loading'); setNetworkError(''); setNetworkSnapshot(null); setActiveRpcUrl(''); setAptosSnapshot(null); setStellarSnapshot(null); setTonSnapshot(null); setBitcoinSnapshot(null); setTronSnapshot(null); setSolanaSnapshot(null);
+      if (!activeMnemonicPhrase) { setNetworkStatus('error'); setNetworkError('Unlock the wallet with its recovery phrase to derive the Aptos account.'); return () => { cancelled = true; }; }
+      import('./core/chain/aptosService').then(({ readAptosSnapshot }) => readAptosSnapshot(activeMnemonicPhrase)).then(snapshot => {
+        if (!cancelled) { setAptosSnapshot(snapshot); setActiveRpcUrl(snapshot.apiUrl); setNetworkStatus('connected'); }
+      }).catch(e => { if (!cancelled) { setAptosSnapshot(null); setNetworkStatus('error'); setNetworkError(e instanceof Error ? e.message : 'Could not read the Aptos balance.'); } });
+      return () => { cancelled = true; };
+    }
+    setAptosSnapshot(null);
     if (selectedOtherNetwork === 'Stellar') {
       setNetworkStatus('loading'); setNetworkError(''); setNetworkSnapshot(null); setActiveRpcUrl(''); setStellarSnapshot(null); setTonSnapshot(null); setBitcoinSnapshot(null); setTronSnapshot(null); setSolanaSnapshot(null);
       if (!activeMnemonicPhrase) { setNetworkStatus('error'); setNetworkError('Unlock the wallet with its recovery phrase to derive the Stellar account.'); return () => { cancelled = true; }; }
@@ -440,11 +458,11 @@ export default function App() {
       <div className={`page-wrap ${activeTab === 'Overview' ? 'overview-page-wrap' : ''}`}>
         {activeTab === 'Market' ? <section className="panel activity-panel"><div className="panel-heading"><div><h2>Market</h2><p>Market data will be connected in a separate, verified phase.</p></div><span className="market-placeholder-tag">PLANNED</span></div><div className="market-empty">No external market feeds are connected in this clean foundation build.</div></section> : activeTab === 'Activity' ? <section className="panel activity-panel activity-page"><div className="panel-heading"><div><h2>History</h2><p>Wallet activity</p></div><span className="market-placeholder-tag">ACTIVITY</span></div><div className="market-empty">Transaction history is not connected yet.</div></section> : activeTab === 'Wallet' ? <section className="panel activity-panel"><div className="panel-heading"><div><h2>Your wallet</h2><p>Manage your local self-custody wallet.</p></div></div><p className="modal-description">{address ? address : 'No wallet is currently unlocked.'}</p><button className="primary-button" onClick={() => setModal('wallet')}>{address ? 'Wallet options' : keystoreExists ? 'Unlock wallet' : 'Create or import wallet'} <ArrowRight size={16}/></button></section> : <>
           <div className="welcome-row"><div><div className="eyebrow"><span className="eyebrow-line"/> YOUR WEB3 HOME</div><h1>Your crypto, clearly.</h1><p className="page-subtitle">One calm place to see and manage your digital assets.</p></div><button className="refresh-button" onClick={() => address ? setNotice('Balance lookup is not enabled yet; no balance is being estimated.') : setModal('wallet')}><span>{address ? 'Refresh' : 'Get started'}</span><ArrowUpRight size={15}/></button></div>
-          <section className="sire-home-value-card" aria-label="Total account value"><div className="sire-home-value-main"><div className="sire-home-value-copy"><div className="sire-home-value-card-top"><span>NATIVE BALANCE</span><button type="button" className="sire-home-value-eye" aria-label={totalValueVisible ? 'Hide balance' : 'Show balance'} onClick={() => setTotalValueVisible(value => !value)}>{totalValueVisible ? <Eye size={17}/> : <EyeOff size={17}/>}</button></div><div className="sire-home-value-amount">{totalValueVisible ? (selectedOtherNetwork === 'Solana' && solanaSnapshot ? `${formatEthForDisplay(solanaSnapshot.balanceSol)} SOL` : selectedOtherNetwork === 'Tron' && tronSnapshot ? `${formatEthForDisplay(tronSnapshot.balanceTrx)} TRX` : selectedOtherNetwork === 'Bitcoin' && bitcoinSnapshot ? `${formatEthForDisplay(bitcoinSnapshot.balanceBtc)} BTC` : selectedOtherNetwork === 'Ton' && tonSnapshot ? `${formatEthForDisplay(tonSnapshot.balanceTon)} TON` : selectedOtherNetwork === 'Stellar' && stellarSnapshot ? `${formatEthForDisplay(stellarSnapshot.balanceXlm)} XLM` : networkSnapshot && selectedNetwork ? `${formatEthForDisplay(networkSnapshot.balanceEth)} ${selectedNetwork?.symbol ?? '—'}` : networkStatus === 'error' ? 'Unavailable' : registryLoading ? 'Loading networks…' : '—') : '••••••'}</div><div className="page-subtitle">{selectedChainAddress ? shortAddress(selectedChainAddress) : 'Create or unlock a wallet to get started'}</div></div><div className="sire-home-value-chart" aria-hidden="true"><svg viewBox="0 0 320 100" preserveAspectRatio="none"><defs><linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="currentColor" stopOpacity=".18"/><stop offset="100%" stopColor="currentColor" stopOpacity="0"/></linearGradient></defs><path d="M0 78 C35 75,45 68,72 71 S110 62,132 66 S165 48,188 53 S220 39,242 45 S278 25,320 31 L320 100 L0 100 Z" fill="url(#balanceGradient)"/><path d="M0 78 C35 75,45 68,72 71 S110 62,132 66 S165 48,188 53 S220 39,242 45 S278 25,320 31" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div></div><button type="button" className="sire-home-value-add-funds" onClick={() => setModal('wallet')}>{address ? 'Wallet options' : 'Get started'}</button></section>
+          <section className="sire-home-value-card" aria-label="Total account value"><div className="sire-home-value-main"><div className="sire-home-value-copy"><div className="sire-home-value-card-top"><span>NATIVE BALANCE</span><button type="button" className="sire-home-value-eye" aria-label={totalValueVisible ? 'Hide balance' : 'Show balance'} onClick={() => setTotalValueVisible(value => !value)}>{totalValueVisible ? <Eye size={17}/> : <EyeOff size={17}/>}</button></div><div className="sire-home-value-amount">{totalValueVisible ? (selectedOtherNetwork === 'Solana' && solanaSnapshot ? `${formatEthForDisplay(solanaSnapshot.balanceSol)} SOL` : selectedOtherNetwork === 'Tron' && tronSnapshot ? `${formatEthForDisplay(tronSnapshot.balanceTrx)} TRX` : selectedOtherNetwork === 'Bitcoin' && bitcoinSnapshot ? `${formatEthForDisplay(bitcoinSnapshot.balanceBtc)} BTC` : selectedOtherNetwork === 'Ton' && tonSnapshot ? `${formatEthForDisplay(tonSnapshot.balanceTon)} TON` : selectedOtherNetwork === 'Stellar' && stellarSnapshot ? `${formatEthForDisplay(stellarSnapshot.balanceXlm)} XLM` : selectedOtherNetwork === 'Aptos' && aptosSnapshot ? `${formatEthForDisplay(aptosSnapshot.balanceApt)} APT` : networkSnapshot && selectedNetwork ? `${formatEthForDisplay(networkSnapshot.balanceEth)} ${selectedNetwork?.symbol ?? '—'}` : networkStatus === 'error' ? 'Unavailable' : registryLoading ? 'Loading networks…' : '—') : '••••••'}</div><div className="page-subtitle">{selectedChainAddress ? shortAddress(selectedChainAddress) : 'Create or unlock a wallet to get started'}</div></div><div className="sire-home-value-chart" aria-hidden="true"><svg viewBox="0 0 320 100" preserveAspectRatio="none"><defs><linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="currentColor" stopOpacity=".18"/><stop offset="100%" stopColor="currentColor" stopOpacity="0"/></linearGradient></defs><path d="M0 78 C35 75,45 68,72 71 S110 62,132 66 S165 48,188 53 S220 39,242 45 S278 25,320 31 L320 100 L0 100 Z" fill="url(#balanceGradient)"/><path d="M0 78 C35 75,45 68,72 71 S110 62,132 66 S165 48,188 53 S220 39,242 45 S278 25,320 31" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div></div><button type="button" className="sire-home-value-add-funds" onClick={() => setModal('wallet')}>{address ? 'Wallet options' : 'Get started'}</button></section>
           <section className="panel activity-panel chain-panel">
             <div className="panel-heading">
               <div><h2>Blockchain connection</h2><p>Live native balance from the selected network</p></div>
-              <button className="panel-action" onClick={() => void refreshNetwork()} disabled={(!selectedNetwork && selectedOtherNetwork !== 'Solana' && selectedOtherNetwork !== 'Tron' && selectedOtherNetwork !== 'Bitcoin' && selectedOtherNetwork !== 'Stellar') || networkStatus === 'loading'}><Activity size={14}/> Refresh</button>
+              <button className="panel-action" onClick={() => void refreshNetwork()} disabled={(!selectedNetwork && selectedOtherNetwork !== 'Solana' && selectedOtherNetwork !== 'Tron' && selectedOtherNetwork !== 'Bitcoin' && selectedOtherNetwork !== 'Stellar' && selectedOtherNetwork !== 'Aptos') || networkStatus === 'loading'}><Activity size={14}/> Refresh</button>
             </div>
             <div className="chain-controls">
               <span className="form-label">Network</span>
@@ -456,10 +474,10 @@ export default function App() {
               {registryError && <p className="wallet-error" role="alert">{registryError} Refresh the page to retry.</p>}
               <div className={`chain-status ${networkStatus}`} role="status">
                 <span className="chain-status-dot"/>
-                <span>{networkStatus === 'loading' ? 'Connecting to RPC…' : networkStatus === 'connected' ? `Connected · ${selectedOtherNetwork === 'Solana' ? `slot ${solanaSnapshot?.slot ?? '—'}` : selectedOtherNetwork === 'Tron' ? 'account balance loaded' : selectedOtherNetwork === 'Bitcoin' ? 'address balance loaded' : selectedOtherNetwork === 'Ton' ? 'account balance loaded' : selectedOtherNetwork === 'Stellar' ? 'account balance loaded' : `block ${networkSnapshot?.blockNumber ?? '—'}`}` : networkStatus === 'error' ? 'Connection failed' : address ? 'Waiting for connection' : 'Connected; unlock wallet to check balance'}</span>
+                <span>{networkStatus === 'loading' ? 'Connecting to RPC…' : networkStatus === 'connected' ? `Connected · ${selectedOtherNetwork === 'Solana' ? `slot ${solanaSnapshot?.slot ?? '—'}` : selectedOtherNetwork === 'Tron' ? 'account balance loaded' : selectedOtherNetwork === 'Bitcoin' ? 'address balance loaded' : selectedOtherNetwork === 'Ton' ? 'account balance loaded' : selectedOtherNetwork === 'Stellar' ? 'account balance loaded' : selectedOtherNetwork === 'Aptos' ? 'account balance loaded' : `block ${networkSnapshot?.blockNumber ?? '—'}`}` : networkStatus === 'error' ? 'Connection failed' : address ? 'Waiting for connection' : 'Connected; unlock wallet to check balance'}</span>
               </div>
               {networkStatus === 'error' && <p className="wallet-error" role="alert">{networkError}</p>}
-              <div className="chain-meta"><span>RPC provider</span><strong>{activeRpcUrl || (networkStatus === 'error' ? 'No responding endpoint' : selectedNetwork?.rpcUrl ?? (selectedOtherNetwork === 'Solana' ? 'Solana mainnet RPC' : selectedOtherNetwork === 'Tron' ? 'TronGrid API' : selectedOtherNetwork === 'Bitcoin' ? 'mempool.space API' : selectedOtherNetwork === 'Ton' ? 'TON API' : selectedOtherNetwork === 'Stellar' ? 'Stellar Horizon API' : 'Waiting for registry'))}</strong></div>
+              <div className="chain-meta"><span>RPC provider</span><strong>{activeRpcUrl || (networkStatus === 'error' ? 'No responding endpoint' : selectedNetwork?.rpcUrl ?? (selectedOtherNetwork === 'Solana' ? 'Solana mainnet RPC' : selectedOtherNetwork === 'Tron' ? 'TronGrid API' : selectedOtherNetwork === 'Bitcoin' ? 'mempool.space API' : selectedOtherNetwork === 'Ton' ? 'TON API' : selectedOtherNetwork === 'Stellar' ? 'Stellar Horizon API' : selectedOtherNetwork === 'Aptos' ? 'Aptos Fullnode API' : 'Waiting for registry'))}</strong></div>
               <div className="chain-meta"><span>Wallet address</span><strong>{selectedChainAddress ? shortAddress(selectedChainAddress) : 'Not unlocked'}</strong></div>
               <p className="chain-disclaimer">Read-only connection. Only your public address is queried; recovery phrase and private key are never sent to the RPC provider.</p>
             </div>
@@ -509,14 +527,14 @@ export default function App() {
           {visibleCuratedNetworks.map(entry => {
             const network = networkForEntry(entry);
             const active = entry.name === selectedOtherNetwork || Boolean(network && network.key === selectedNetworkKey);
-            const unavailable = !network && entry.name !== 'Solana' && entry.name !== 'Tron' && entry.name !== 'Bitcoin' && entry.name !== 'Ton' && entry.name !== 'Stellar';
+            const unavailable = !network && entry.name !== 'Solana' && entry.name !== 'Tron' && entry.name !== 'Bitcoin' && entry.name !== 'Ton' && entry.name !== 'Stellar' && entry.name !== 'Aptos';
             return <button type="button" key={entry.name} className={`network-picker-row ${active ? 'active' : ''} ${unavailable ? 'unavailable' : ''}`} onClick={() => {
-              if (entry.name === 'Solana' || entry.name === 'Tron' || entry.name === 'Bitcoin' || entry.name === 'Ton' || entry.name === 'Stellar') { setSelectedOtherNetwork(entry.name); setNetworkDrawerOpen(false); return; }
+              if (entry.name === 'Solana' || entry.name === 'Tron' || entry.name === 'Bitcoin' || entry.name === 'Ton' || entry.name === 'Stellar' || entry.name === 'Aptos') { setSelectedOtherNetwork(entry.name); setNetworkDrawerOpen(false); return; }
               if (!network) { setNotice(`${entry.name} is listed in Ferra’s network directory, but its chain adapter is not integrated yet.`); return; }
               setSelectedOtherNetwork(''); setSelectedNetworkKey(network.key); setSolanaSnapshot(null); setTxEstimate(null); setTxError(''); setNetworkDrawerOpen(false); setNotice(`Switched to ${entry.name}.`);
             }}>
               <span className={`network-picker-icon network-icon-${entry.name.toLowerCase().replace(/[^a-z0-9]/g, '')}`}>{entry.name === 'Ethereum' ? 'Ξ' : entry.name === 'Bitcoin' ? '₿' : entry.name === 'Ton' ? 'T' : entry.name === 'Stellar' ? 'S' : entry.name.slice(0, 1).toUpperCase()}</span>
-              <span className="network-picker-row-copy"><strong>{entry.name}</strong><small>{entry.name === 'Solana' ? 'SOL · read-only balance' : entry.name === 'Tron' ? 'TRX · read-only balance' : entry.name === 'Bitcoin' ? 'BTC · read-only balance' : entry.name === 'Ton' ? 'TON · read-only balance' : entry.name === 'Stellar' ? 'XLM · read-only balance' : network ? `${network.symbol} · Chain ID ${network.chainId}` : entry.family === 'Other' ? 'Non-EVM · integration pending' : 'EVM · integration pending'}</small></span>
+              <span className="network-picker-row-copy"><strong>{entry.name}</strong><small>{entry.name === 'Solana' ? 'SOL · read-only balance' : entry.name === 'Tron' ? 'TRX · read-only balance' : entry.name === 'Bitcoin' ? 'BTC · read-only balance' : entry.name === 'Ton' ? 'TON · read-only balance' : entry.name === 'Stellar' ? 'XLM · read-only balance' : entry.name === 'Aptos' ? 'APT · read-only balance' : network ? `${network.symbol} · Chain ID ${network.chainId}` : entry.family === 'Other' ? 'Non-EVM · integration pending' : 'EVM · integration pending'}</small></span>
               {active ? <span className="network-picker-check">✓</span> : unavailable ? <span className="network-picker-soon">SOON</span> : <ArrowRight size={16} className="network-picker-arrow"/>}
             </button>;
           })}
