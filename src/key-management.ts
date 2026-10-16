@@ -38,6 +38,10 @@ export function deriveSupportedAddresses(
   mnemonic: string,
   bip39Passphrase = '',
 ): WalletAddress[] {
+  // Wallet Core exposes the canonical BIP-39 checksum/word-list validator; do not derive from word count alone.
+  if (!core.Mnemonic.isValid(mnemonic)) {
+    throw new Error('Invalid BIP-39 recovery phrase or checksum. Check the words and their order.');
+  }
   const wallet = core.HDWallet.createWithMnemonic(mnemonic, bip39Passphrase);
   try {
     const ethereum = String(wallet.getAddressForCoin(core.CoinType.ethereum));
