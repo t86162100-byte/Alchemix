@@ -1,0 +1,29 @@
+name: Wallet build verification
+
+on:
+  push:
+    branches:
+      - trust-wallet-clone
+  pull_request:
+    branches:
+      - trust-wallet-clone
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Install dependencies
+        run: npm install
+      - name: Type-check and build
+        run: npm run build
