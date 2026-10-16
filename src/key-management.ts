@@ -76,6 +76,7 @@ export function deriveSupportedAddresses(
     }
 
     const result: WalletAddress[] = [];
+    const getAddressForCoin = wallet.getAddressForCoin as unknown as (coinType: number) => string;
 
     for (const entry of WALLET_CORE_REGISTRY) {
       // Solana is deliberately handled by the separately validated fallback below:
@@ -88,7 +89,7 @@ export function deriveSupportedAddresses(
       if (coinType === undefined) continue;
 
       try {
-        const value = String(wallet.getAddressForCoin(coinType)).trim();
+        const value = String(getAddressForCoin(coinType)).trim();
         if (!value || value === '[object Object]') continue;
 
         const isEvmAddress = /^0x[0-9a-fA-F]{40}$/.test(value);
