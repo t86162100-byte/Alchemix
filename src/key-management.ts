@@ -9,6 +9,7 @@ export type WalletAddress = {
   derivationPath: string;
   family: 'EVM' | 'UTXO' | 'Ed25519' | 'Other';
   note?: string;
+  registryId?: string;
 };
 
 type WalletCoreRegistryEntry = {
@@ -45,7 +46,7 @@ function normalizeCoinIdentifier(value: string): string {
 function findWalletCoreCoinType(core: WalletCoreRuntime, entry: WalletCoreRegistryEntry): number | undefined {
   const coinTypes = core.CoinType as unknown as Record<string, unknown>;
   const candidates = Object.entries(coinTypes).filter(
-    ([key, value]) => !/^\\d+$/.test(key) && typeof value === 'number',
+    ([key, value]) => !/^\d+$/.test(key) && typeof value === 'number',
   );
   const identifiers = [entry.id, entry.name].map(normalizeCoinIdentifier);
   const match = candidates.find(([key]) => identifiers.includes(normalizeCoinIdentifier(key)));
@@ -95,10 +96,15 @@ export function deriveSupportedAddresses(
         const isSharedEvmPath = isEvmAddress && derivationPath === EVM_PATH;
         result.push({
           label,
+          registryId: entry.id,
           ticker: entry.symbol,
           value,
           derivationPath,
-          family: isEvmAddress ? 'EVM' : entry.id === 'bitcoin' ? 'UTXO' : 'Other',
+          family: isEvmAddress
+            ? 'EVM'
+            : ['Bitcoin', 'BitcoinCash', 'BitcoinDiamond', 'Zcash', 'Verge', 'Groestlcoin', 'Decred', 'Firo', 'Komodo'].includes(entry.blockchain)
+              ? 'UTXO'
+              : 'Other',
           note: isSharedEvmPath
             ? 'Shared EVM account address; network connection not enabled'
             : `Derived by Wallet Core from its pinned registry; network connection not enabled`,
@@ -109,23 +115,22 @@ export function deriveSupportedAddresses(
       }
     }
 
-    const priority = new Map(PREFERRED_CHAIN_ORDER.map((id, index) => [id, index]));
-    result.sort((a, b) => {
-      const idA = WALLET_CORE_REGISTRY.find((entry) => (DISPLAY_NAME_OVERRIDES[entry.id] ?? entry.name) === a.label)?.id ?? a.label;
-      const idB = WALLET_CORE_REGISTRY.find((entry) => (DISPLAY_NAME_OVERRIDES[entry.id] ?? entry.name) === b.label)?.id ?? b.label;
-      const orderA = priority.get(idA) ?? Number.MAX_SAFE_INTEGER;
-      const orderB = priority.get(idB) ?? Number.MAX_SAFE_INTEGER;
-      return orderA - orderB || a.label.localeCompare(b.label);
-    });
-
     const solana = deriveSolanaAddress(mnemonic, bip39Passphrase);
     result.push({
       label: 'Solana',
+      registryId: 'solana',
       ticker: 'SOL',
       value: solana,
       derivationPath: SOLANA_DERIVATION_PATH,
       family: 'Ed25519',
       note: 'Locally derived with BIP-39 and SLIP-0010; other Solana wallets may use a different path',
+    });
+
+    const priority = new Map(PREFERRED_CHAIN_ORDER.map((id, index) => [id, index]));
+    result.sort((a, b) => {
+      const orderA = priority.get(a.registryId ?? '') ?? Number.MAX_SAFE_INTEGER;
+      const orderB = priority.get(b.registryId ?? '') ?? Number.MAX_SAFE_INTEGER;
+      return orderA - orderB || a.label.localeCompare(b.label);
     });
     return result;
   } finally {
