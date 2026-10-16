@@ -28,6 +28,12 @@ function base64ToBytes(value: string): Uint8Array {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 }
 
+function toArrayBuffer(bytes: Uint8Array): ArrayBuffer {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
+}
+
 function getCrypto(): Crypto {
   if (!globalThis.crypto?.subtle || !globalThis.crypto.getRandomValues) {
     throw new Error('Secure browser cryptography is unavailable. Open the app over HTTPS in a supported browser.');
@@ -39,13 +45,13 @@ async function deriveEncryptionKey(password: string, salt: Uint8Array): Promise<
   const cryptoApi = getCrypto();
   const material = await cryptoApi.subtle.importKey(
     'raw',
-    new TextEncoder().encode(password),
+    toArrayBuffer(new TextEncoder().encode(password)),
     'PBKDF2',
     false,
     ['deriveKey'],
   );
   return cryptoApi.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt: toArrayBuffer(salt), iterations: PBKDF2_ITERATIONS, hash: 'SHA-256' },
     material,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -90,9 +96,9 @@ export async function encryptMnemonic(
     mnemonic: mnemonic.trim().split(/\s+/).join(' '),
     bip39Passphrase,
   };
-  const plaintext = new TextEncoder().encode(JSON.stringify(secret));
+  const plaintext = toArrayBuffer(new TextEncoder().encode(JSON.stringify(secret)));
   const encrypted = await cryptoApi.subtle.encrypt(
-    { name: 'AES-GCM', iv, additionalData: VAULT_AAD, tagLength: 128 },
+    { name: 'AES-GCM', iv: toArrayBuffer(iv), additionalData: toArrayBuffer(VAULT_AAD), tagLength: 128 },
     key,
     plaintext,
   );
@@ -115,9 +121,9 @@ export async function decryptMnemonic(vault: EncryptedVault, password: string): 
     if (salt.length !== 16 || iv.length !== 12) throw new Error('Invalid encrypted vault parameters.');
     const key = await deriveEncryptionKey(password, salt);
     const plaintext = await cryptoApi.subtle.decrypt(
-      { name: 'AES-GCM', iv, additionalData: VAULT_AAD, tagLength: 128 },
+      { name: 'AES-GCM', iv: toArrayBuffer(iv), additionalData: toArrayBuffer(VAULT_AAD), tagLength: 128 },
       key,
-      base64ToBytes(vault.ciphertext),
+      toArrayBuffer(base64ToBytes(vault.ciphertext)),
     );
     const parsed: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(plaintext));
     if (
