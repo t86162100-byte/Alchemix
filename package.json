@@ -14,7 +14,8 @@
     "@trustwallet/wallet-core": "4.8.4",
     "@scure/bip39": "^2.0.1",
     "micro-key-producer": "^0.10.2",
-    "@scure/base": "^2.0.0"
+    "@scure/base": "^2.0.0",
+    "qrcode": "^1.5.4"
   },
   "devDependencies": {
     "typescript": "^5.8.3",
