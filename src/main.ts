@@ -1,5 +1,6 @@
 import './style.css';
 import QRCode from 'qrcode';
+import { loadPortfolio, type PortfolioSnapshot, type ChainBalanceResult, type AssetBalance } from './balance-service';
 import { initializeWalletCore } from './wallet-core';
 import { deriveSupportedAddresses, runKeyDerivationSelfTests, type WalletAddress } from './key-management';
 import {
@@ -20,11 +21,115 @@ let pendingMnemonic: string | null = null;
 let addresses: WalletAddress[] = [];
 let selectedReceiveAddress: WalletAddress | null = null;
 let errorMessage = '';
+let portfolioSnapshot: PortfolioSnapshot | null = null;
+let portfolioLoading = false;
+let portfolioError = '';
+let portfolioRefreshTimer: number | null = null;
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   })[character] ?? character);
+}
+
+function formatBalance(value: string, maxFraction = 8): string {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return value;
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: maxFraction, minimumFractionDigits: 0 }).format(parsed);
+}
+
+function formatUsd(value: number | undefined): string {
+  if (value === undefined || !Number.isFinite(value)) return 'Price unavailable';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: value < 1 ? 6 : 2 }).format(value);
+}
+
+function renderAsset(asset: AssetBalance): string {
+  const tokenLocation = asset.contractAddress ?? asset.mintAddress;
+  return `<article class="portfolio-asset">
+    <div class="portfolio-asset-icon">${escapeHtml(asset.symbol.slice(0, 1))}</div>
+    <div class="portfolio-asset-main">
+      <strong>${escapeHtml(asset.name)}</strong>
+      <span>${escapeHtml(asset.symbol)} · ${asset.decimals} decimals</span>
+      ${tokenLocation ? `<code title="${escapeHtml(tokenLocation)}">${escapeHtml(tokenLocation)}</code>` : ''}
+      <small>${escapeHtml(asset.source)}</small>
+    </div>
+    <div class="portfolio-asset-value"><strong>${escapeHtml(formatBalance(asset.balance))}</strong><span>${escapeHtml(formatUsd(asset.usdValue))}</span></div>
+  </article>`;
+}
+
+function renderChainBalance(chain: ChainBalanceResult): string {
+  const statusLabel = chain.status === 'success' ? 'LIVE' : chain.status === 'partial' ? 'PARTIAL' : chain.status === 'loading' ? 'LOADING' : chain.status === 'unavailable' ? 'UNAVAILABLE' : 'ERROR';
+  const statusClass = chain.status === 'success' ? 'tag-green' : '';
+  const assets = chain.assets.length ? chain.assets.map(renderAsset).join('') : '<p class="portfolio-empty">No balances returned by the provider.</p>';
+  return `<article class="portfolio-chain">
+    <div class="portfolio-chain-heading"><div><strong>${escapeHtml(chain.name)}</strong><span>${escapeHtml(chain.nativeSymbol)} network</span></div><span class="tag ${statusClass}">${statusLabel}</span></div>
+    <p class="portfolio-chain-message">${escapeHtml(chain.message)}</p>
+    <div class="portfolio-assets">${assets}</div>
+  </article>`;
+}
+
+function renderPortfolioPanel(): string {
+  const snapshot = portfolioSnapshot;
+  const total = snapshot?.totalUsd;
+  const totalLabel = total === undefined ? 'USD valuation unavailable' : snapshot?.unpricedAssets
+    ? `Partial estimate · ${formatUsd(total)}`
+    : formatUsd(total);
+  const updated = snapshot?.updatedAt ? new Date(snapshot.updatedAt).toLocaleTimeString() : 'Not refreshed yet';
+  const chains = snapshot?.chains.map(renderChainBalance).join('') ?? '';
+  const pending = portfolioLoading ? '<p class="portfolio-notice" role="status">Fetching live network balances and discovering owned tokens…</p>' : '';
+  const error = portfolioError ? `<p class="portfolio-error" role="alert">${escapeHtml(portfolioError)}</p>` : '';
+  const summary = snapshot
+    ? `<div class="portfolio-summary"><span class="eyebrow">ESTIMATED PORTFOLIO VALUE</span><strong>${escapeHtml(totalLabel)}</strong><small>${snapshot.pricedAssets} priced asset(s) · ${snapshot.unpricedAssets} asset(s) without a verifiable price</small></div>`
+    : '<div class="portfolio-summary"><span class="eyebrow">ESTIMATED PORTFOLIO VALUE</span><strong>—</strong><small>Balances and prices have not loaded yet.</small></div>';
+  return `<div class="section-heading"><div><span class="eyebrow">STEP 2 · LIVE DATA</span><h2>Portfolio & discovered assets</h2></div><button class="secondary portfolio-refresh" id="refresh-portfolio" ${portfolioLoading ? 'disabled' : ''}>${portfolioLoading ? 'Refreshing…' : '↻ Refresh'}</button></div>
+    ${summary}
+    <p class="portfolio-updated">Last updated: ${escapeHtml(updated)} · Automatic refresh every 60 seconds while unlocked.</p>
+    ${pending}${error}
+    <div class="portfolio-chain-grid">${chains || '<p class="portfolio-empty">The first refresh will query Ethereum, BNB Chain, Base, Solana, Bitcoin and Tron.</p>'}</div>
+    <p class="muted-note">Balances come from public RPCs and indexed explorers. Token discovery is separate from ownership: only token holdings returned for this address are listed. Token indexers can lag, unknown token metadata is not guessed, and totals exclude assets without a verifiable USD price. Provider failure is shown rather than replaced with a fabricated zero.</p>`;
+}
+
+function bindPortfolioEvents(): void {
+  document.querySelector<HTMLButtonElement>('#refresh-portfolio')?.addEventListener('click', () => { void refreshPortfolio(); });
+}
+
+async function refreshPortfolio(): Promise<void> {
+  if (portfolioLoading || view !== 'ready') return;
+  portfolioLoading = true;
+  portfolioError = '';
+  updatePortfolioPanel();
+  try {
+    portfolioSnapshot = await loadPortfolio(addresses);
+    if (portfolioSnapshot.chains.every((chain) => chain.status === 'error')) {
+      portfolioError = 'All balance providers failed. Existing last-known data is not treated as current.';
+    }
+  } catch (error) {
+    portfolioError = error instanceof Error ? error.message : 'Portfolio refresh failed.';
+  } finally {
+    portfolioLoading = false;
+    updatePortfolioPanel();
+  }
+}
+
+function updatePortfolioPanel(): void {
+  const panel = document.querySelector<HTMLElement>('#portfolio-panel');
+  if (panel && view === 'ready') {
+    panel.innerHTML = renderPortfolioPanel();
+    bindPortfolioEvents();
+  }
+}
+
+function startPortfolioAutoRefresh(): void {
+  if (portfolioRefreshTimer !== null) window.clearInterval(portfolioRefreshTimer);
+  portfolioRefreshTimer = window.setInterval(() => { if (view === 'ready' && !portfolioLoading) void refreshPortfolio(); }, 60_000);
+}
+
+function stopPortfolioAutoRefresh(): void {
+  if (portfolioRefreshTimer !== null) window.clearInterval(portfolioRefreshTimer);
+  portfolioRefreshTimer = null;
+  portfolioSnapshot = null;
+  portfolioLoading = false;
+  portfolioError = '';
 }
 
 
@@ -239,6 +344,7 @@ function render(): void {
         <p class="intro">The recovery phrase was validated, encrypted, and saved locally. These addresses were derived by Wallet Core; no balances have been requested or simulated.</p>
         <div class="success-banner"><span class="success-check">✓</span><div><strong>Encrypted local vault saved</strong><span>Your recovery phrase is not stored in plaintext.</span></div></div>
       </section>
+      <section class="address-panel portfolio-panel" id="portfolio-panel">${renderPortfolioPanel()}</section>
       <section class="address-panel">
         <div class="section-heading"><div><span class="eyebrow">RECEIVING ADDRESSES</span><h2>Your first addresses</h2></div><span class="tag tag-green">DERIVED LOCALLY · ${addresses.length} CHAINS</span></div>
         ${addressRows}
@@ -271,6 +377,11 @@ function render(): void {
   })() : '';
   app.innerHTML = `<main class="shell">${header}<div class="content-area">${content}</div>${footer}${receiveDialog}</main>`;
   bindEvents();
+  if (view === 'ready') {
+    bindPortfolioEvents();
+    startPortfolioAutoRefresh();
+    if (!portfolioSnapshot && !portfolioLoading) void refreshPortfolio();
+  }
   if (selectedReceiveAddress) void renderReceiveQr();
 }
 
@@ -460,6 +571,7 @@ function bindEvents(): void {
   document.querySelector<HTMLButtonElement>('#lock-wallet')?.addEventListener('click', () => {
     selectedReceiveAddress = null;
     addresses = [];
+    stopPortfolioAutoRefresh();
     errorMessage = '';
     view = 'locked';
     render();
@@ -470,6 +582,7 @@ function bindEvents(): void {
     removeSavedVault();
     selectedReceiveAddress = null;
     addresses = [];
+    stopPortfolioAutoRefresh();
     pendingMnemonic = null;
     errorMessage = '';
     view = 'welcome';
