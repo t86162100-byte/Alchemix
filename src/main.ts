@@ -149,7 +149,7 @@ function render(): void {
     const addressRows = addresses.map((address) => `
       <article class="address-row">
         <div class="coin-icon">${address.ticker.slice(0, 1)}</div>
-        <div class="address-info"><strong>${escapeHtml(address.label)}</strong><span>${escapeHtml(address.ticker)} · receiving address</span><code>${escapeHtml(address.value)}</code></div>
+        <div class="address-info"><strong>${escapeHtml(address.label)}</strong><span>${escapeHtml(address.ticker)} · ${escapeHtml(address.family)} · receiving address</span><code>${escapeHtml(address.value)}</code><small class="path-note">Path: ${escapeHtml(address.derivationPath)}</small><small class="path-note">${escapeHtml(address.note ?? "")}</small></div>
         <button class="copy-button" data-copy="${escapeHtml(address.value)}" aria-label="Copy ${escapeHtml(address.label)} address">Copy</button>
       </article>`).join('');
     content = `
