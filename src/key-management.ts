@@ -166,7 +166,9 @@ export function deriveSupportedAddresses(
           blockchain: entry.blockchain,
           ticker: entry.id === 'ton' ? 'TON' : entry.symbol,
           value,
-          derivationPath,
+          derivationPath: isActuallySharedEvmPath
+            ? derivationPath
+            : 'Wallet Core default path (registry path not independently verified)',
           family: isEvmAddress
             ? 'EVM'
             : ['Bitcoin', 'BitcoinCash', 'BitcoinDiamond', 'Zcash', 'Verge', 'Groestlcoin', 'Decred', 'Firo', 'Komodo'].includes(entry.blockchain)
@@ -174,7 +176,7 @@ export function deriveSupportedAddresses(
               : 'Other',
           note: isActuallySharedEvmPath
             ? 'Shared EVM account address; network connection not enabled'
-            : 'Derived by Wallet Core from its pinned registry; network connection not enabled',
+            : 'Derived using Wallet Core default path. The displayed registry path is not asserted to match; deposit support is not verified.',
         });
       } catch {
         // A registry entry is not usable if this installed runtime cannot derive it.
