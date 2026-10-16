@@ -164,7 +164,7 @@ export function deriveSupportedAddresses(
           label,
           registryId: entry.id,
           blockchain: entry.blockchain,
-          ticker: entry.symbol,
+          ticker: entry.id === 'ton' ? 'TON' : entry.symbol,
           value,
           derivationPath,
           family: isEvmAddress
