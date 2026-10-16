@@ -66,6 +66,7 @@ function deriveAddresses(core: WalletCoreRuntime, mnemonic: string, bip39Passphr
 }
 
 function render(): void {
+  if (!app) return;
   const error = errorMessage
     ? `<p class="form-error" id="form-error" role="alert">${escapeHtml(errorMessage)}</p>`
     : '<p class="form-error" id="form-error" role="alert" hidden></p>';
