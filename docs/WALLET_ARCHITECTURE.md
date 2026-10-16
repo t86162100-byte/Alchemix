@@ -25,7 +25,8 @@ Keep these responsibilities separate. They have different failure modes and need
 
 ## Current derivation notes
 
-- EVM networks share the standard Ethereum account path and therefore the same account address across EVM-compatible networks; this does not establish that their RPC or transaction support is implemented.
+- The address directory is sourced from the pinned Wallet Core 4.8.4 `registry.json` snapshot (168 entries). Runtime derivation matches registry IDs/names to the WASM `CoinType` enum and omits entries that fail to derive; an in-app self-test requires at least 100 addresses.
+- EVM networks sharing `m/44'/60'/0'/0/0` derive the same Ethereum-format account address; this does not establish that their RPC or transaction support is implemented.
 - Bitcoin uses the native-SegWit BIP-84 account path currently recorded in the code.
 - Trust Wallet Core's registry documents two Solana derivation paths: the default `m/44'/501'/0'` and an alternative `m/44'/501'/0'/0'`. They can produce different addresses from the same phrase. The current fallback implements the first path and must not be described as universal Solana-wallet compatibility.
 - Solana derivation is currently implemented separately because the installed Wallet Core WASM build does not expose the expected coin-type API. Keep this fallback only while it is validated against the upstream Wallet Core published vector and independent reference material.
