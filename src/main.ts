@@ -35,6 +35,15 @@ function validateReceiveAddress(address: WalletAddress): { valid: boolean; messa
     ? { valid: true, message: `Local address-format check passed for ${network}. This does not confirm deposit support or monitor incoming funds.` }
     : { valid: false, message: `The address does not match the expected ${network} format. Receiving is disabled for this address to avoid a potentially unsafe deposit.` };
 
+  // Prefer Wallet Core's own chain-aware validator whenever derivation supplied
+  // a result. Regex fallbacks below are used only when that API is unavailable.
+  if (address.formatValidated === true) {
+    return { valid: true, message: `Wallet Core accepted this ${address.label} address format. This does not confirm deposit support or monitor incoming funds.` };
+  }
+  if (address.formatValidated === false) {
+    return { valid: false, message: `Wallet Core did not validate this ${address.label} address for its selected coin type. Receiving is disabled to avoid a potentially unsafe deposit.` };
+  }
+
   if (address.family === 'EVM') return valid(/^0x[0-9a-fA-F]{40}$/, address.label);
   if (address.registryId === 'doge') return valid(/^D[1-9A-HJ-NP-Za-km-z]{25,34}$/, 'Dogecoin');
   if (blockchain === 'bitcoin') return valid(/^(bc1[ac-hj-np-z02-9]{11,71}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})$/, 'Bitcoin mainnet');
