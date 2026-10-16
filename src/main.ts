@@ -144,6 +144,8 @@ function render(): void {
           <p id="busy-note" class="muted-note">The encrypted recovery phrase remains in local browser storage.</p><span id="busy-indicator" class="busy-indicator"></span>
         </form>
         <button class="text-button" id="show-restore">Restore a different wallet instead</button>
+        <button class="secondary" id="create-another-wallet">Create a completely new wallet</button>
+        <p class="muted-note">Creating a new wallet will replace the encrypted wallet saved in this browser after you finish setup. Your old wallet can only be recovered later with its original recovery phrase (and any optional BIP-39 passphrase).</p>
       </section>`;
   } else {
     const addressRows = addresses.map((address) => `
