@@ -11,6 +11,7 @@ export type WalletAddress = {
   note?: string;
   registryId?: string;
   blockchain?: string;
+  formatValidated?: boolean;
 };
 
 type WalletCoreRegistryEntry = {
@@ -93,6 +94,38 @@ function findWalletCoreCoinType(core: WalletCoreRuntime, entry: WalletCoreRegist
 
 const EVM_PATH = "m/44'/60'/0'/0/0";
 
+function deriveAddressAtPath(core: WalletCoreRuntime, wallet: unknown, coinType: unknown, path: string): string {
+  const walletApi = wallet as { getKey?: (coinType: unknown, path: string) => unknown };
+  if (typeof walletApi.getKey !== 'function') return '';
+  let keyHandle: unknown;
+  try {
+    keyHandle = walletApi.getKey.call(wallet, coinType, path);
+    if (!keyHandle) return '';
+    const coinApi = coinType as { deriveAddress?: (key: unknown) => unknown } | number;
+    if (typeof coinApi === 'object' && coinApi !== null && typeof coinApi.deriveAddress === 'function') {
+      return String(coinApi.deriveAddress(keyHandle)).trim();
+    }
+    const enumApi = core.CoinType as unknown as { deriveAddress?: (coin: unknown, key: unknown) => unknown };
+    if (typeof enumApi.deriveAddress === 'function') return String(enumApi.deriveAddress(coinType, keyHandle)).trim();
+    return '';
+  } catch {
+    return '';
+  } finally {
+    try { (keyHandle as { delete?: () => void } | undefined)?.delete?.(); } catch { /* Best-effort WASM memory cleanup. */ }
+  }
+}
+
+function validateAddressFormat(core: WalletCoreRuntime, value: string, coinType: unknown): boolean | undefined {
+  try {
+    const api = core as unknown as { AnyAddress?: { isValid?: (address: string, coin: unknown) => boolean } };
+    return typeof api.AnyAddress?.isValid === 'function'
+      ? Boolean(api.AnyAddress.isValid(value, coinType))
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function deriveSupportedAddresses(
   core: WalletCoreRuntime,
   mnemonic: string,
@@ -132,29 +165,44 @@ export function deriveSupportedAddresses(
       // enum to understand network-specific registry IDs (Base, Linea, etc.).
       const isSharedEvmPath = entry.blockchain === 'Ethereum' && derivationPath === EVM_PATH;
       let value = '';
+      let selectedCoinType: unknown = isSharedEvmPath ? core.CoinType.ethereum : undefined;
+      let displayedPath = derivationPath;
+      let exactPathUsed = isSharedEvmPath;
       if (isSharedEvmPath) {
         value = ethereum;
       } else {
         const coinType = findWalletCoreCoinType(core, entry);
-        // Trust Wallet's registry coinId is the SLIP-44 coin type for standard
-        // non-EVM chains. Try it only as a runtime candidate; only accept it
-        // if Wallet Core actually derives a non-empty address.
         const candidates = coinType === undefined
           ? (Number.isInteger(entry.coinId) ? [entry.coinId] : [])
           : [coinType, ...(Number.isInteger(entry.coinId) ? [entry.coinId] : [])];
         for (const candidate of candidates) {
-          try {
-            const derived = String(getAddressForCoin(candidate)).trim();
-            if (derived && derived !== '[object Object]') {
-              value = derived;
-              break;
+          const exact = deriveAddressAtPath(core, wallet, candidate, derivationPath);
+          if (exact && exact !== '[object Object]') {
+            value = exact;
+            selectedCoinType = candidate;
+            exactPathUsed = true;
+            break;
+          }
+        }
+        if (!value) {
+          for (const candidate of candidates) {
+            try {
+              const derived = String(getAddressForCoin(candidate)).trim();
+              if (derived && derived !== '[object Object]') {
+                value = derived;
+                selectedCoinType = candidate;
+                displayedPath = 'Wallet Core default (registry path not independently derived)';
+                exactPathUsed = false;
+                break;
+              }
+            } catch {
+              // Try the next candidate.
             }
-          } catch {
-            // Try the next candidate. No secrets are logged or exposed.
           }
         }
       }
-      if (!value) continue;
+      if (!value || selectedCoinType === undefined) continue;
+      const formatValidated = validateAddressFormat(core, value, selectedCoinType);
 
       try {
         const isEvmAddress = /^0x[0-9a-fA-F]{40}$/.test(value);
@@ -166,9 +214,8 @@ export function deriveSupportedAddresses(
           blockchain: entry.blockchain,
           ticker: entry.id === 'ton' ? 'TON' : entry.symbol,
           value,
-          derivationPath: isActuallySharedEvmPath
-            ? derivationPath
-            : 'Wallet Core default path (registry path not independently verified)',
+          derivationPath: displayedPath,
+          formatValidated,
           family: isEvmAddress
             ? 'EVM'
             : ['Bitcoin', 'BitcoinCash', 'BitcoinDiamond', 'Zcash', 'Verge', 'Groestlcoin', 'Decred', 'Firo', 'Komodo'].includes(entry.blockchain)
@@ -176,7 +223,9 @@ export function deriveSupportedAddresses(
               : 'Other',
           note: isActuallySharedEvmPath
             ? 'Shared EVM account address; network connection not enabled'
-            : 'Derived using Wallet Core default path. The displayed registry path is not asserted to match; deposit support is not verified.',
+            : exactPathUsed
+              ? 'Derived using the exact registry path; network connection and deposit monitoring are not enabled'
+              : 'Derived using Wallet Core default path; registry path was not independently applied, so do not deposit until verified',
         });
       } catch {
         // A registry entry is not usable if this installed runtime cannot derive it.
