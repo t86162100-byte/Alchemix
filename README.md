@@ -21,7 +21,7 @@ npm install
 npm run dev
 ```
 
-Build the static web application with `npm run build`; output is written to `dist/`. The prebuild step copies the Wallet Core WASM binary into Vite's public assets.
+Run the automated derivation regression suite with `npm test`, then build the static web application with `npm run build`; output is written to `dist/`. The prebuild step copies the Wallet Core WASM binary into Vite's public assets. CI is configured to run the regression suite before building.
 
 ## Implemented in the first wallet-creation milestone
 
@@ -40,6 +40,7 @@ Build the static web application with `npm run build`; output is written to `dis
 - Derive the default Bitcoin native-SegWit address and show the BIP-84 path (`m/84'/0'/0'/0/0`).
 - Derive Solana locally with BIP-39 plus SLIP-0010 using Trust Wallet Core's published default path (`m/44'/501'/0'`). This fallback is used because the installed Wallet Core WASM build does not expose the expected Solana coin-type API. Trust Wallet Core documents an alternative Solana path (`m/44'/501'/0'/0'`) that produces a different address; do not assume every wallet uses the same path.
 - Browser self-tests compare Ethereum, Bitcoin, and Solana derivation against published Trust Wallet Core reference outputs and check Solana address format.
+- Automated Solana regression tests check the official Wallet Core default-path vector, reject an invalid phrase, and confirm that a BIP-39 passphrase changes the derived address. The vector and path are from the upstream Wallet Core test suite at the pinned source revision.
 - The self-test button uses public test-only mnemonic fixtures, never the user's wallet phrase. Do not use those fixtures for funds.
 
 The detailed module boundaries and completion gates are documented in [docs/WALLET_ARCHITECTURE.md](docs/WALLET_ARCHITECTURE.md).
