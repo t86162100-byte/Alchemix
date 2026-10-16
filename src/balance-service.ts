@@ -142,7 +142,17 @@ function dedupeAssets(assets: AssetBalance[]): AssetBalance[] {
 
 async function fetchEvmNative(config: ChainConfig, address: string): Promise<AssetBalance> {
   let lastError: unknown;
-  for (const url of config.rpcUrls ?? []) {
+  const alchemyRpcHosts: Record<string, string> = {
+    ethereum: 'eth-mainnet.g.alchemy.com',
+    bsc: 'bnb-mainnet.g.alchemy.com',
+    base: 'base-mainnet.g.alchemy.com',
+  };
+  const alchemyHost = alchemyRpcHosts[config.id];
+  const urls = [
+    ...(ALCHEMY_API_KEY && alchemyHost ? [`https://${alchemyHost}/v2/${encodeURIComponent(ALCHEMY_API_KEY)}`] : []),
+    ...(config.rpcUrls ?? []),
+  ];
+  for (const url of urls) {
     try {
       const raw = String(await rpc(url, 'eth_getBalance', [address, 'latest']));
       if (!/^0x[0-9a-f]+$/i.test(raw)) throw new Error('RPC returned an invalid balance');
@@ -150,7 +160,7 @@ async function fetchEvmNative(config: ChainConfig, address: string): Promise<Ass
       return {
         id: `${config.id}:native`, chainId: String(config.chainId), chainName: config.name,
         kind: 'native', name: config.name, symbol: config.symbol, balance, decimals: config.decimals,
-        source: `Public JSON-RPC (${new URL(url).host})`,
+        source: `${url.includes('alchemy.com') ? 'Alchemy JSON-RPC' : 'Public JSON-RPC'} (${new URL(url).host})`,
       };
     } catch (error) { lastError = error; }
   }
@@ -204,7 +214,12 @@ async function fetchAlchemyAssets(config: ChainConfig, address: string): Promise
       const detail = response?.error?.message ?? response?.message ?? 'unexpected Portfolio API response';
       throw new Error(String(detail));
     }
-    rows.push(...response.data.tokens.filter((row: any) => row?.network === network));
+    const networkRows = response.data.tokens.filter((row: any) => row?.network === network);
+    if (response?.error && networkRows.length === 0) {
+      const detail = response.error.message ?? response.error.partialErrors?.[0]?.message ?? 'network returned a partial failure';
+      throw new Error(String(detail));
+    }
+    rows.push(...networkRows);
     pageKey = typeof response.data.pageKey === 'string' && response.data.pageKey ? response.data.pageKey : undefined;
     pages += 1;
     if (pages >= 20 && pageKey) throw new Error('Alchemy token pagination exceeded the safety limit; some holdings may be omitted.');
@@ -520,9 +535,17 @@ export async function loadPortfolio(addresses: Array<{ registryId?: string; valu
           asset.priceSource = 'CoinGecko spot price';
         }
       }
-      if (usd !== undefined && Number.isFinite(usd)) { totalUsd += usd; pricedAssets += 1; }
-      else if (Number(asset.balance) > 0) unpricedAssets += 1;
+      const balance = Number(asset.balance);
+      const hasPositiveBalance = Number.isFinite(balance) && balance > 0;
+      // Empty assets must not inflate the "priced assets" count. Only holdings
+      // with a positive, finite balance contribute to portfolio counts/totals.
+      if (hasPositiveBalance && usd !== undefined && Number.isFinite(usd)) {
+        totalUsd += usd;
+        pricedAssets += 1;
+      } else if (hasPositiveBalance) {
+        unpricedAssets += 1;
+      }
     }
   }
-  return { chains, updatedAt: Date.now(), totalUsd: pricedAssets ? totalUsd : undefined, pricedAssets, unpricedAssets };
+  return { chains, updatedAt: Date.now(), totalUsd: pricedAssets > 0 ? totalUsd : unpricedAssets > 0 ? undefined : 0, pricedAssets, unpricedAssets };
 }
