@@ -253,7 +253,7 @@ async function fetchBitcoin(address: string): Promise<ChainBalanceResult> {
 }
 
 async function fetchTron(address: string): Promise<ChainBalanceResult> {
-  const response = await getJson('https://api.trongrid.io/wallet/getaccount?visible=true&address=' + encodeURIComponent(address));
+  const response = await postJson('https://api.trongrid.io/wallet/getaccount', { address, visible: true });
   if (!response || typeof response !== 'object') throw new Error('Tron provider returned an unexpected account response');
   const rawBalance = response.balance ?? 0;
   const native: AssetBalance = {
@@ -297,6 +297,17 @@ async function fetchTron(address: string): Promise<ChainBalanceResult> {
 
 async function getJsonWithHeaders(url: string, headers: Record<string, string>): Promise<any> {
   const response = await fetch(url, { signal: timeoutSignal(), headers: { accept: 'application/json', ...headers } });
+  if (!response.ok) throw new Error(`Provider returned HTTP ${response.status}`);
+  return response.json();
+}
+
+async function postJson(url: string, body: unknown): Promise<any> {
+  const response = await fetch(url, {
+    method: 'POST',
+    signal: timeoutSignal(),
+    headers: { accept: 'application/json', 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
   if (!response.ok) throw new Error(`Provider returned HTTP ${response.status}`);
   return response.json();
 }
