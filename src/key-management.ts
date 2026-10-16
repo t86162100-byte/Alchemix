@@ -20,6 +20,8 @@ type WalletCoreRegistryEntry = {
   derivation?: Array<{ path?: string }>;
 };
 
+type WalletCoreCoinType = { value: number };
+
 const WALLET_CORE_REGISTRY = walletCoreRegistryJson as WalletCoreRegistryEntry[];
 const PREFERRED_CHAIN_ORDER = [
   'ethereum', 'smartchain', 'base', 'polygon', 'arbitrum', 'optimism',
@@ -43,29 +45,45 @@ function normalizeCoinIdentifier(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-function findWalletCoreCoinType(core: WalletCoreRuntime, entry: WalletCoreRegistryEntry): number | undefined {
+function isWalletCoreCoinType(value: unknown): value is WalletCoreCoinType {
+  return typeof value === 'object'
+    && value !== null
+    && typeof (value as { value?: unknown }).value === 'number';
+}
+
+/**
+ * Wallet Core WASM exposes CoinType members as objects (for example,
+ * CoinType.ethereum.value), not JavaScript numbers. Keep and pass the actual
+ * enum object to HDWallet.getAddressForCoin; passing its numeric .value is not
+ * the API shown in Trust Wallet Core's own WASM sample.
+ */
+function findWalletCoreCoinType(core: WalletCoreRuntime, entry: WalletCoreRegistryEntry): WalletCoreCoinType | undefined {
   const coinTypes = core.CoinType as unknown as Record<string, unknown>;
   const identifiers = [entry.id, entry.name].map(normalizeCoinIdentifier);
 
-  // Some Wallet Core WASM builds expose enum members as direct properties that
-  // are not enumerable, so Object.entries() alone can miss every supported coin.
+  // Prefer exact registry ID/name properties, including non-enumerable members.
   for (const identifier of [entry.id, entry.name]) {
     const direct = coinTypes[identifier];
-    if (typeof direct === 'number') return direct;
+    if (isWalletCoreCoinType(direct)) return direct;
   }
 
-  // EVM networks share Ethereum's key derivation; their registry coinId is a
-  // chain ID, not a distinct Wallet Core derivation coin type.
-  if (entry.blockchain === 'Ethereum' && entry.derivation?.[0]?.path === EVM_PATH) {
-    const ethereum = coinTypes.ethereum;
-    if (typeof ethereum === 'number') return ethereum;
-  }
-
+  // Fall back to normalized enum member names. CoinType values are wrapper
+  // objects, so filter by their numeric .value rather than typeof value === number.
   const candidates = Object.entries(coinTypes).filter(
-    ([key, value]) => !/^\\d+$/.test(key) && typeof value === 'number',
+    ([key, value]) => !/^\d+$/.test(key) && isWalletCoreCoinType(value),
   );
   const match = candidates.find(([key]) => identifiers.includes(normalizeCoinIdentifier(key)));
-  return match?.[1] as number | undefined;
+  if (match && isWalletCoreCoinType(match[1])) return match[1];
+
+  // EVM chains using the standard Ethereum derivation path share the same
+  // underlying account key. Use Wallet Core's actual Ethereum CoinType object
+  // only if this particular registry ID is not present in the runtime.
+  if (entry.blockchain === 'Ethereum' && entry.derivation?.[0]?.path === EVM_PATH) {
+    const ethereum = coinTypes.ethereum;
+    if (isWalletCoreCoinType(ethereum)) return ethereum;
+  }
+
+  return undefined;
 }
 
 const EVM_PATH = "m/44'/60'/0'/0/0";
@@ -91,17 +109,16 @@ export function deriveSupportedAddresses(
     }
 
     const result: WalletAddress[] = [];
-    const getAddressForCoin = wallet.getAddressForCoin as unknown as (coinType: number) => string;
+    const getAddressForCoin = wallet.getAddressForCoin as unknown as (coinType: WalletCoreCoinType) => string;
 
     for (const entry of WALLET_CORE_REGISTRY) {
-      // Solana is deliberately handled by the separately validated fallback below:
-      // the installed WASM build does not expose its expected CoinType API.
+      // Solana is handled by the separately validated SLIP-0010 implementation below.
       if (entry.id === 'solana') continue;
       const derivationPath = entry.derivation?.[0]?.path;
       if (!derivationPath) continue;
 
       const coinType = findWalletCoreCoinType(core, entry);
-      if (coinType === undefined) continue;
+      if (!coinType) continue;
 
       try {
         const value = String(getAddressForCoin(coinType)).trim();
@@ -123,11 +140,10 @@ export function deriveSupportedAddresses(
               : 'Other',
           note: isSharedEvmPath
             ? 'Shared EVM account address; network connection not enabled'
-            : `Derived by Wallet Core from its pinned registry; network connection not enabled`,
+            : 'Derived by Wallet Core from its pinned registry; network connection not enabled',
         });
       } catch {
-        // A registry entry is not treated as usable if this installed runtime cannot
-        // derive it. Other entries continue to load; failed entries are not fabricated.
+        // Do not fabricate an address if this runtime cannot derive this entry.
       }
     }
 
