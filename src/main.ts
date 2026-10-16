@@ -48,8 +48,8 @@ function setBusy(busy: boolean, message = ''): void {
   if (busyIndicator) busyIndicator.textContent = busy ? 'WORKING…' : '';
 }
 
-function deriveAddresses(core: WalletCoreRuntime, mnemonic: string): WalletAddress[] {
-  const wallet = core.HDWallet.createWithMnemonic(mnemonic, '');
+function deriveAddresses(core: WalletCoreRuntime, mnemonic: string, bip39Passphrase = ''): WalletAddress[] {
+  const wallet = core.HDWallet.createWithMnemonic(mnemonic, bip39Passphrase);
   try {
     const ethereumAddress = String(wallet.getAddressForCoin(core.CoinType.ethereum));
     const bitcoinAddress = String(wallet.getAddressForCoin(core.CoinType.bitcoin));
@@ -133,6 +133,9 @@ function render(): void {
         <form id="restore-form" class="wallet-form">
           <label for="restore-phrase">Recovery phrase</label>
           <textarea id="restore-phrase" name="phrase" rows="4" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="Enter your words separated by spaces" required></textarea>
+          <label for="restore-bip39-passphrase">Optional BIP-39 passphrase</label>
+          <input id="restore-bip39-passphrase" name="bip39-passphrase" type="password" autocomplete="off" placeholder="Leave blank if your original wallet had none" />
+          <p class="muted-note">This is the original wallet’s optional BIP-39 passphrase, not the local encryption password. It changes the derived addresses.</p>
           <label for="restore-password">Create a local wallet password</label>
           <input id="restore-password" name="password" type="password" minlength="12" autocomplete="new-password" placeholder="At least 12 characters" required />
           <label for="restore-confirm-password">Confirm password</label>
@@ -213,6 +216,10 @@ function bindEvents(): void {
   });
 
   document.querySelector<HTMLButtonElement>('#show-restore')?.addEventListener('click', () => {
+    if (view === 'locked') {
+      const confirmed = window.confirm('Restoring a different wallet will replace the encrypted wallet currently saved in this browser after the new phrase is validated. Continue only if you have backed up the existing recovery phrase.');
+      if (!confirmed) return;
+    }
     errorMessage = '';
     view = 'restore';
     render();
@@ -276,6 +283,7 @@ function bindEvents(): void {
     const form = event.currentTarget as HTMLFormElement;
     const data = new FormData(form);
     const phrase = normalizeMnemonic(String(data.get('phrase') ?? ''));
+    const bip39Passphrase = String(data.get('bip39-passphrase') ?? '');
     const password = String(data.get('password') ?? '');
     const confirmation = String(data.get('confirm-password') ?? '');
     const wordCount = phrase ? phrase.split(' ').length : 0;
@@ -296,8 +304,8 @@ function bindEvents(): void {
     setBusy(true, 'Validating the recovery phrase, deriving addresses, and encrypting locally…');
     try {
       const core = await initializeWalletCore();
-      const derived = deriveAddresses(core, phrase);
-      const encrypted = await encryptMnemonic(phrase, password);
+      const derived = deriveAddresses(core, phrase, bip39Passphrase);
+      const encrypted = await encryptMnemonic(phrase, password, bip39Passphrase);
       saveVault(encrypted);
       addresses = derived;
       view = 'ready';
@@ -319,9 +327,9 @@ function bindEvents(): void {
     try {
       const vault = getSavedVault();
       if (!vault) throw new Error('No encrypted wallet was found in this browser.');
-      const phrase = await decryptMnemonic(vault, password);
+      const secret = await decryptMnemonic(vault, password);
       const core = await initializeWalletCore();
-      addresses = deriveAddresses(core, phrase);
+      addresses = deriveAddresses(core, secret.mnemonic, secret.bip39Passphrase);
       view = 'ready';
       errorMessage = '';
       render();
