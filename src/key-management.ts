@@ -45,10 +45,25 @@ function normalizeCoinIdentifier(value: string): string {
 
 function findWalletCoreCoinType(core: WalletCoreRuntime, entry: WalletCoreRegistryEntry): number | undefined {
   const coinTypes = core.CoinType as unknown as Record<string, unknown>;
-  const candidates = Object.entries(coinTypes).filter(
-    ([key, value]) => !/^\d+$/.test(key) && typeof value === 'number',
-  );
   const identifiers = [entry.id, entry.name].map(normalizeCoinIdentifier);
+
+  // Some Wallet Core WASM builds expose enum members as direct properties that
+  // are not enumerable, so Object.entries() alone can miss every supported coin.
+  for (const identifier of [entry.id, entry.name]) {
+    const direct = coinTypes[identifier];
+    if (typeof direct === 'number') return direct;
+  }
+
+  // EVM networks share Ethereum's key derivation; their registry coinId is a
+  // chain ID, not a distinct Wallet Core derivation coin type.
+  if (entry.blockchain === 'Ethereum' && entry.derivation?.[0]?.path === EVM_PATH) {
+    const ethereum = coinTypes.ethereum;
+    if (typeof ethereum === 'number') return ethereum;
+  }
+
+  const candidates = Object.entries(coinTypes).filter(
+    ([key, value]) => !/^\\d+$/.test(key) && typeof value === 'number',
+  );
   const match = candidates.find(([key]) => identifiers.includes(normalizeCoinIdentifier(key)));
   return match?.[1] as number | undefined;
 }
