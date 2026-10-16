@@ -162,7 +162,7 @@ function render(): void {
         <div class="success-banner"><span class="success-check">✓</span><div><strong>Encrypted local vault saved</strong><span>Your recovery phrase is not stored in plaintext.</span></div></div>
       </section>
       <section class="address-panel">
-        <div class="section-heading"><div><span class="eyebrow">RECEIVING ADDRESSES</span><h2>Your first addresses</h2></div><span class="tag tag-green">DERIVED LOCALLY</span></div>
+        <div class="section-heading"><div><span class="eyebrow">RECEIVING ADDRESSES</span><h2>Your first addresses</h2></div><span class="tag tag-green">DERIVED LOCALLY · ${addresses.length} CHAINS</span></div>
         ${addressRows}
         <p class="muted-note">EVM networks intentionally share the same Ethereum account address and derivation path. Network connections, balances, token discovery, and transactions are not enabled by this step.</p>
         <div class="ready-actions"><button class="secondary" id="run-key-tests">Run derivation tests</button><button class="secondary" id="lock-wallet">Lock wallet</button><button class="danger-button" id="remove-wallet">Remove encrypted copy</button></div>
