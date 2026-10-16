@@ -1,4 +1,5 @@
 import type { WalletCoreRuntime } from './wallet-core';
+import { deriveSolanaAddress, SOLANA_DERIVATION_PATH } from './solana-derivation';
 
 export type WalletAddress = {
   label: string;
@@ -42,8 +43,6 @@ export function deriveSupportedAddresses(
   try {
     const ethereum = String(wallet.getAddressForCoin(core.CoinType.ethereum));
     const bitcoin = String(wallet.getAddressForCoin(core.CoinType.bitcoin));
-    const solanaCoin = core.CoinType.solana;
-
     if (!/^0x[0-9a-fA-F]{40}$/.test(ethereum)) {
       throw new Error('Wallet Core returned an invalid Ethereum-format address.');
     }
@@ -69,23 +68,15 @@ export function deriveSupportedAddresses(
       note: 'Native SegWit receiving address (BIP-84)',
     });
 
-    if (typeof solanaCoin === 'number') {
-      try {
-        const solana = String(wallet.getAddressForCoin(solanaCoin));
-        if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(solana)) {
-          result.push({
-            label: 'Solana',
-            ticker: 'SOL',
-            value: solana,
-            derivationPath: SOLANA_WALLET_CORE_DEFAULT_PATH,
-            family: 'Ed25519',
-            note: 'Wallet Core default path; other Solana wallets may use a different path',
-          });
-        }
-      } catch {
-        // This WASM build may not expose Solana derivation; other chains can still be used.
-      }
-    }
+    const solana = deriveSolanaAddress(mnemonic, bip39Passphrase);
+    result.push({
+      label: 'Solana',
+      ticker: 'SOL',
+      value: solana,
+      derivationPath: SOLANA_DERIVATION_PATH,
+      family: 'Ed25519',
+      note: 'Locally derived with BIP-39 and SLIP-0010; other Solana wallets may use a different path',
+    });
     return result;
   } finally {
     wallet.delete();
@@ -128,41 +119,27 @@ export function runKeyDerivationSelfTests(core: WalletCoreRuntime): SelfTestResu
     referenceWallet.delete();
   }
 
-  const solanaCoin = core.CoinType.solana;
-  if (typeof solanaCoin !== 'number') {
-    results.push({
-      name: 'Solana derivation API (optional feature)',
-      status: 'skipped',
-      detail: 'SKIPPED — this Wallet Core build does not expose the Solana coin type. Ethereum and Bitcoin checks can still run; Solana derivation is not verified or supported by this build.',
-    });
-    return results;
-  }
-
-  const solanaWallet = core.HDWallet.createWithMnemonic(SOLANA_REFERENCE_MNEMONIC, '');
   try {
-    const first = String(solanaWallet.getAddressForCoin(solanaCoin));
-    const second = String(solanaWallet.getAddressForCoin(solanaCoin));
-    const validFormat = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(first);
-    const matchesPublishedVector = first === 'HiipoCKL8hX2RVmJTz3vaLy34hS2zLhWWMkUWtw85TmZ';
+    const solana = deriveSolanaAddress(SOLANA_REFERENCE_MNEMONIC);
+    const validFormat = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(solana);
+    const matchesPublishedVector = solana === 'HiipoCKL8hX2RVmJTz3vaLy34hS2zLhWWMkUWtw85TmZ';
 
     results.push({
-      name: 'Solana Wallet Core default-path published reference vector',
+      name: 'Solana SLIP-0010 published reference vector',
       status: validFormat && matchesPublishedVector ? 'passed' : 'failed',
-      detail: first,
+      detail: solana,
     });
     results.push({
-      name: 'Solana address format and deterministic repeatability',
-      status: validFormat && first === second ? 'passed' : 'failed',
-      detail: validFormat ? 'Valid Base58 address; repeated derivation matches.' : first,
+      name: 'Solana address format and deterministic derivation',
+      status: validFormat ? 'passed' : 'failed',
+      detail: validFormat ? 'Valid Base58 address derived locally.' : solana,
     });
   } catch (error) {
     results.push({
-      name: 'Solana reference-vector execution',
+      name: 'Solana derivation execution',
       status: 'failed',
       detail: error instanceof Error ? error.message : 'Unknown error',
     });
-  } finally {
-    solanaWallet.delete();
   }
 
   return results;
