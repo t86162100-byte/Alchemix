@@ -211,6 +211,13 @@ function bindEvents(): void {
     view = 'restore';
     render();
   });
+  document.querySelector<HTMLButtonElement>('#create-another-wallet')?.addEventListener('click', () => {
+    const confirmed = window.confirm('Creating a new wallet will replace the encrypted wallet currently saved in this browser after you finish setup. Continue only if you have safely backed up the old wallet recovery phrase. Your old wallet will not be deleted from the blockchain, but you will need its original recovery phrase (and any optional BIP-39 passphrase) to restore it later.');
+    if (!confirmed) return;
+    errorMessage = '';
+    view = 'welcome';
+    render();
+  });
   document.querySelector<HTMLButtonElement>('#cancel-create')?.addEventListener('click', () => {
     pendingMnemonic = null;
     errorMessage = '';
