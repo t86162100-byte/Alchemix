@@ -50,9 +50,6 @@ export function deriveSupportedAddresses(
     if (!/^(bc1|[13])[a-zA-HJ-NP-Z0-9]{20,}$/.test(bitcoin)) {
       throw new Error('Wallet Core returned an invalid Bitcoin-format address.');
     }
-    if (typeof solanaCoin !== 'number') {
-      throw new Error('This Wallet Core build does not expose Solana derivation.');
-    }
 
     const result: WalletAddress[] = EVM_NETWORKS.map(({ label, ticker }) => ({
       label,
@@ -72,18 +69,23 @@ export function deriveSupportedAddresses(
       note: 'Native SegWit receiving address (BIP-84)',
     });
 
-    const solana = String(wallet.getAddressForCoin(solanaCoin));
-    if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(solana)) {
-      throw new Error('Wallet Core returned an invalid Solana-format address.');
+    if (typeof solanaCoin === 'number') {
+      try {
+        const solana = String(wallet.getAddressForCoin(solanaCoin));
+        if (/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(solana)) {
+          result.push({
+            label: 'Solana',
+            ticker: 'SOL',
+            value: solana,
+            derivationPath: SOLANA_WALLET_CORE_DEFAULT_PATH,
+            family: 'Ed25519',
+            note: 'Wallet Core default path; other Solana wallets may use a different path',
+          });
+        }
+      } catch {
+        // This WASM build may not expose Solana derivation; other chains can still be used.
+      }
     }
-    result.push({
-      label: 'Solana',
-      ticker: 'SOL',
-      value: solana,
-      derivationPath: SOLANA_WALLET_CORE_DEFAULT_PATH,
-      family: 'Ed25519',
-      note: 'Wallet Core default path; other Solana wallets may use a different path',
-    });
     return result;
   } finally {
     wallet.delete();
