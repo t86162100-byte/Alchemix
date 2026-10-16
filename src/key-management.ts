@@ -92,7 +92,7 @@ export function deriveSupportedAddresses(
   }
 }
 
-export type SelfTestResult = { name: string; passed: boolean; detail: string };
+export type SelfTestResult = { name: string; status: 'passed' | 'failed' | 'skipped'; detail: string };
 
 // Public, published Wallet Core test fixtures only. Never use these phrases for funds.
 const EVM_BTC_REFERENCE_MNEMONIC =
@@ -110,18 +110,18 @@ export function runKeyDerivationSelfTests(core: WalletCoreRuntime): SelfTestResu
 
     results.push({
       name: 'Ethereum BIP-44 published Trust Wallet Core reference vector',
-      passed: eth.toLowerCase() === '0xa3dcd899c0f3832dfdfed9479a9d828c6a4eb2a7',
+      status: eth.toLowerCase() === '0xa3dcd899c0f3832dfdfed9479a9d828c6a4eb2a7' ? 'passed' : 'failed',
       detail: eth,
     });
     results.push({
       name: 'Bitcoin BIP-84 native SegWit published Trust Wallet Core reference vector',
-      passed: btc.toLowerCase() === 'bc1qpsp72plnsqe6e2dvtsetxtww2cz36ztmfxghpd',
+      status: btc.toLowerCase() === 'bc1qpsp72plnsqe6e2dvtsetxtww2cz36ztmfxghpd' ? 'passed' : 'failed',
       detail: btc,
     });
   } catch (error) {
     results.push({
       name: 'Ethereum/Bitcoin reference-vector execution',
-      passed: false,
+      status: 'failed',
       detail: error instanceof Error ? error.message : 'Unknown error',
     });
   } finally {
@@ -131,9 +131,9 @@ export function runKeyDerivationSelfTests(core: WalletCoreRuntime): SelfTestResu
   const solanaCoin = core.CoinType.solana;
   if (typeof solanaCoin !== 'number') {
     results.push({
-      name: 'Solana default derivation API',
-      passed: false,
-      detail: 'This Wallet Core build does not expose the Solana coin type.',
+      name: 'Solana derivation API (optional feature)',
+      status: 'skipped',
+      detail: 'SKIPPED — this Wallet Core build does not expose the Solana coin type. Ethereum and Bitcoin checks can still run; Solana derivation is not verified or supported by this build.',
     });
     return results;
   }
@@ -147,18 +147,18 @@ export function runKeyDerivationSelfTests(core: WalletCoreRuntime): SelfTestResu
 
     results.push({
       name: 'Solana Wallet Core default-path published reference vector',
-      passed: validFormat && matchesPublishedVector,
+      status: validFormat && matchesPublishedVector ? 'passed' : 'failed',
       detail: first,
     });
     results.push({
       name: 'Solana address format and deterministic repeatability',
-      passed: validFormat && first === second,
+      status: validFormat && first === second ? 'passed' : 'failed',
       detail: validFormat ? 'Valid Base58 address; repeated derivation matches.' : first,
     });
   } catch (error) {
     results.push({
       name: 'Solana reference-vector execution',
-      passed: false,
+      status: 'failed',
       detail: error instanceof Error ? error.message : 'Unknown error',
     });
   } finally {
