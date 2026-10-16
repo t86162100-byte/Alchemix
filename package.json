@@ -8,6 +8,9 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview --host 0.0.0.0"
   },
+  "dependencies": {
+    "@trustwallet/wallet-core": "4.8.4"
+  },
   "devDependencies": {
     "typescript": "^5.8.3",
     "vite": "^6.3.5"
