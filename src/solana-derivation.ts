@@ -1,4 +1,5 @@
-import { mnemonicToSeedSync } from '@scure/bip39';
+import { mnemonicToSeedSync, validateMnemonic } from '@scure/bip39';
+import { wordlist } from '@scure/bip39/wordlists/english.js';
 import slip10 from 'micro-key-producer/slip10.js';
 import { base58 } from '@scure/base';
 
@@ -14,6 +15,9 @@ export const SOLANA_DERIVATION_PATH = "m/44'/501'/0'";
  * The seed and private key material are never persisted or sent over the network.
  */
 export function deriveSolanaAddress(mnemonic: string, bip39Passphrase = ''): string {
+  if (!validateMnemonic(mnemonic, wordlist)) {
+    throw new Error('Cannot derive a Solana address from an invalid English BIP-39 recovery phrase.');
+  }
   const seed = mnemonicToSeedSync(mnemonic, bip39Passphrase);
   let root: ReturnType<typeof slip10.fromMasterSeed> | undefined;
   let child: ReturnType<typeof slip10.fromMasterSeed> | undefined;
