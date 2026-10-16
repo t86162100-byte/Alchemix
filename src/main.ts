@@ -101,7 +101,7 @@ async function refreshPortfolio(): Promise<void> {
   try {
     portfolioSnapshot = await loadPortfolio(addresses);
     if (portfolioSnapshot.chains.every((chain) => chain.status === 'error')) {
-      portfolioError = 'All balance providers failed. Existing last-known data is not treated as current.';
+      portfolioError = 'All balance providers failed. No current balances are available; do not interpret missing data as zero.';
     }
   } catch (error) {
     portfolioError = error instanceof Error ? error.message : 'Portfolio refresh failed.';
@@ -424,6 +424,9 @@ function bindEvents(): void {
   document.querySelector<HTMLButtonElement>('#create-another-wallet')?.addEventListener('click', () => {
     const confirmed = window.confirm('Creating a new wallet will replace the encrypted wallet currently saved in this browser after you finish setup. Continue only if you have safely backed up the old wallet recovery phrase. Your old wallet will not be deleted from the blockchain, but you will need its original recovery phrase (and any optional BIP-39 passphrase) to restore it later.');
     if (!confirmed) return;
+    stopPortfolioAutoRefresh();
+    selectedReceiveAddress = null;
+    addresses = [];
     errorMessage = '';
     view = 'welcome';
     render();
