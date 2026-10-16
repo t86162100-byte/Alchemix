@@ -1,17 +1,18 @@
 # Tradingview X
 
-A clean, self-custodial multichain wallet project. This branch starts with a fresh web application shell and pins the official Trust Wallet Core source as a Git submodule.
+A clean, self-custodial multichain wallet project. This branch starts with a fresh web application shell and uses the official Trust Wallet Core WebAssembly package for local cryptographic operations.
 
-## Source import
+## Source and licensing
 
-- Upstream: https://github.com/trustwallet/wallet-core
-- Pinned revision: `adf80f8bac989e18a4ef1922e2b9eaeb4bf804a9`
-- License: Apache-2.0; preserve upstream and third-party notices.
-- Initialize the source after cloning: `git submodule update --init --recursive`
+- Wallet Core upstream: https://github.com/trustwallet/wallet-core
+- Pinned source submodule revision: `adf80f8bac989e18a4ef1922e2b9eaeb4bf804a9`
+- NPM runtime: `@trustwallet/wallet-core@4.8.4`
+- Preserve upstream and third-party license notices. Check package and upstream licensing before redistribution.
+- Initialize the source submodule after cloning if you need the upstream C++ source: `git submodule update --init --recursive`
 
-Trust Wallet Core is the cryptographic engine, not the complete Trust Wallet application. Tradingview X is an independent project and is not affiliated with Trust Wallet.
+Trust Wallet Core is a cryptographic engine, not the complete Trust Wallet application. Tradingview X is an independent project and is not affiliated with Trust Wallet.
 
-## Run the web shell
+## Run locally
 
 Requirements: Node.js 20 or newer.
 
@@ -20,8 +21,21 @@ npm install
 npm run dev
 ```
 
-Build the static web shell with `npm run build`; output is written to `dist/`.
+Build the static web application with `npm run build`; output is written to `dist/`. The prebuild step copies the Wallet Core WASM binary into Vite's public assets.
 
-## Security status
+## Implemented in the first wallet-creation milestone
 
-This is the clean starting scaffold, not a production wallet yet. Wallet creation, encrypted local key storage, recovery, address derivation, chain adapters, token discovery, transaction construction, signing, and broadcast must be implemented and tested before real funds are used. No real-money send action is enabled in this scaffold.
+- Generate a 12-word BIP-39 recovery phrase with Wallet Core.
+- Show the phrase for offline backup and require users to type it back in the correct order.
+- Require a local encryption password of at least 12 characters.
+- Encrypt the recovery phrase and optional BIP-39 passphrase with AES-256-GCM using a PBKDF2-HMAC-SHA-256-derived key (600,000 iterations), random salt, and random IV.
+- Store only the encrypted vault envelope in browser local storage.
+- Restore from a recovery phrase, including an optional BIP-39 passphrase.
+- Unlock an encrypted vault and derive initial Ethereum and Bitcoin receiving addresses locally.
+- Lock the UI or remove the encrypted local copy.
+
+## Security status — development only
+
+This is **not production-ready and must not be used with real funds**. The Wallet Core NPM WASM integration is beta. The current implementation needs automated BIP-39 and address test vectors, independent review of the generated addresses and key derivation, browser/device testing, and security review. Browser local storage and JavaScript execution are exposed to same-origin script compromise; encryption at rest does not protect secrets from malicious code running in the page while a wallet is unlocked.
+
+Balance retrieval, token discovery, network adapters, transaction construction, transaction signing, broadcast, and send UI remain unimplemented/disabled. Wallet Core does not itself connect to blockchain nodes or broadcast transactions.
