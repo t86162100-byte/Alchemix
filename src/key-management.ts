@@ -32,7 +32,6 @@ const EVM_NETWORKS = [
 
 const EVM_PATH = "m/44'/60'/0'/0/0";
 const BITCOIN_BIP84_PATH = "m/84'/0'/0'/0/0";
-const SOLANA_WALLET_CORE_DEFAULT_PATH = "m/44'/501'/0'";
 
 export function deriveSupportedAddresses(
   core: WalletCoreRuntime,
