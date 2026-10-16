@@ -12,6 +12,11 @@ export type EncryptedVault = {
   ciphertext: string;
 };
 
+export type VaultSecret = {
+  mnemonic: string;
+  bip39Passphrase: string;
+};
+
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';
   for (let i = 0; i < bytes.length; i += 1) binary += String.fromCharCode(bytes[i]);
@@ -71,13 +76,21 @@ export function getSavedVault(): EncryptedVault | null {
   }
 }
 
-export async function encryptMnemonic(mnemonic: string, password: string): Promise<EncryptedVault> {
+export async function encryptMnemonic(
+  mnemonic: string,
+  password: string,
+  bip39Passphrase = '',
+): Promise<EncryptedVault> {
   if (password.length < 12) throw new Error('Use a password with at least 12 characters.');
   const cryptoApi = getCrypto();
   const salt = cryptoApi.getRandomValues(new Uint8Array(16));
   const iv = cryptoApi.getRandomValues(new Uint8Array(12));
   const key = await deriveEncryptionKey(password, salt);
-  const plaintext = new TextEncoder().encode(mnemonic.trim().split(/\s+/).join(' '));
+  const secret: VaultSecret = {
+    mnemonic: mnemonic.trim().split(/\s+/).join(' '),
+    bip39Passphrase,
+  };
+  const plaintext = new TextEncoder().encode(JSON.stringify(secret));
   const encrypted = await cryptoApi.subtle.encrypt(
     { name: 'AES-GCM', iv, additionalData: VAULT_AAD, tagLength: 128 },
     key,
@@ -94,7 +107,7 @@ export async function encryptMnemonic(mnemonic: string, password: string): Promi
   };
 }
 
-export async function decryptMnemonic(vault: EncryptedVault, password: string): Promise<string> {
+export async function decryptMnemonic(vault: EncryptedVault, password: string): Promise<VaultSecret> {
   try {
     const cryptoApi = getCrypto();
     const salt = base64ToBytes(vault.salt);
@@ -106,7 +119,15 @@ export async function decryptMnemonic(vault: EncryptedVault, password: string): 
       key,
       base64ToBytes(vault.ciphertext),
     );
-    return new TextDecoder('utf-8', { fatal: true }).decode(plaintext);
+    const parsed: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(plaintext));
+    if (
+      !parsed || typeof parsed !== 'object' ||
+      !('mnemonic' in parsed) || typeof parsed.mnemonic !== 'string' ||
+      !('bip39Passphrase' in parsed) || typeof parsed.bip39Passphrase !== 'string'
+    ) {
+      throw new Error('Invalid wallet secret payload.');
+    }
+    return { mnemonic: parsed.mnemonic, bip39Passphrase: parsed.bip39Passphrase };
   } catch {
     throw new Error('Could not unlock this wallet. Check the password or restore using your recovery phrase.');
   }
