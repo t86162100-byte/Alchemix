@@ -10,6 +10,7 @@ export type WalletAddress = {
   family: 'EVM' | 'UTXO' | 'Ed25519' | 'Other';
   note?: string;
   registryId?: string;
+  blockchain?: string;
 };
 
 type WalletCoreRegistryEntry = {
@@ -162,6 +163,7 @@ export function deriveSupportedAddresses(
         result.push({
           label,
           registryId: entry.id,
+          blockchain: entry.blockchain,
           ticker: entry.symbol,
           value,
           derivationPath,
@@ -183,6 +185,7 @@ export function deriveSupportedAddresses(
     result.push({
       label: 'Solana',
       registryId: 'solana',
+      blockchain: 'Solana',
       ticker: 'SOL',
       value: solana,
       derivationPath: SOLANA_DERIVATION_PATH,
