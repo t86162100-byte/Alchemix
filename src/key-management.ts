@@ -112,7 +112,12 @@ export function deriveSupportedAddresses(
     }
 
     const result: WalletAddress[] = [];
-    const getAddressForCoin = wallet.getAddressForCoin as unknown as (coinType: unknown) => string;
+    // Keep the method bound to the Wallet Core HDWallet instance. The WASM
+    // wrapper reads its native pointer from `this`; extracting the method and
+    // invoking it as a plain function can make non-EVM derivation fail.
+    const getAddressForCoin = (coinType: unknown): string =>
+      (wallet.getAddressForCoin as unknown as (this: typeof wallet, coinType: unknown) => string)
+        .call(wallet, coinType);
 
     for (const entry of WALLET_CORE_REGISTRY) {
       // Solana uses the separately tested SLIP-0010 derivation below.
