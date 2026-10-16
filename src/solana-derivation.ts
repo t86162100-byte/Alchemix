@@ -1,6 +1,6 @@
 import { mnemonicToSeedSync } from '@scure/bip39';
 import slip10 from 'micro-key-producer/slip10.js';
-import { PublicKey } from '@solana/web3.js';
+import { base58 } from '@scure/base';
 
 /**
  * Solana's Wallet Core-compatible default account path.
@@ -25,7 +25,7 @@ export function deriveSolanaAddress(mnemonic: string, bip39Passphrase = ''): str
     if (publicKey.length !== 32) {
       throw new Error('Solana derivation returned an invalid Ed25519 public key.');
     }
-    const address = new PublicKey(publicKey).toBase58();
+    const address = base58.encode(publicKey);
     if (!/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(address)) {
       throw new Error('Solana derivation returned an invalid Base58 address.');
     }
