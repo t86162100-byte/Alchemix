@@ -44,7 +44,7 @@ export function deriveSupportedAddresses(core: WalletCoreRuntime, mnemonic: stri
 }
 
 export type SelfTestResult = { name: string; passed: boolean; detail: string };
-const REFERENCE_MNEMONIC = 'ripple scissors kick mammal oak again sun offer wealth tomorrow wagon turn fatal'.replace('mammal oak', 'mammal hire column oak');
+const REFERENCE_MNEMONIC = 'ripple scissors kick mammal hire column oak again sun offer wealth tomorrow wagon turn fatal';
 // Published fixture from Trust Wallet Core's usage guide. Never use test phrases for funds.
 export function runKeyDerivationSelfTests(core: WalletCoreRuntime): SelfTestResult[] {
   const results: SelfTestResult[] = [];
