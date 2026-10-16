@@ -25,4 +25,4 @@ jobs:
       - name: Install dependencies
         run: npm install
       - name: Type-check and build
-        run: npm run build
+        run: npm run test && npm run build
