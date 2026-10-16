@@ -36,14 +36,14 @@ Run the automated derivation regression suite with `npm test`, then build the st
 
 ## Step 2 — multichain key derivation (in progress)
 
-- Derive the default Ethereum account and display it for Ethereum, BNB Chain, Base, Polygon, Arbitrum, Optimism, Avalanche C-Chain, Mantle, Linea, Scroll, zkSync Era, opBNB, Celo, Gnosis, Moonbeam, Moonriver, and Fantom. These EVM networks intentionally share the same Ethereum account path/address; listing them does not mean RPC, balances, or transactions are connected.
-- Derive the default Bitcoin native-SegWit address and show the BIP-84 path (`m/84'/0'/0'/0/0`).
-- Derive Solana locally with BIP-39 plus SLIP-0010 using Trust Wallet Core's published default path (`m/44'/501'/0'`). This fallback is used because the installed Wallet Core WASM build does not expose the expected Solana coin-type API. Trust Wallet Core documents an alternative Solana path (`m/44'/501'/0'/0'`) that produces a different address; do not assume every wallet uses the same path.
-- Browser self-tests compare Ethereum, Bitcoin, and Solana derivation against published Trust Wallet Core reference outputs and check Solana address format.
-- Automated Solana regression tests check the official Wallet Core default-path vector, reject an invalid phrase, and confirm that a BIP-39 passphrase changes the derived address. The vector and path are from the upstream Wallet Core test suite at the pinned source revision.
-- The self-test button uses public test-only mnemonic fixtures, never the user's wallet phrase. Do not use those fixtures for funds.
+- The app now vendors the upstream Trust Wallet Core 4.8.4 `registry.json` snapshot, containing **168 chain entries** with native tickers and default derivation paths. It matches each entry to the installed Wallet Core WASM coin-type enum and derives addresses locally where that runtime supports it. Entries that cannot be derived are omitted instead of fabricated.
+- Common EVM networks are shown first. EVM chains using `m/44'/60'/0'/0/0` intentionally share the same Ethereum-format account address; other chains use their registry-defined derivation path. The UI shows the number of locally derived addresses.
+- Bitcoin uses the native-SegWit BIP-84 path (`m/84'/0'/0'/0/0`). Solana uses a separate BIP-39/SLIP-0010 fallback with the published default path (`m/44'/501'/0'`), because the installed WASM build does not expose the expected Solana coin-type API. The alternative Solana path (`m/44'/501'/0'/0'`) yields a different address.
+- The browser self-test now checks Ethereum, Bitcoin, Solana reference vectors and whether the runtime can derive **100 or more** addresses from the pinned registry. The automated suite also checks registry size/metadata and Solana derivation behavior. Public test-only mnemonic fixtures are never used for funds.
 
-The detailed module boundaries and completion gates are documented in [docs/WALLET_ARCHITECTURE.md](docs/WALLET_ARCHITECTURE.md).
+**This expands local address derivation, not live network support.** RPC connections, balances, token discovery, fee estimation, transaction building/signing, and broadcast are still separate work; sending remains disabled.
+
+See [docs/WALLET_CORE_REGISTRY.md](docs/WALLET_CORE_REGISTRY.md) and [docs/WALLET_ARCHITECTURE.md](docs/WALLET_ARCHITECTURE.md) for registry provenance and implementation gates.
 
 ## Security status — development only
 
