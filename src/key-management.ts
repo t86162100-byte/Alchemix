@@ -16,7 +16,7 @@ export function deriveSupportedAddresses(core: WalletCoreRuntime, mnemonic: stri
   try {
     const ethereum = String(wallet.getAddressForCoin(core.CoinType.ethereum));
     const bitcoin = String(wallet.getAddressForCoin(core.CoinType.bitcoin));
-    const solanaCoin = (core.CoinType as unknown as Record<string, number | undefined>).solana;
+    const solanaCoin = core.CoinType.solana;
     if (!/^0x[0-9a-fA-F]{40}$/.test(ethereum)) throw new Error('Wallet Core returned an invalid Ethereum-format address.');
     if (!/^(bc1|[13])[a-zA-HJ-NP-Z0-9]{20,}$/.test(bitcoin)) throw new Error('Wallet Core returned an invalid Bitcoin-format address.');
 
