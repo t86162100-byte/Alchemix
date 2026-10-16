@@ -36,6 +36,7 @@ function validateReceiveAddress(address: WalletAddress): { valid: boolean; messa
     : { valid: false, message: `The address does not match the expected ${network} format. Receiving is disabled for this address to avoid a potentially unsafe deposit.` };
 
   if (address.family === 'EVM') return valid(/^0x[0-9a-fA-F]{40}$/, address.label);
+  if (address.registryId === 'doge') return valid(/^D[1-9A-HJ-NP-Za-km-z]{25,34}$/, 'Dogecoin');
   if (blockchain === 'bitcoin') return valid(/^(bc1[ac-hj-np-z02-9]{11,71}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})$/, 'Bitcoin mainnet');
   if (blockchain === 'solana') return valid(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, 'Solana');
   if (blockchain === 'tron') return valid(/^T[1-9A-HJ-NP-Za-km-z]{33}$/, 'Tron');
@@ -46,8 +47,7 @@ function validateReceiveAddress(address: WalletAddress): { valid: boolean; messa
   if (blockchain === 'cosmos' || blockchain === 'nativeinjective' || blockchain === 'thorchain') {
     return valid(/^[a-z0-9]{1,20}1[ac-hj-np-z02-9]{20,}$/i, address.label);
   }
-  if (blockchain === 'theopentonnetwork') return valid(/^(EQ|UQ)[A-Za-z0-9_-]{46}$/, 'TON');
-  if (blockchain === 'dogecoin') return valid(/^D[1-9A-HJ-NP-Za-km-z]{25,34}$/, 'Dogecoin');
+  if (blockchain === 'theopennetwork') return valid(/^(EQ|UQ)[A-Za-z0-9_-]{46}$/, 'TON');
   if (blockchain === 'bitcoincash') return valid(/^(bitcoincash:)?[qp][a-z0-9]{41,}$/i, 'Bitcoin Cash');
   return {
     valid: false,
