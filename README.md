@@ -34,8 +34,16 @@ Build the static web application with `npm run build`; output is written to `dis
 - Unlock an encrypted vault and derive initial Ethereum and Bitcoin receiving addresses locally.
 - Lock the UI or remove the encrypted local copy.
 
+## Step 2 — multichain key derivation (in progress)
+
+- Derive the default Ethereum account and display it for Ethereum, BNB Chain, Base, Polygon, Arbitrum, Optimism, Avalanche C-Chain, Mantle, Linea, Scroll, zkSync Era, opBNB, Celo, Gnosis, Moonbeam, Moonriver, and Fantom. These EVM networks intentionally share the same Ethereum account path/address; listing them does not mean RPC, balances, or transactions are connected.
+- Derive the default Bitcoin native-SegWit address and show the BIP-84 path.
+- Derive a Solana address through Wallet Core's default Solana coin path.
+- Browser self-tests compare Ethereum and Bitcoin results to published Trust Wallet Core reference outputs. Solana currently gets address-format and repeatability checks only; an independent published Solana reference vector must still be added.
+- The self-test button uses a public test-only mnemonic fixture, never the user's wallet phrase. Do not use that fixture for funds.
+
 ## Security status — development only
 
-This is **not production-ready and must not be used with real funds**. The Wallet Core NPM WASM integration is beta. The current implementation needs automated BIP-39 and address test vectors, independent review of the generated addresses and key derivation, browser/device testing, and security review. Browser local storage and JavaScript execution are exposed to same-origin script compromise; encryption at rest does not protect secrets from malicious code running in the page while a wallet is unlocked.
+This is **not production-ready and must not be used with real funds**. The Wallet Core NPM WASM integration is beta. The current implementation needs broader automated BIP-39 and address test vectors (including an independent Solana vector), independent review of the generated addresses and key derivation, browser/device testing, and security review. Browser local storage and JavaScript execution are exposed to same-origin script compromise; encryption at rest does not protect secrets from malicious code running in the page while a wallet is unlocked.
 
 Balance retrieval, token discovery, network adapters, transaction construction, transaction signing, broadcast, and send UI remain unimplemented/disabled. Wallet Core does not itself connect to blockchain nodes or broadcast transactions.
