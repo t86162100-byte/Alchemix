@@ -1,5 +1,6 @@
 import './style.css';
-import { initializeWalletCore, type WalletCoreRuntime } from './wallet-core';
+import { initializeWalletCore } from './wallet-core';
+import { deriveSupportedAddresses, runKeyDerivationSelfTests, type WalletAddress } from './key-management';
 import {
   decryptMnemonic,
   encryptMnemonic,
@@ -11,7 +12,6 @@ import {
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('App root element was not found');
 
-type WalletAddress = { label: string; ticker: string; value: string };
 type View = 'welcome' | 'create-phrase' | 'restore' | 'locked' | 'ready';
 
 let view: View = 'welcome';
@@ -46,23 +46,6 @@ function setBusy(busy: boolean, message = ''): void {
   if (note && message) note.textContent = message;
   const busyIndicator = document.querySelector<HTMLSpanElement>('#busy-indicator');
   if (busyIndicator) busyIndicator.textContent = busy ? 'WORKING…' : '';
-}
-
-function deriveAddresses(core: WalletCoreRuntime, mnemonic: string, bip39Passphrase = ''): WalletAddress[] {
-  const wallet = core.HDWallet.createWithMnemonic(mnemonic, bip39Passphrase);
-  try {
-    const ethereumAddress = String(wallet.getAddressForCoin(core.CoinType.ethereum));
-    const bitcoinAddress = String(wallet.getAddressForCoin(core.CoinType.bitcoin));
-    if (!ethereumAddress || ethereumAddress === '[object Object]' || !bitcoinAddress || bitcoinAddress === '[object Object]') {
-      throw new Error('Wallet Core did not return usable addresses.');
-    }
-    return [
-      { label: 'Ethereum', ticker: 'ETH', value: ethereumAddress },
-      { label: 'Bitcoin', ticker: 'BTC', value: bitcoinAddress },
-    ];
-  } finally {
-    wallet.delete();
-  }
 }
 
 function render(): void {
@@ -179,9 +162,10 @@ function render(): void {
       <section class="address-panel">
         <div class="section-heading"><div><span class="eyebrow">RECEIVING ADDRESSES</span><h2>Your first addresses</h2></div><span class="tag tag-green">DERIVED LOCALLY</span></div>
         ${addressRows}
-        <p class="muted-note">Address derivation for this first milestone shows Ethereum and Bitcoin only. It does not mean network balances or transactions are connected.</p>
-        <div class="ready-actions"><button class="secondary" id="lock-wallet">Lock wallet</button><button class="danger-button" id="remove-wallet">Remove encrypted copy</button></div>
+        <p class="muted-note">EVM networks intentionally share the same Ethereum account address and derivation path. Network connections, balances, token discovery, and transactions are not enabled by this step.</p>
+        <div class="ready-actions"><button class="secondary" id="run-key-tests">Run derivation tests</button><button class="secondary" id="lock-wallet">Lock wallet</button><button class="danger-button" id="remove-wallet">Remove encrypted copy</button></div>
       </section>
+      <section id="key-test-results" class="address-panel test-results" hidden aria-live="polite"></section>
       <div class="warning-box bottom-warning"><strong>Still a development build.</strong> Do not deposit real funds. Wallet creation and restore need automated test vectors, browser/device testing, and independent security review before production use.</div>`;
   }
 
@@ -265,7 +249,7 @@ function bindEvents(): void {
     setBusy(true, 'Deriving addresses and encrypting your recovery phrase locally…');
     try {
       const core = await initializeWalletCore();
-      const derived = deriveAddresses(core, pendingMnemonic);
+      const derived = deriveSupportedAddresses(core, pendingMnemonic);
       const encrypted = await encryptMnemonic(pendingMnemonic, password);
       saveVault(encrypted);
       addresses = derived;
@@ -305,7 +289,7 @@ function bindEvents(): void {
     setBusy(true, 'Validating the recovery phrase, deriving addresses, and encrypting locally…');
     try {
       const core = await initializeWalletCore();
-      const derived = deriveAddresses(core, phrase, bip39Passphrase);
+      const derived = deriveSupportedAddresses(core, phrase, bip39Passphrase);
       const encrypted = await encryptMnemonic(phrase, password, bip39Passphrase);
       saveVault(encrypted);
       addresses = derived;
@@ -330,7 +314,7 @@ function bindEvents(): void {
       if (!vault) throw new Error('No encrypted wallet was found in this browser.');
       const secret = await decryptMnemonic(vault, password);
       const core = await initializeWalletCore();
-      addresses = deriveAddresses(core, secret.mnemonic, secret.bip39Passphrase);
+      addresses = deriveSupportedAddresses(core, secret.mnemonic, secret.bip39Passphrase);
       view = 'ready';
       errorMessage = '';
       render();
@@ -339,6 +323,29 @@ function bindEvents(): void {
       setError(error instanceof Error && error.message.startsWith('The encrypted wallet data')
         ? error.message
         : 'Could not unlock this wallet. Check the password or restore using your recovery phrase.');
+    }
+  });
+
+  document.querySelector<HTMLButtonElement>('#run-key-tests')?.addEventListener('click', async () => {
+    const button = document.querySelector<HTMLButtonElement>('#run-key-tests');
+    const output = document.querySelector<HTMLElement>('#key-test-results');
+    if (!output || !button) return;
+    button.disabled = true;
+    button.textContent = 'Running tests…';
+    output.hidden = false;
+    output.innerHTML = '<h2>Key derivation self-tests</h2><p class="muted-note">Using a public test-only phrase; your wallet phrase is not used for these reference tests.</p>';
+    try {
+      const core = await initializeWalletCore();
+      const results = runKeyDerivationSelfTests(core);
+      const passed = results.filter((result) => result.passed).length;
+      output.innerHTML = `<div class="section-heading"><div><span class="eyebrow">STEP 2 · LOCAL CRYPTO TESTS</span><h2>${passed}/${results.length} checks passed</h2></div><span class="tag ${passed === results.length ? 'tag-green' : ''}">${passed === results.length ? 'CHECKS PASSED' : 'REVIEW REQUIRED'}</span></div>` +
+        results.map((result) => `<article class="test-result"><strong>${result.passed ? '✓' : '✕'} ${escapeHtml(result.name)}</strong><code>${escapeHtml(result.detail)}</code></article>`).join('') +
+        '<p class="muted-note">Ethereum and Bitcoin are compared with published Trust Wallet Core reference outputs. Solana currently checks format and deterministic repeatability only; an independent published Solana vector is still required before calling that test verified.</p>';
+    } catch (error) {
+      output.innerHTML = `<p class="form-error">${escapeHtml(error instanceof Error ? error.message : 'Test run failed.')}</p>`;
+    } finally {
+      button.disabled = false;
+      button.textContent = 'Run derivation tests';
     }
   });
 
