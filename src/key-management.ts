@@ -62,7 +62,7 @@ export function runKeyDerivationSelfTests(core: WalletCoreRuntime): SelfTestResu
       passed: btc.toLowerCase() === 'bc1qpsp72plnsqe6e2dvtsetxtww2cz36ztmfxghpd',
       detail: btc,
     });
-    const solanaCoin = (core.CoinType as unknown as Record<string, number | undefined>).solana;
+    const solanaCoin = core.CoinType.solana;
     if (typeof solanaCoin === 'number') {
       const first = String(wallet.getAddressForCoin(solanaCoin));
       const second = String(wallet.getAddressForCoin(solanaCoin));
