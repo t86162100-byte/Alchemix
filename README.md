@@ -37,10 +37,10 @@ Build the static web application with `npm run build`; output is written to `dis
 ## Step 2 — multichain key derivation (in progress)
 
 - Derive the default Ethereum account and display it for Ethereum, BNB Chain, Base, Polygon, Arbitrum, Optimism, Avalanche C-Chain, Mantle, Linea, Scroll, zkSync Era, opBNB, Celo, Gnosis, Moonbeam, Moonriver, and Fantom. These EVM networks intentionally share the same Ethereum account path/address; listing them does not mean RPC, balances, or transactions are connected.
-- Derive the default Bitcoin native-SegWit address and show the BIP-84 path.
-- Derive a Solana address through Wallet Core's default Solana coin path.
-- Browser self-tests compare Ethereum and Bitcoin results to published Trust Wallet Core reference outputs. Solana currently gets address-format and repeatability checks only; an independent published Solana reference vector must still be added.
-- The self-test button uses a public test-only mnemonic fixture, never the user's wallet phrase. Do not use that fixture for funds.
+- Derive the default Bitcoin native-SegWit address and show the BIP-84 path (`m/84'/0'/0'/0/0`).
+- Derive a Solana address through Wallet Core's default path (`m/44'/501'/0'`). Some Solana wallets use `m/44'/501'/0'/0'`; path compatibility needs explicit account-discovery support rather than assuming all wallets match.
+- Browser self-tests compare Ethereum, Bitcoin, and Solana default derivation against published Trust Wallet Core reference outputs and check Solana address format/repeatability.
+- The self-test button uses public test-only mnemonic fixtures, never the user's wallet phrase. Do not use those fixtures for funds.
 
 ## Security status — development only
 
