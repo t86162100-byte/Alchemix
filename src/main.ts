@@ -1,4 +1,5 @@
 import './style.css';
+import QRCode from 'qrcode';
 import { initializeWalletCore } from './wallet-core';
 import { deriveSupportedAddresses, runKeyDerivationSelfTests, type WalletAddress } from './key-management';
 import {
@@ -17,12 +18,75 @@ type View = 'welcome' | 'create-phrase' | 'restore' | 'locked' | 'ready';
 let view: View = 'welcome';
 let pendingMnemonic: string | null = null;
 let addresses: WalletAddress[] = [];
+let selectedReceiveAddress: WalletAddress | null = null;
 let errorMessage = '';
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
   })[character] ?? character);
+}
+
+
+function validateReceiveAddress(address: WalletAddress): { valid: boolean; message: string } {
+  const value = address.value.trim();
+  const blockchain = (address.blockchain ?? '').toLowerCase();
+  const valid = (pattern: RegExp, network: string) => pattern.test(value)
+    ? { valid: true, message: `Local address-format check passed for ${network}. This does not confirm deposit support or monitor incoming funds.` }
+    : { valid: false, message: `The address does not match the expected ${network} format. Receiving is disabled for this address to avoid a potentially unsafe deposit.` };
+
+  if (address.family === 'EVM') return valid(/^0x[0-9a-fA-F]{40}$/, address.label);
+  if (blockchain === 'bitcoin') return valid(/^(bc1[ac-hj-np-z02-9]{11,71}|[13][a-km-zA-HJ-NP-Z1-9]{25,34})$/, 'Bitcoin mainnet');
+  if (blockchain === 'solana') return valid(/^[1-9A-HJ-NP-Za-km-z]{32,44}$/, 'Solana');
+  if (blockchain === 'tron') return valid(/^T[1-9A-HJ-NP-Za-km-z]{33}$/, 'Tron');
+  if (blockchain === 'stellar') return valid(/^G[A-Z2-7]{55}$/, 'Stellar');
+  if (blockchain === 'ripple') return valid(/^r[1-9A-HJ-NP-Za-km-z]{24,34}$/, 'XRP Ledger');
+  if (blockchain === 'aptos') return valid(/^0x[0-9a-fA-F]{1,64}$/, 'Aptos');
+  if (blockchain === 'sui') return valid(/^0x[0-9a-fA-F]{64}$/, 'Sui');
+  if (blockchain === 'cosmos' || blockchain === 'nativeinjective' || blockchain === 'thorchain') {
+    return valid(/^[a-z0-9]{1,20}1[ac-hj-np-z02-9]{20,}$/i, address.label);
+  }
+  if (blockchain === 'theopentonnetwork') return valid(/^(EQ|UQ)[A-Za-z0-9_-]{46}$/, 'TON');
+  if (blockchain === 'dogecoin') return valid(/^D[1-9A-HJ-NP-Za-km-z]{25,34}$/, 'Dogecoin');
+  if (blockchain === 'bitcoincash') return valid(/^(bitcoincash:)?[qp][a-z0-9]{41,}$/i, 'Bitcoin Cash');
+  return {
+    valid: false,
+    message: `Tradingview X does not yet have a network-specific address-format validator for ${address.label}. Do not use this derived address for a deposit until that network's derivation and address format have been independently verified.`,
+  };
+}
+
+function receiveTokenGuidance(address: WalletAddress): string {
+  const blockchain = (address.blockchain ?? '').toLowerCase();
+  if (address.family === 'EVM') {
+    return `Compatible tokens on ${address.label} use the same account address as the native coin. For example, USDT as an ERC-20 token on Ethereum uses the ETH address, but token contracts differ across networks. Select the exact same network and token standard at the sending wallet.`;
+  }
+  if (blockchain === 'solana') return 'SOL and compatible SPL tokens use this Solana account address. Confirm the exact token/mint and use the Solana network.';
+  if (blockchain === 'tron') return 'TRX and compatible TRC-20 tokens use this Tron address. Confirm the exact token contract and use the Tron network.';
+  return 'Some tokens share their underlying chain account address, but this is chain- and token-standard-specific. Verify the exact asset and network with the sender before depositing.';
+}
+
+async function renderReceiveQr(): Promise<void> {
+  const address = selectedReceiveAddress;
+  const target = document.querySelector<HTMLDivElement>('#receive-qr');
+  if (!address || !target) return;
+  const check = validateReceiveAddress(address);
+  if (!check.valid) {
+    target.innerHTML = '<p class="receive-warning">QR generation is disabled until this network has a verified address-format check.</p>';
+    return;
+  }
+  target.textContent = 'Generating QR locally…';
+  try {
+    const dataUrl = await QRCode.toDataURL(address.value, {
+      errorCorrectionLevel: 'M',
+      margin: 2,
+      width: 240,
+      color: { dark: '#0b0f17', light: '#ffffff' },
+    });
+    if (selectedReceiveAddress?.value !== address.value) return;
+    target.innerHTML = `<img class="receive-qr-image" src="${dataUrl}" alt="QR code for the ${escapeHtml(address.label)} receiving address" />`;
+  } catch {
+    target.textContent = 'Could not generate the QR code on this device. You can still copy the full address.';
+  }
 }
 
 function normalizeMnemonic(value: string): string {
@@ -148,12 +212,17 @@ function render(): void {
         <p class="muted-note">Creating a new wallet will replace the encrypted wallet saved in this browser after you finish setup. Your old wallet can only be recovered later with its original recovery phrase (and any optional BIP-39 passphrase).</p>
       </section>`;
   } else {
-    const addressRows = addresses.map((address) => `
+    const addressRows = addresses.map((address) => {
+      const check = validateReceiveAddress(address);
+      const addressKey = address.registryId ?? address.label;
+      return `
       <article class="address-row">
-        <div class="coin-icon">${address.ticker.slice(0, 1)}</div>
-        <div class="address-info"><strong>${escapeHtml(address.label)}</strong><span>${escapeHtml(address.ticker)} · ${escapeHtml(address.family)} · receiving address</span><code>${escapeHtml(address.value)}</code><small class="path-note">Path: ${escapeHtml(address.derivationPath)}</small><small class="path-note">${escapeHtml(address.note ?? "")}</small></div>
-        <button class="copy-button" data-copy="${escapeHtml(address.value)}" aria-label="Copy ${escapeHtml(address.label)} address">Copy</button>
-      </article>`).join('');
+        <div class="coin-icon">${escapeHtml(address.ticker.slice(0, 1))}</div>
+        <div class="address-info"><strong>${escapeHtml(address.label)}</strong><span>${escapeHtml(address.ticker)} · ${escapeHtml(address.family)} · ${check.valid ? 'format check passed' : 'receiving not verified'}</span><code>${escapeHtml(address.value)}</code><small class="path-note">Path: ${escapeHtml(address.derivationPath)}</small><small class="path-note">${escapeHtml(address.note ?? "")}</small></div>
+        <button class="receive-button" data-receive="${escapeHtml(addressKey)}" ${check.valid ? '' : 'disabled'} title="${escapeHtml(check.valid ? 'Open receive details and local QR code' : check.message)}">Receive</button>
+        <button class="copy-button" data-copy="${escapeHtml(address.value)}" aria-label="Copy ${escapeHtml(address.label)} address" ${check.valid ? '' : 'disabled'} title="${escapeHtml(check.valid ? 'Copy full address' : 'Copy disabled until address validation is implemented')}">Copy</button>
+      </article>`;
+    }).join('');
     content = `
       <section class="hero ready-hero">
         <div class="eyebrow"><span class="eyebrow-line"></span> WALLET CREATED</div>
@@ -171,8 +240,29 @@ function render(): void {
       <div class="warning-box bottom-warning"><strong>Still a development build.</strong> Do not deposit real funds. Wallet creation and restore need automated test vectors, browser/device testing, and independent security review before production use.</div>`;
   }
 
-  app.innerHTML = `<main class="shell">${header}<div class="content-area">${content}</div>${footer}</main>`;
+  const receiveDialog = view === 'ready' && selectedReceiveAddress ? (() => {
+    const address = selectedReceiveAddress;
+    const check = validateReceiveAddress(address);
+    return `
+      <div class="receive-backdrop" role="presentation">
+        <section class="receive-dialog" role="dialog" aria-modal="true" aria-labelledby="receive-title">
+          <div class="receive-dialog-header">
+            <div><span class="eyebrow">RECEIVE ASSET</span><h2 id="receive-title">${escapeHtml(address.label)}</h2><p class="receive-subtitle">${escapeHtml(address.ticker)} · ${escapeHtml(address.blockchain ?? address.label)} network</p></div>
+            <button class="receive-close" id="close-receive" aria-label="Close receive screen">×</button>
+          </div>
+          <div class="receive-qr-shell" id="receive-qr">${check.valid ? 'Generating QR locally…' : 'QR unavailable until address validation passes.'}</div>
+          <div class="receive-address-label">YOUR RECEIVING ADDRESS</div>
+          <code class="receive-address-value">${escapeHtml(address.value)}</code>
+          <p class="receive-validation ${check.valid ? 'is-valid' : 'is-invalid'}">${escapeHtml(check.message)}</p>
+          ${check.valid ? `<button class="primary active receive-copy-action" data-copy="${escapeHtml(address.value)}">Copy full address</button>` : ''}
+          <div class="receive-token-guidance"><strong>Asset and network warning</strong><p>${escapeHtml(receiveTokenGuidance(address))}</p></div>
+          <p class="muted-note">The QR code is generated locally in this browser. This screen does not request balances, detect deposits, or prove that a network/provider supports this address. Tradingview X remains a development build; do not deposit real funds yet.</p>
+        </section>
+      </div>`;
+  })() : '';
+  app.innerHTML = `<main class="shell">${header}<div class="content-area">${content}</div>${footer}${receiveDialog}</main>`;
   bindEvents();
+  if (selectedReceiveAddress) void renderReceiveQr();
 }
 
 function bindEvents(): void {
@@ -359,6 +449,7 @@ function bindEvents(): void {
   });
 
   document.querySelector<HTMLButtonElement>('#lock-wallet')?.addEventListener('click', () => {
+    selectedReceiveAddress = null;
     addresses = [];
     errorMessage = '';
     view = 'locked';
@@ -368,10 +459,25 @@ function bindEvents(): void {
     const confirmed = window.confirm('Remove the encrypted wallet from this browser? Do this only after safely backing up your recovery phrase. This cannot be undone from this browser.');
     if (!confirmed) return;
     removeSavedVault();
+    selectedReceiveAddress = null;
     addresses = [];
     pendingMnemonic = null;
     errorMessage = '';
     view = 'welcome';
+    render();
+  });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-receive]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const key = button.dataset.receive ?? '';
+      const address = addresses.find((item) => (item.registryId ?? item.label) === key);
+      if (!address || !validateReceiveAddress(address).valid) return;
+      selectedReceiveAddress = address;
+      render();
+    });
+  });
+  document.querySelector<HTMLButtonElement>('#close-receive')?.addEventListener('click', () => {
+    selectedReceiveAddress = null;
     render();
   });
 
