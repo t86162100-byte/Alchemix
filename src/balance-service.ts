@@ -54,7 +54,14 @@ const CHAINS: ChainConfig[] = [
   { id: 'tron', name: 'Tron', symbol: 'TRX', decimals: 6, family: 'tron', registryId: 'tron' },
 ];
 
-const SOLANA_RPC = ['https://solana-rpc.publicnode.com', 'https://api.mainnet-beta.solana.com'];
+const runtimeEnv = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env ?? {};
+const ALCHEMY_API_KEY = runtimeEnv.VITE_ALCHEMY_API_KEY?.trim() ?? '';
+const configuredSolanaRpc = runtimeEnv.VITE_SOLANA_RPC_URL?.trim() ?? '';
+const SOLANA_RPC = [
+  ...(configuredSolanaRpc ? [configuredSolanaRpc] : []),
+  'https://api.mainnet.solana.com',
+  'https://api.mainnet-beta.solana.com',
+];
 const SOLANA_TOKEN_PROGRAMS = [
   'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
   'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
@@ -150,9 +157,109 @@ async function fetchEvmNative(config: ChainConfig, address: string): Promise<Ass
   throw lastError instanceof Error ? lastError : new Error('All native-balance RPC providers failed');
 }
 
+function alchemyNetwork(config: ChainConfig): string | undefined {
+  if (config.id === 'ethereum') return 'eth-mainnet';
+  if (config.id === 'bsc') return 'bnb-mainnet';
+  if (config.id === 'base') return 'base-mainnet';
+  if (config.id === 'solana') return 'sol-mainnet';
+  return undefined;
+}
+
+function parseRawTokenBalance(raw: unknown): string | undefined {
+  if (typeof raw !== 'string' && typeof raw !== 'number' && typeof raw !== 'bigint') return undefined;
+  const value = String(raw).trim();
+  try {
+    if (/^0x[0-9a-f]+$/i.test(value)) return BigInt(value).toString();
+    if (/^\\d+$/.test(value)) return BigInt(value).toString();
+  } catch { return undefined; }
+  return undefined;
+}
+
+/**
+ * Alchemy's documented Portfolio API returns owned fungible holdings, metadata,
+ * and price data for supported EVM networks and Solana. This is an indexer, not
+ * a token registry: only returned positive balances are shown as owned assets.
+ * API key is a public browser credential; restrict it by app origin and quotas.
+ */
+async function fetchAlchemyAssets(config: ChainConfig, address: string): Promise<AssetBalance[]> {
+  const network = alchemyNetwork(config);
+  if (!ALCHEMY_API_KEY) throw new Error('Alchemy Portfolio API is not configured (set VITE_ALCHEMY_API_KEY in Render).');
+  if (!network) throw new Error('Alchemy Portfolio API does not support this network mapping.');
+  const endpoint = `https://api.g.alchemy.com/data/v1/${encodeURIComponent(ALCHEMY_API_KEY)}/assets/tokens/by-address`;
+  const rows: any[] = [];
+  let pageKey: string | undefined;
+  let pages = 0;
+  do {
+    const body: Record<string, unknown> = {
+      addresses: [{ address, networks: [network] }],
+      withMetadata: true,
+      withPrices: true,
+      includeNativeTokens: true,
+      includeErc20Tokens: true,
+      includeBlockMetadata: false,
+    };
+    if (pageKey) body.pageKey = pageKey;
+    const response = await postJson(endpoint, body);
+    if (!Array.isArray(response?.data?.tokens)) {
+      const detail = response?.error?.message ?? response?.message ?? 'unexpected Portfolio API response';
+      throw new Error(String(detail));
+    }
+    rows.push(...response.data.tokens.filter((row: any) => row?.network === network));
+    pageKey = typeof response.data.pageKey === 'string' && response.data.pageKey ? response.data.pageKey : undefined;
+    pages += 1;
+    if (pages >= 20 && pageKey) throw new Error('Alchemy token pagination exceeded the safety limit; some holdings may be omitted.');
+  } while (pageKey);
+
+  const assets: AssetBalance[] = [];
+  for (const row of rows) {
+    const raw = parseRawTokenBalance(row?.tokenBalance);
+    const metadata = row?.tokenMetadata ?? {};
+    const decimals = Number(metadata.decimals);
+    if (!raw || !Number.isInteger(decimals) || decimals < 0 || decimals > 36) continue;
+    let rawBigInt: bigint;
+    try { rawBigInt = BigInt(raw); } catch { continue; }
+    if (rawBigInt <= 0n) continue;
+    const native = row?.tokenAddress == null;
+    const symbol = typeof metadata.symbol === 'string' ? metadata.symbol.trim() : '';
+    const name = typeof metadata.name === 'string' ? metadata.name.trim() : '';
+    const tokenAddress = typeof row?.tokenAddress === 'string' ? row.tokenAddress : undefined;
+    if (!symbol || symbol.length > 24 || (!native && !name && !tokenAddress)) continue;
+    if (config.family === 'evm' && !native && (!tokenAddress || !/^0x[a-fA-F0-9]{40}$/.test(tokenAddress))) continue;
+    if (config.family === 'solana' && !native && (!tokenAddress || !/^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(tokenAddress))) continue;
+    const unitPrice = Array.isArray(row?.tokenPrices)
+      ? numeric(row.tokenPrices.find((price: any) => String(price?.currency).toLowerCase() === 'usd')?.value)
+      : undefined;
+    const amount = amountFromRaw(raw, decimals);
+    const balanceNumber = Number(amount);
+    const usdValue = unitPrice !== undefined && Number.isFinite(balanceNumber) ? unitPrice * balanceNumber : undefined;
+    assets.push({
+      id: native ? `${config.id}:native` : `${config.id}:token:${tokenAddress!.toLowerCase()}`,
+      chainId: config.family === 'evm' ? String(config.chainId) : 'solana-mainnet',
+      chainName: config.name,
+      kind: native ? 'native' : 'token',
+      name: name || symbol,
+      symbol,
+      balance: amount,
+      decimals,
+      ...(native ? {} : config.family === 'solana' ? { mintAddress: tokenAddress } : { contractAddress: tokenAddress }),
+      ...(usdValue !== undefined ? { usdValue, priceSource: 'Alchemy Portfolio API token price' } : {}),
+      source: 'Alchemy Portfolio API (indexed holdings and on-chain balance data)',
+    });
+  }
+  return dedupeAssets(assets);
+}
+
 async function fetchEvmTokens(config: ChainConfig, address: string): Promise<AssetBalance[]> {
-  // Try chain-scoped Routescan first, then its documented all-chains endpoint filtered
-  // to this chain. Some chain-specific routes return HTTP 400 even when native RPC works.
+  const failures: string[] = [];
+  if (ALCHEMY_API_KEY) {
+    try {
+      return (await fetchAlchemyAssets(config, address)).filter((asset) => asset.kind === 'token');
+    } catch (error) {
+      failures.push(`Alchemy: ${error instanceof Error ? error.message : 'provider error'}`);
+    }
+  }
+  // Routescan is a secondary indexer. Some networks/addresses return HTTP 400;
+  // do not interpret an indexer failure as an empty token portfolio.
   const encodedAddress = encodeURIComponent(address);
   const urls = [
     `https://api.routescan.io/v2/network/mainnet/evm/${config.chainId}/address/${encodedAddress}/erc20-holdings?limit=25`,
@@ -168,17 +275,21 @@ async function fetchEvmTokens(config: ChainConfig, address: string): Promise<Ass
       break;
     } catch (error) { lastError = error; }
   }
-  if (!data) throw lastError instanceof Error ? lastError : new Error('All token indexers failed');
+  if (!data) {
+    failures.push(`Routescan: ${lastError instanceof Error ? lastError.message : 'provider error'}`);
+    throw new Error(`Automatic token discovery failed. ${failures.join('; ')}. Configure VITE_ALCHEMY_API_KEY in Render to use the documented multi-chain token indexer.`);
+  }
   const items: AssetBalance[] = [];
   for (const item of data.items) {
-    // Routescan's address holdings schema uses tokenAddress/tokenDecimals/tokenQuantity.
     const contract = item.tokenAddress;
     const decimals = Number(item.tokenDecimals);
     const symbol = typeof item.tokenSymbol === 'string' ? item.tokenSymbol.trim() : '';
     if (!tokenMetadataSafe(contract, decimals, symbol)) continue;
-    const balance = String(item.tokenQuantity ?? '').trim();
+    const rawQuantity = String(item.tokenQuantity ?? '').trim();
+    let balance = rawQuantity;
+    // Routescan returns tokenQuantity as a human-readable quantity in its holdings schema.
     const amount = Number(balance);
-    if (!balance || !Number.isFinite(amount) || amount <= 0) continue;
+    if (!rawQuantity || !Number.isFinite(amount) || amount <= 0) continue;
     items.push({
       id: `${config.id}:erc20:${contract.toLowerCase()}`, chainId: String(config.chainId), chainName: config.name,
       kind: 'token', name: typeof item.tokenName === 'string' && item.tokenName.trim() ? item.tokenName.trim().slice(0, 80) : symbol,
@@ -206,6 +317,32 @@ async function fetchEvm(config: ChainConfig, address: string): Promise<ChainBala
 }
 
 async function fetchSolana(address: string): Promise<ChainBalanceResult> {
+  if (ALCHEMY_API_KEY) {
+    try {
+      const indexed = await fetchAlchemyAssets(CHAINS.find((chain) => chain.id === 'solana')!, address);
+      if (indexed.some((asset) => asset.kind === 'native')) {
+        return {
+          id: 'solana', name: 'Solana', nativeSymbol: 'SOL', address,
+          status: 'success',
+          message: 'Live SOL and indexed SPL holdings loaded through Alchemy Portfolio API. Token metadata/prices may be unavailable for some mints.',
+          assets: dedupeAssets(indexed), updatedAt: Date.now(),
+        };
+      }
+      throw new Error('Indexer returned no native SOL balance row.');
+    } catch (error) {
+      // Continue to the configured RPC providers; preserve the indexer failure if they fail too.
+      const alchemyError = error instanceof Error ? error.message : 'Alchemy provider error';
+      try {
+        return await fetchSolanaRpc(address);
+      } catch (rpcError) {
+        throw new Error(`Alchemy Portfolio API: ${alchemyError}; Solana RPC fallback: ${rpcError instanceof Error ? rpcError.message : 'provider error'}`);
+      }
+    }
+  }
+  return fetchSolanaRpc(address);
+}
+
+async function fetchSolanaRpc(address: string): Promise<ChainBalanceResult> {
   let lastError: unknown;
   for (const endpoint of SOLANA_RPC) {
     try {
@@ -329,7 +466,7 @@ async function getJsonWithHeaders(url: string, headers: Record<string, string>):
 async function postJson(url: string, body: unknown): Promise<any> {
   const response = await fetch(url, {
     method: 'POST',
-    signal: timeoutSignal(),
+    signal: timeoutSignal(25000),
     headers: { accept: 'application/json', 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
