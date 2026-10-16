@@ -149,6 +149,22 @@ const SOLANA_REFERENCE_MNEMONIC =
 export function runKeyDerivationSelfTests(core: WalletCoreRuntime): SelfTestResult[] {
   const results: SelfTestResult[] = [];
 
+  try {
+    const registryAddresses = deriveSupportedAddresses(core, EVM_BTC_REFERENCE_MNEMONIC);
+    const derivedCount = registryAddresses.length;
+    results.push({
+      name: 'Wallet Core 4.8.4 multi-chain registry derivation coverage',
+      status: derivedCount >= 100 ? 'passed' : 'failed',
+      detail: `Derived ${derivedCount} receiving addresses from the pinned Wallet Core registry (target: 100+).`,
+    });
+  } catch (error) {
+    results.push({
+      name: 'Wallet Core multi-chain registry derivation coverage',
+      status: 'failed',
+      detail: error instanceof Error ? error.message : 'Unknown registry derivation error',
+    });
+  }
+
   const referenceWallet = core.HDWallet.createWithMnemonic(EVM_BTC_REFERENCE_MNEMONIC, '');
   try {
     const eth = String(referenceWallet.getAddressForCoin(core.CoinType.ethereum));
