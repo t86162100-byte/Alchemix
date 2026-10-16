@@ -346,9 +346,9 @@ function bindEvents(): void {
     try {
       const core = await initializeWalletCore();
       const results = runKeyDerivationSelfTests(core);
-      const passed = results.filter((result) => result.passed).length;
-      output.innerHTML = `<div class="section-heading"><div><span class="eyebrow">STEP 2 · LOCAL CRYPTO TESTS</span><h2>${passed}/${results.length} checks passed</h2></div><span class="tag ${passed === results.length ? 'tag-green' : ''}">${passed === results.length ? 'CHECKS PASSED' : 'REVIEW REQUIRED'}</span></div>` +
-        results.map((result) => `<article class="test-result"><strong>${result.passed ? '✓' : '✕'} ${escapeHtml(result.name)}</strong><code>${escapeHtml(result.detail)}</code></article>`).join('') +
+      const passed = results.filter((result) => result.status === 'passed').length;
+      output.innerHTML = `<div class="section-heading"><div><span class="eyebrow">STEP 2 · LOCAL CRYPTO TESTS</span><h2>${passed}/${results.length} checks passed</h2></div><span class="tag ${results.every((result) => result.status === 'passed') ? 'tag-green' : ''}">${results.some((result) => result.status === 'failed') ? 'REVIEW REQUIRED' : results.some((result) => result.status === 'skipped') ? 'PARTIAL · OPTIONAL TEST SKIPPED' : 'CHECKS PASSED'}</span></div>` +
+        results.map((result) => `<article class="test-result"><strong>${result.status === 'passed' ? '✓' : result.status === 'skipped' ? '↷ SKIPPED' : '✕'} ${escapeHtml(result.name)}</strong><code>${escapeHtml(result.detail)}</code></article>`).join('') +
         '<p class="muted-note">These local checks use public test-only phrases and published Trust Wallet Core reference outputs for Ethereum, Bitcoin, and Solana. They never use your wallet phrase. Passing these vectors verifies those expected outputs for this engine build; it is not a security audit or proof that every wallet app uses the same derivation path.</p>';
     } catch (error) {
       output.innerHTML = `<p class="form-error">${escapeHtml(error instanceof Error ? error.message : 'Test run failed.')}</p>`;
