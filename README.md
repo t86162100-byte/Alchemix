@@ -31,7 +31,7 @@ Run the automated derivation regression suite with `npm test`, then build the st
 - Encrypt the recovery phrase and optional BIP-39 passphrase with AES-256-GCM using a PBKDF2-HMAC-SHA-256-derived key (600,000 iterations), random salt, and random IV.
 - Store only the encrypted vault envelope in browser local storage.
 - Restore from a recovery phrase, including an optional BIP-39 passphrase.
-- Unlock an encrypted vault and derive initial Ethereum and Bitcoin receiving addresses locally.
+- Unlock an encrypted vault and derive receiving addresses from the pinned Wallet Core multichain registry where the installed runtime supports them.
 - Lock the UI or remove the encrypted local copy.
 
 ## Step 2 — multichain key derivation (in progress)
