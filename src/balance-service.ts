@@ -254,8 +254,8 @@ async function fetchBitcoin(address: string): Promise<ChainBalanceResult> {
 
 async function fetchTron(address: string): Promise<ChainBalanceResult> {
   const response = await getJson('https://api.trongrid.io/wallet/getaccount?visible=true&address=' + encodeURIComponent(address));
-  const rawBalance = response?.balance;
-  if (rawBalance === undefined) throw new Error('Tron provider did not return an account balance');
+  if (!response || typeof response !== 'object') throw new Error('Tron provider returned an unexpected account response');
+  const rawBalance = response.balance ?? 0;
   const native: AssetBalance = {
     id: 'tron:native', chainId: 'tron-mainnet', chainName: 'Tron', kind: 'native',
     name: 'Tron', symbol: 'TRX', balance: amountFromRaw(String(rawBalance), 6), decimals: 6,
@@ -263,13 +263,14 @@ async function fetchTron(address: string): Promise<ChainBalanceResult> {
   };
   // TRC-20 enumeration needs an indexed token-holder endpoint. TronScan's documented
   // endpoint requires an API key, so do not silently claim a complete token list.
-  const keyConfigured = Boolean(import.meta.env.VITE_TRONSCAN_API_KEY);
+  const tronScanApiKey = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env?.VITE_TRONSCAN_API_KEY ?? '';
+  const keyConfigured = Boolean(tronScanApiKey);
   let tokens: AssetBalance[] = [];
   let tokenMessage = 'TRC-20 discovery unavailable: configure VITE_TRONSCAN_API_KEY for the documented TronScan token-holdings endpoint.';
   if (keyConfigured) {
     try {
       const url = `https://apilist.tronscanapi.com/api/account/tokens?address=${encodeURIComponent(address)}&start=0&limit=200&hidden=0&show=1`;
-      const data = await getJsonWithHeaders(url, { 'TRON-PRO-API-KEY': import.meta.env.VITE_TRONSCAN_API_KEY });
+      const data = await getJsonWithHeaders(url, { 'TRON-PRO-API-KEY': tronScanApiKey });
       const rows = Array.isArray(data.data) ? data.data : Array.isArray(data.tokens) ? data.tokens : [];
       tokens = rows.map((item: any) => {
         const contract = String(item.tokenId ?? item.contractAddress ?? item.tokenAddr ?? '');
