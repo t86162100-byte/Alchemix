@@ -11,9 +11,9 @@
   },
   "dependencies": {
     "@trustwallet/wallet-core": "4.8.4",
-    "@solana/web3.js": "^1.98.4",
     "@scure/bip39": "^2.0.1",
-    "micro-key-producer": "^0.10.2"
+    "micro-key-producer": "^0.10.2",
+    "@scure/base": "^2.0.0"
   },
   "devDependencies": {
     "typescript": "^5.8.3",
