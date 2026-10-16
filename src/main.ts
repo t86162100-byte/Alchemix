@@ -220,7 +220,7 @@ function render(): void {
         <div class="coin-icon">${escapeHtml(address.ticker.slice(0, 1))}</div>
         <div class="address-info"><strong>${escapeHtml(address.label)}</strong><span>${escapeHtml(address.ticker)} · ${escapeHtml(address.family)} · ${check.valid ? 'format check passed' : 'receiving not verified'}</span><code>${escapeHtml(address.value)}</code><small class="path-note">Path: ${escapeHtml(address.derivationPath)}</small><small class="path-note">${escapeHtml(address.note ?? "")}</small></div>
         <button class="receive-button" data-receive="${escapeHtml(addressKey)}" ${check.valid ? '' : 'disabled'} title="${escapeHtml(check.valid ? 'Open receive details and local QR code' : check.message)}">Receive</button>
-        <button class="copy-button" data-copy="${escapeHtml(address.value)}" aria-label="Copy ${escapeHtml(address.label)} address" ${check.valid ? '' : 'disabled'} title="${escapeHtml(check.valid ? 'Copy full address' : 'Copy disabled until address validation is implemented')}">Copy</button>
+        <button class="copy-button" data-copy="${escapeHtml(address.value)}" aria-label="Copy ${escapeHtml(address.label)} address" title="Copy the full derived address. Copying does not mean deposits are verified.">Copy</button>
       </article>`;
     }).join('');
     content = `
@@ -484,13 +484,39 @@ function bindEvents(): void {
   document.querySelectorAll<HTMLButtonElement>('[data-copy]').forEach((button) => {
     button.addEventListener('click', async () => {
       const value = button.dataset.copy ?? '';
+      const originalLabel = button.dataset.originalLabel ?? button.textContent ?? 'Copy';
+      button.dataset.originalLabel = originalLabel;
       try {
-        await navigator.clipboard.writeText(value);
+        if (navigator.clipboard?.writeText && window.isSecureContext) {
+          await navigator.clipboard.writeText(value);
+        } else {
+          const temporary = document.createElement('textarea');
+          temporary.value = value;
+          temporary.readOnly = true;
+          temporary.setAttribute('aria-hidden', 'true');
+          temporary.style.position = 'fixed';
+          temporary.style.opacity = '0';
+          temporary.style.pointerEvents = 'none';
+          document.body.appendChild(temporary);
+          temporary.select();
+          const copied = document.execCommand('copy');
+          temporary.remove();
+          if (!copied) throw new Error('Clipboard copy was denied');
+        }
         button.textContent = 'Copied';
-        window.setTimeout(() => { button.textContent = 'Copy'; }, 1400);
+        window.setTimeout(() => { if (button.isConnected) button.textContent = originalLabel; }, 1400);
       } catch {
-        button.textContent = 'Copy unavailable';
-        window.setTimeout(() => { button.textContent = 'Copy'; }, 1600);
+        button.textContent = 'Select address';
+        window.setTimeout(() => { if (button.isConnected) button.textContent = originalLabel; }, 1600);
+        const addressValue = value;
+        const modalValue = document.querySelector<HTMLElement>('.receive-address-value');
+        if (modalValue && modalValue.textContent === addressValue) {
+          const selection = window.getSelection();
+          const range = document.createRange();
+          range.selectNodeContents(modalValue);
+          selection?.removeAllRanges();
+          selection?.addRange(range);
+        }
       }
     });
   });
