@@ -15,6 +15,7 @@ export type WalletAddress = {
 type WalletCoreRegistryEntry = {
   id: string;
   name: string;
+  coinId?: number;
   symbol: string;
   blockchain: string;
   derivation?: Array<{ path?: string }>;
@@ -119,16 +120,40 @@ export function deriveSupportedAddresses(
       const derivationPath = entry.derivation?.[0]?.path;
       if (!derivationPath) continue;
 
-      const coinType = findWalletCoreCoinType(core, entry);
-      if (coinType === undefined) continue;
+      // Every registry row on the canonical Ethereum BIP-44 path represents
+      // a separate EVM network, not a separate key derivation. Reuse the
+      // address already verified by Wallet Core instead of asking its CoinType
+      // enum to understand network-specific registry IDs (Base, Linea, etc.).
+      const isSharedEvmPath = entry.blockchain === 'Ethereum' && derivationPath === EVM_PATH;
+      let value = '';
+      if (isSharedEvmPath) {
+        value = ethereum;
+      } else {
+        const coinType = findWalletCoreCoinType(core, entry);
+        // Trust Wallet's registry coinId is the SLIP-44 coin type for standard
+        // non-EVM chains. Try it only as a runtime candidate; only accept it
+        // if Wallet Core actually derives a non-empty address.
+        const candidates = coinType === undefined
+          ? (Number.isInteger(entry.coinId) ? [entry.coinId] : [])
+          : [coinType, ...(Number.isInteger(entry.coinId) ? [entry.coinId] : [])];
+        for (const candidate of candidates) {
+          try {
+            const derived = String(getAddressForCoin(candidate)).trim();
+            if (derived && derived !== '[object Object]') {
+              value = derived;
+              break;
+            }
+          } catch {
+            // Try the next candidate. No secrets are logged or exposed.
+          }
+        }
+      }
+      if (!value) continue;
 
       try {
-        const value = String(getAddressForCoin(coinType)).trim();
-        if (!value || value === '[object Object]') continue;
-
         const isEvmAddress = /^0x[0-9a-fA-F]{40}$/.test(value);
         const label = DISPLAY_NAME_OVERRIDES[entry.id] ?? entry.name;
-        const isSharedEvmPath = isEvmAddress && derivationPath === EVM_PATH;
+        const isActuallySharedEvmPath = isEvmAddress && isSharedEvmPath;
         result.push({
           label,
           registryId: entry.id,
@@ -140,7 +165,7 @@ export function deriveSupportedAddresses(
             : ['Bitcoin', 'BitcoinCash', 'BitcoinDiamond', 'Zcash', 'Verge', 'Groestlcoin', 'Decred', 'Firo', 'Komodo'].includes(entry.blockchain)
               ? 'UTXO'
               : 'Other',
-          note: isSharedEvmPath
+          note: isActuallySharedEvmPath
             ? 'Shared EVM account address; network connection not enabled'
             : 'Derived by Wallet Core from its pinned registry; network connection not enabled',
         });
