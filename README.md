@@ -38,12 +38,14 @@ Build the static web application with `npm run build`; output is written to `dis
 
 - Derive the default Ethereum account and display it for Ethereum, BNB Chain, Base, Polygon, Arbitrum, Optimism, Avalanche C-Chain, Mantle, Linea, Scroll, zkSync Era, opBNB, Celo, Gnosis, Moonbeam, Moonriver, and Fantom. These EVM networks intentionally share the same Ethereum account path/address; listing them does not mean RPC, balances, or transactions are connected.
 - Derive the default Bitcoin native-SegWit address and show the BIP-84 path (`m/84'/0'/0'/0/0`).
-- Derive a Solana address through Wallet Core's default path (`m/44'/501'/0'`). Some Solana wallets use `m/44'/501'/0'/0'`; path compatibility needs explicit account-discovery support rather than assuming all wallets match.
-- Browser self-tests compare Ethereum, Bitcoin, and Solana default derivation against published Trust Wallet Core reference outputs and check Solana address format/repeatability.
+- Derive Solana locally with BIP-39 plus SLIP-0010 using Trust Wallet Core's published default path (`m/44'/501'/0'`). This fallback is used because the installed Wallet Core WASM build does not expose the expected Solana coin-type API. Trust Wallet Core documents an alternative Solana path (`m/44'/501'/0'/0'`) that produces a different address; do not assume every wallet uses the same path.
+- Browser self-tests compare Ethereum, Bitcoin, and Solana derivation against published Trust Wallet Core reference outputs and check Solana address format.
 - The self-test button uses public test-only mnemonic fixtures, never the user's wallet phrase. Do not use those fixtures for funds.
+
+The detailed module boundaries and completion gates are documented in [docs/WALLET_ARCHITECTURE.md](docs/WALLET_ARCHITECTURE.md).
 
 ## Security status — development only
 
-This is **not production-ready and must not be used with real funds**. The Wallet Core NPM WASM integration is beta. The current implementation needs broader automated BIP-39 and address test vectors (including an independent Solana vector), independent review of the generated addresses and key derivation, browser/device testing, and security review. Browser local storage and JavaScript execution are exposed to same-origin script compromise; encryption at rest does not protect secrets from malicious code running in the page while a wallet is unlocked.
+This is **not production-ready and must not be used with real funds**. The Wallet Core NPM WASM integration is beta. The current implementation needs broader automated BIP-39 and address test vectors, independent cross-implementation verification of Solana derivation, browser/device testing, dependency review, and security review. Browser local storage and JavaScript execution are exposed to same-origin script compromise; encryption at rest does not protect secrets from malicious code running in the page while a wallet is unlocked.
 
 Balance retrieval, token discovery, network adapters, transaction construction, transaction signing, broadcast, and send UI remain unimplemented/disabled. Wallet Core does not itself connect to blockchain nodes or broadcast transactions.
