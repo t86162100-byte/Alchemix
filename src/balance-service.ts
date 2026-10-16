@@ -54,7 +54,7 @@ const CHAINS: ChainConfig[] = [
   { id: 'tron', name: 'Tron', symbol: 'TRX', decimals: 6, family: 'tron', registryId: 'tron' },
 ];
 
-const SOLANA_RPC = ['https://api.mainnet-beta.solana.com'];
+const SOLANA_RPC = ['https://solana-rpc.publicnode.com', 'https://api.mainnet-beta.solana.com'];
 const SOLANA_TOKEN_PROGRAMS = [
   'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA',
   'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb',
@@ -68,12 +68,12 @@ const COINGECKO_IDS: Record<string, string> = {
   TRX: 'tron',
 };
 
-function timeoutSignal(ms = 12000): AbortSignal {
+function timeoutSignal(ms = 25000): AbortSignal {
   return AbortSignal.timeout(ms);
 }
 
-async function getJson(url: string): Promise<any> {
-  const response = await fetch(url, { signal: timeoutSignal(), headers: { accept: 'application/json' } });
+async function getJson(url: string, timeoutMs = 25000): Promise<any> {
+  const response = await fetch(url, { signal: timeoutSignal(timeoutMs), headers: { accept: 'application/json' } });
   if (!response.ok) throw new Error(`Provider returned HTTP ${response.status}`);
   return response.json();
 }
@@ -151,12 +151,27 @@ async function fetchEvmNative(config: ChainConfig, address: string): Promise<Ass
 }
 
 async function fetchEvmTokens(config: ChainConfig, address: string): Promise<AssetBalance[]> {
-  // Routescan indexes holder balances and token metadata without requiring an API key on its free tier.
-  const url = `https://api.routescan.io/v2/network/mainnet/evm/${config.chainId}/address/${encodeURIComponent(address)}/erc20-holdings?limit=100`;
-  const data = await getJson(url);
-  if (!Array.isArray(data.items)) throw new Error('Token indexer returned an unexpected response');
+  // Try chain-scoped Routescan first, then its documented all-chains endpoint filtered
+  // to this chain. Some chain-specific routes return HTTP 400 even when native RPC works.
+  const encodedAddress = encodeURIComponent(address);
+  const urls = [
+    `https://api.routescan.io/v2/network/mainnet/evm/${config.chainId}/address/${encodedAddress}/erc20-holdings?limit=25`,
+    `https://api.routescan.io/v2/network/mainnet/evm/all/address/${encodedAddress}/erc20-holdings?includedChainIds=${config.chainId}&limit=25`,
+  ];
+  let data: any;
+  let lastError: unknown;
+  for (const url of urls) {
+    try {
+      const candidate = await getJson(url);
+      if (!Array.isArray(candidate.items)) throw new Error('Token indexer returned an unexpected response');
+      data = candidate;
+      break;
+    } catch (error) { lastError = error; }
+  }
+  if (!data) throw lastError instanceof Error ? lastError : new Error('All token indexers failed');
   const items: AssetBalance[] = [];
   for (const item of data.items) {
+    // Routescan's address holdings schema uses tokenAddress/tokenDecimals/tokenQuantity.
     const contract = item.tokenAddress;
     const decimals = Number(item.tokenDecimals);
     const symbol = typeof item.tokenSymbol === 'string' ? item.tokenSymbol.trim() : '';
@@ -236,7 +251,17 @@ async function fetchSolana(address: string): Promise<ChainBalanceResult> {
 }
 
 async function fetchBitcoin(address: string): Promise<ChainBalanceResult> {
-  const data = await getJson(`https://mempool.space/api/address/${encodeURIComponent(address)}`);
+  let data: any;
+  let lastError: unknown;
+  const endpoints = [
+    `https://mempool.space/api/address/${encodeURIComponent(address)}`,
+    `https://blockstream.info/api/address/${encodeURIComponent(address)}`,
+  ];
+  for (const url of endpoints) {
+    try { data = await getJson(url, 30000); break; }
+    catch (error) { lastError = error; }
+  }
+  if (!data) throw lastError instanceof Error ? lastError : new Error('Bitcoin explorer providers unavailable');
   const chain = data?.chain_stats;
   const mempool = data?.mempool_stats;
   if (!chain || !mempool) throw new Error('Bitcoin explorer returned an unexpected response');
