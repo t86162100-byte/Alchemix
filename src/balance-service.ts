@@ -1,3 +1,5 @@
+import walletCoreRegistryJson from './data/wallet-core-registry.json';
+
 export type AssetBalance = {
   id: string;
   chainId: string;
