@@ -6,3 +6,47 @@
 /* Step 2: live balances and owned-token discovery */
 .portfolio-panel{margin-bottom:18px}.portfolio-refresh{white-space:nowrap;flex:0 0 auto}.portfolio-summary{display:flex;flex-direction:column;gap:8px;padding:20px;border:1px solid #285844;border-radius:12px;background:linear-gradient(135deg,rgba(22,57,42,.38),rgba(14,19,29,.6));margin:8px 0 12px}.portfolio-summary>strong{font-size:clamp(24px,4vw,36px);letter-spacing:-.055em;overflow-wrap:anywhere}.portfolio-summary>small,.portfolio-updated{font-size:10px;color:#91a0b4;line-height:1.7}.portfolio-updated{margin:0 0 16px}.portfolio-chain-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:14px}.portfolio-chain{min-width:0;border:1px solid #273242;border-radius:11px;background:rgba(9,14,22,.48);padding:15px}.portfolio-chain-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}.portfolio-chain-heading>div{display:flex;flex-direction:column;gap:4px}.portfolio-chain-heading strong{font-size:13px}.portfolio-chain-heading>div>span{font-size:10px;color:#8392a7}.portfolio-chain-message{font-size:10px;line-height:1.7;color:#8291a5;margin:11px 0}.portfolio-assets{display:flex;flex-direction:column;gap:0}.portfolio-asset{display:flex;align-items:flex-start;gap:9px;padding:12px 0;border-top:1px solid #202b3a;min-width:0}.portfolio-asset-icon{display:grid;place-items:center;width:29px;height:29px;flex:0 0 29px;border:1px solid #355b4b;border-radius:9px;color:#70e0b0;font-size:11px;font-weight:800}.portfolio-asset-main{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}.portfolio-asset-main strong{font-size:11px;line-height:1.5;overflow-wrap:anywhere}.portfolio-asset-main span,.portfolio-asset-main small{font-size:9px;color:#8c9ab0;line-height:1.5}.portfolio-asset-main code{font-family:'DM Mono',monospace;font-size:9px;color:#a5b4c7;overflow-wrap:anywhere;line-height:1.6}.portfolio-asset-value{display:flex;flex-direction:column;align-items:flex-end;gap:5px;flex:0 0 auto;max-width:42%;text-align:right}.portfolio-asset-value strong{font-family:'DM Mono',monospace;font-size:10px;overflow-wrap:anywhere;max-width:100%}.portfolio-asset-value span{font-size:9px;color:#91a0b4;white-space:normal}.portfolio-notice,.portfolio-error,.portfolio-empty{font-size:11px;line-height:1.7;padding:12px;border-radius:8px}.portfolio-notice{color:#d9c38f;background:rgba(83,65,29,.22);border:1px solid #594a2d}.portfolio-error{color:#ffb5bb;background:#29191e;border:1px solid #704148}.portfolio-empty{color:#8c9ab0;background:#101722;border:1px dashed #2c394a}.portfolio-panel>.muted-note{margin-top:16px}
 @media(max-width:760px){.portfolio-chain-grid{grid-template-columns:1fr}.portfolio-panel{padding:16px}.portfolio-chain{padding:13px}.portfolio-asset-value{max-width:38%}.portfolio-refresh{padding:11px 12px}}
+
+
+/* Portfolio dashboard refinement: keep each network's native balance and discovered
+   token holdings together so network status, balance and assets read as one unit. */
+.portfolio-chain-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start;margin-top:22px}
+.portfolio-chain{min-width:0;padding:0;overflow:hidden;border:1px solid #29334a;border-radius:18px;background:linear-gradient(145deg,rgba(18,25,43,.98),rgba(9,14,27,.98));box-shadow:0 12px 32px rgba(0,0,0,.14);transition:border-color .18s,transform .18s}
+.portfolio-chain:hover{border-color:#4a4f8a}
+.portfolio-chain-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:18px 18px 14px}
+.portfolio-chain-title{display:flex;align-items:center;gap:11px;min-width:0}
+.portfolio-chain-title>div{display:flex;flex-direction:column;gap:4px;min-width:0}
+.portfolio-chain-title>div strong{font-size:14px;letter-spacing:-.25px;color:#f2f4ff}
+.portfolio-chain-title>div span{font-size:11px;color:#8f9bb8}
+.portfolio-chain-symbol{width:38px;height:38px;flex:0 0 38px;display:grid;place-items:center;border-radius:13px;background:linear-gradient(145deg,#5c5cff,#8b5cf6);color:white;font-size:17px;font-weight:800;box-shadow:0 5px 18px rgba(91,80,255,.22)}
+.portfolio-native-balance{margin:0 18px;padding:15px 15px;display:flex;align-items:flex-end;justify-content:space-between;gap:12px;border:1px solid rgba(113,125,255,.18);border-radius:13px;background:linear-gradient(110deg,rgba(68,66,160,.17),rgba(18,29,55,.32))}
+.portfolio-balance-label{display:block;margin-bottom:7px;color:#8f9bb8;font-size:10px;text-transform:uppercase;letter-spacing:.09em}
+.portfolio-native-balance>div>strong{display:block;font-size:22px;letter-spacing:-.8px;font-variant-numeric:tabular-nums;color:#f4f6ff;overflow-wrap:anywhere}
+.portfolio-native-balance>div>strong small{font-size:12px;font-weight:600;letter-spacing:0;color:#a7b2d0}
+.portfolio-native-usd{font-size:12px;color:#aeb9d7;white-space:nowrap;padding-bottom:3px;font-variant-numeric:tabular-nums}
+.portfolio-chain-message{margin:12px 18px 15px!important;font-size:11px!important;line-height:1.65!important;color:#8c9ab8!important}
+.portfolio-token-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:13px 18px;border-top:1px solid #202a40;border-bottom:1px solid #202a40;background:rgba(5,10,23,.32)}
+.portfolio-token-heading strong{font-size:11px;color:#dbe2f8}
+.portfolio-token-heading span{font-size:10px;color:#8796b9;border:1px solid #303b58;border-radius:999px;padding:4px 8px;white-space:nowrap}
+.portfolio-assets{display:flex;flex-direction:column;gap:0;padding:0 14px}
+.portfolio-asset{display:grid;grid-template-columns:34px minmax(0,1fr) auto;align-items:center;gap:10px;padding:13px 4px;border-bottom:1px solid rgba(42,53,78,.72);min-width:0}
+.portfolio-asset:last-child{border-bottom:0}
+.portfolio-asset-icon{width:32px;height:32px;border-radius:11px;display:grid;place-items:center;background:linear-gradient(145deg,#283d6e,#4b3e91);color:#e2e7ff;font-size:13px;font-weight:800}
+.portfolio-asset-main{display:flex;flex-direction:column;gap:4px;min-width:0}
+.portfolio-asset-main strong{font-size:12px;color:#edf1ff;overflow-wrap:anywhere}
+.portfolio-asset-main>span{font-size:10px;color:#8c9abb}
+.portfolio-asset-main code{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:9px;color:#7586ad;background:rgba(4,9,21,.35);padding:3px 5px;border-radius:5px}
+.portfolio-asset-main small{font-size:9px;line-height:1.4;color:#7383a6;overflow-wrap:anywhere}
+.portfolio-asset-value{display:flex;flex-direction:column;align-items:flex-end;gap:5px;min-width:72px}
+.portfolio-asset-value strong{font-size:12px;color:#f0f3ff;font-variant-numeric:tabular-nums}
+.portfolio-asset-value span{font-size:10px;color:#93a4c8;white-space:nowrap}
+.portfolio-token-empty{display:flex;align-items:center;gap:11px;padding:18px 4px;color:#8d9bb8}
+.portfolio-token-empty-icon{display:grid;place-items:center;width:32px;height:32px;border:1px solid #303c5a;border-radius:11px;font-size:19px;color:#818cff}
+.portfolio-token-empty>div{display:flex;flex-direction:column;gap:5px;min-width:0}
+.portfolio-token-empty strong{font-size:11px;color:#d7def5}
+.portfolio-token-empty span{font-size:10px;line-height:1.5;color:#8796b9}
+.portfolio-summary{border:1px solid #303a59!important;border-radius:18px!important;background:radial-gradient(ellipse at 85% 0%,rgba(93,75,255,.18),transparent 45%),linear-gradient(145deg,#111a30,#0c1222)!important;padding:24px!important}
+.portfolio-summary>strong{font-size:clamp(26px,4vw,38px)!important;letter-spacing:-1.2px!important;font-variant-numeric:tabular-nums}
+.portfolio-updated{color:#8493b4!important;font-size:11px!important}
+@media(max-width:760px){.portfolio-chain-grid{grid-template-columns:1fr;gap:12px}.portfolio-chain-heading{padding:15px 15px 12px}.portfolio-native-balance{margin:0 15px;padding:13px}.portfolio-chain-message{margin:10px 15px 13px!important}.portfolio-token-heading{padding:12px 15px}.portfolio-assets{padding:0 11px}.portfolio-asset{grid-template-columns:32px minmax(0,1fr) auto;gap:8px;padding:12px 3px}.portfolio-asset-value{min-width:64px}.portfolio-asset-value strong{font-size:11px}.portfolio-asset-main small{display:none}.portfolio-native-balance>div>strong{font-size:20px}}
+@media(min-width:761px){.portfolio-chain-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
