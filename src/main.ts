@@ -60,10 +60,19 @@ function renderAsset(asset: AssetBalance): string {
 function renderChainBalance(chain: ChainBalanceResult): string {
   const statusLabel = chain.status === 'success' ? 'LIVE' : chain.status === 'partial' ? 'PARTIAL' : chain.status === 'loading' ? 'LOADING' : chain.status === 'unavailable' ? 'UNAVAILABLE' : 'ERROR';
   const statusClass = chain.status === 'success' ? 'tag-green' : '';
-  const assets = chain.assets.length ? chain.assets.map(renderAsset).join('') : '<p class="portfolio-empty">No balances returned by the provider.</p>';
+  const native = chain.assets.find((asset) => asset.kind === 'native');
+  const tokens = chain.assets.filter((asset) => asset.kind === 'token');
+  const nativeBalance = native ? formatBalance(native.balance) : 'Unavailable';
+  const nativeValue = native ? formatUsd(native.usdValue) : 'Price unavailable';
+  const assets = tokens.length ? tokens.map(renderAsset).join('') : '<div class="portfolio-token-empty"><span class="portfolio-token-empty-icon">◇</span><div><strong>No token holdings detected yet</strong><span>Tokens will appear here when indexed holdings are found for this address.</span></div></div>';
   return `<article class="portfolio-chain">
-    <div class="portfolio-chain-heading"><div><strong>${escapeHtml(chain.name)}</strong><span>${escapeHtml(chain.nativeSymbol)} network</span></div><span class="tag ${statusClass}">${statusLabel}</span></div>
+    <div class="portfolio-chain-heading"><div class="portfolio-chain-title"><span class="portfolio-chain-symbol">${escapeHtml(chain.nativeSymbol.slice(0, 1))}</span><div><strong>${escapeHtml(chain.name)}</strong><span>${escapeHtml(chain.nativeSymbol)} network</span></div></div><span class="tag ${statusClass}">${statusLabel}</span></div>
+    <div class="portfolio-native-balance">
+      <div><span class="portfolio-balance-label">Native balance</span><strong>${escapeHtml(nativeBalance)} <small>${escapeHtml(chain.nativeSymbol)}</small></strong></div>
+      <span class="portfolio-native-usd">${escapeHtml(nativeValue)}</span>
+    </div>
     <p class="portfolio-chain-message">${escapeHtml(chain.message)}</p>
+    <div class="portfolio-token-heading"><strong>Discovered token holdings</strong><span>${tokens.length} ${tokens.length === 1 ? 'token' : 'tokens'}</span></div>
     <div class="portfolio-assets">${assets}</div>
   </article>`;
 }
