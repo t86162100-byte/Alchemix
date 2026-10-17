@@ -126,6 +126,24 @@ function updatePortfolioPanel(): void {
     panel.innerHTML = renderPortfolioPanel();
     bindPortfolioEvents();
   }
+  const total = document.querySelector<HTMLElement>('#wallet-total-balance');
+  const note = document.querySelector<HTMLElement>('#wallet-balance-note');
+  if (total) {
+    if (portfolioLoading && !portfolioSnapshot) {
+      total.textContent = 'Checking balances…';
+      if (note) note.textContent = 'Connecting to balance providers. This may take a moment.';
+    } else if (portfolioSnapshot) {
+      total.textContent = portfolioSnapshot.totalUsd === undefined
+        ? 'Valuation unavailable'
+        : portfolioSnapshot.unpricedAssets > 0
+          ? `Partial · ${formatUsd(portfolioSnapshot.totalUsd)}`
+          : formatUsd(portfolioSnapshot.totalUsd);
+      if (note) note.textContent = `${portfolioSnapshot.pricedAssets} priced assets · ${portfolioSnapshot.unpricedAssets} without a verifiable price. Updated ${new Date(portfolioSnapshot.updatedAt).toLocaleTimeString()}.`;
+    } else if (portfolioError) {
+      total.textContent = 'Balance unavailable';
+      if (note) note.textContent = 'A balance provider failed. Refresh to try again; missing data is not zero.';
+    }
+  }
 }
 
 function startPortfolioAutoRefresh(): void {
