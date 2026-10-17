@@ -122,6 +122,7 @@ async function refreshPortfolio(): Promise<void> {
   } finally {
     portfolioLoading = false;
     updatePortfolioPanel();
+    if (view === 'ready' && activeScreen !== 'home') render();
   }
 }
 
@@ -796,8 +797,6 @@ document.addEventListener('click', (event) => {
     if (receive) receive.click();
     else openWalletInfo('Receive', 'Unlock the wallet and wait for a verified receiving address to become available.', 'wallet-receive');
   }
-  if (action === 'send') openWalletInfo('Send crypto', 'Sending is intentionally disabled until transaction construction, fee estimation, local signing, broadcast, confirmation tracking and failure handling are implemented and tested for the selected network. Never share your recovery phrase or private keys.', 'wallet-send');
-  if (action === 'swap') openWalletInfo('Swap', 'Swap is not enabled yet. Live quotes, route validation, price-impact limits, simulation, signing and broadcast must be implemented and tested first.', 'wallet-swap');
   if (action === 'assets') { activeScreen = 'markets'; selectedNetwork = 'All networks'; selectedAsset = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
   if (action === 'send') { activeScreen = 'send'; selectedAsset = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
   if (action === 'swap') { activeScreen = 'swap'; selectedAsset = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
