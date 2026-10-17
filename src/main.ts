@@ -25,6 +25,11 @@ let portfolioSnapshot: PortfolioSnapshot | null = null;
 let portfolioLoading = false;
 let portfolioError = '';
 let portfolioRefreshTimer: number | null = null;
+type ReadyScreen = 'home' | 'markets' | 'activity' | 'settings' | 'swap' | 'send' | 'asset';
+let activeScreen: ReadyScreen = 'home';
+let selectedAsset: AssetBalance | null = null;
+let networkQuery = '';
+let selectedNetwork = 'All networks';
 
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (character) => ({
@@ -45,7 +50,7 @@ function formatUsd(value: number | undefined): string {
 
 function renderAsset(asset: AssetBalance): string {
   const tokenLocation = asset.contractAddress ?? asset.mintAddress;
-  return `<article class="portfolio-asset">
+  return `<article class="portfolio-asset portfolio-asset-selectable" role="button" tabindex="0" data-asset-open="${escapeHtml(asset.name)}" data-asset-symbol="${escapeHtml(asset.symbol)}" title="View ${escapeHtml(asset.name)} details">
     <div class="portfolio-asset-icon">${escapeHtml(asset.symbol.slice(0, 1))}</div>
     <div class="portfolio-asset-main">
       <strong>${escapeHtml(asset.name)}</strong>
@@ -268,11 +273,11 @@ function render(): void {
 
   const bottomNav = view === 'ready' ? `
     <nav class="floating-nav" aria-label="Main navigation">
-      <button class="nav-item is-active" data-nav="home" aria-current="page"><span class="nav-icon">⌂</span><span>Home</span></button>
-      <button class="nav-item" data-nav="markets"><span class="nav-icon">◈</span><span>Markets</span></button>
-      <button class="nav-item nav-swap" data-nav="swap" aria-label="Swap, coming soon"><span class="nav-icon">⇄</span><span>Swap</span></button>
-      <button class="nav-item" data-nav="activity"><span class="nav-icon">↗</span><span>Activity</span></button>
-      <button class="nav-item" data-nav="settings"><span class="nav-icon">⚙</span><span>Settings</span></button>
+      <button class="nav-item ${activeScreen === 'home' ? 'is-active' : ''}" data-nav="home"><span class="nav-icon">⌂</span><span>Home</span></button>
+      <button class="nav-item ${activeScreen === 'markets' || activeScreen === 'asset' ? 'is-active' : ''}" data-nav="markets"><span class="nav-icon">◈</span><span>Markets</span></button>
+      <button class="nav-item nav-swap ${activeScreen === 'swap' ? 'is-active' : ''}" data-nav="swap"><span class="nav-icon">⇄</span><span>Swap</span></button>
+      <button class="nav-item ${activeScreen === 'activity' ? 'is-active' : ''}" data-nav="activity"><span class="nav-icon">↗</span><span>Activity</span></button>
+      <button class="nav-item ${activeScreen === 'settings' ? 'is-active' : ''}" data-nav="settings"><span class="nav-icon">⚙</span><span>Settings</span></button>
     </nav>` : '';
 
   let content = '';
@@ -407,6 +412,27 @@ function render(): void {
       <div class="warning-box bottom-warning"><strong>Still a development build.</strong> Do not deposit real funds. Wallet creation and restore need automated test vectors, browser/device testing, and independent security review before production use.</div>`;
   }
 
+  if (view === 'ready' && activeScreen !== 'home') {
+    const chainNames = Array.from(new Set([...(portfolioSnapshot?.chains.map((chain) => chain.name) ?? []), ...addresses.map((address) => address.label)])).sort();
+    const allAssets = (portfolioSnapshot?.chains ?? []).filter((chain) => selectedNetwork === 'All networks' || chain.name === selectedNetwork).flatMap((chain) => chain.assets.map((asset) => ({ chain, asset })));
+    if (activeScreen === 'markets') {
+      const filtered = chainNames.filter((name) => name.toLowerCase().includes(networkQuery.toLowerCase()));
+      content = `<section class="product-screen"><div class="screen-topline"><span class="eyebrow">ASSET EXPLORER</span><span class="tag">LIVE PROVIDER DATA</span></div><h1 class="screen-title">Markets <span>& assets.</span></h1><p class="screen-intro">Explore detected wallet holdings and choose a network. Values appear only when returned by available providers.</p><div class="market-summary-strip"><div><small>NETWORKS</small><strong>${chainNames.length || '—'}</strong></div><div><small>DETECTED ASSETS</small><strong>${portfolioSnapshot ? portfolioSnapshot.chains.reduce((n, c) => n + c.assets.length, 0) : '—'}</strong></div><div><small>DATA</small><strong>${portfolioLoading ? 'Updating' : portfolioSnapshot ? 'Refreshed' : 'Pending'}</strong></div></div><section class="screen-panel"><div class="screen-panel-heading"><div><span class="eyebrow">NETWORK DIRECTORY</span><h2>Choose network</h2></div><span class="screen-panel-meta">${chainNames.length} available</span></div><label class="search-field"><span>⌕</span><input id="network-search" type="search" value="${escapeHtml(networkQuery)}" placeholder="Search networks…" aria-label="Search networks" autocomplete="off" /></label><div class="network-filter-list">${['All networks', ...chainNames].map((name) => `<button type="button" class="network-filter ${selectedNetwork === name ? 'is-selected' : ''}" data-network-select="${escapeHtml(name)}">${escapeHtml(name)}</button>`).join('')}</div><div class="network-directory-list">${filtered.map((name) => { const chain = portfolioSnapshot?.chains.find((c) => c.name === name); return `<button type="button" class="network-directory-row" data-network-select="${escapeHtml(name)}"><span class="network-logo">${escapeHtml(name.slice(0, 1))}</span><span><strong>${escapeHtml(name)}</strong><small>${escapeHtml(chain?.status ?? 'Address derived · balance status unavailable')}</small></span><span class="network-row-arrow">›</span></button>`; }).join('') || '<p class="muted-note">No networks match your search.</p>'}</div></section><section class="screen-panel"><div class="screen-panel-heading"><div><span class="eyebrow">YOUR WALLET</span><h2>${escapeHtml(selectedNetwork === 'All networks' ? 'Detected assets' : selectedNetwork + ' assets')}</h2></div><button class="secondary compact-button" id="screen-refresh-portfolio" ${portfolioLoading ? 'disabled' : ''}>↻ Refresh</button></div><div class="market-assets-list">${allAssets.length ? allAssets.map(({ chain, asset }) => `<article class="market-asset-row portfolio-asset-selectable" role="button" tabindex="0" data-asset-open="${escapeHtml(asset.name)}" data-asset-symbol="${escapeHtml(asset.symbol)}"><span class="market-coin-mark">${escapeHtml(asset.symbol.slice(0, 1))}</span><span class="market-asset-copy"><strong>${escapeHtml(asset.name)}</strong><small>${escapeHtml(asset.symbol)} · ${escapeHtml(chain.name)} · ${asset.kind === 'native' ? 'native asset' : 'token'}</small></span><span class="market-asset-value"><strong>${escapeHtml(formatBalance(asset.balance))} ${escapeHtml(asset.symbol)}</strong><small>${escapeHtml(formatUsd(asset.usdValue))}</small></span><span class="market-row-chevron">›</span></article>`).join('') : `<div class="screen-empty"><span class="empty-orbit">◈</span><h3>No verified holdings to show</h3><p>${portfolioLoading ? 'Live holdings are loading.' : 'No assets were returned for this network, or data has not loaded. Missing data is not treated as zero.'}</p><button class="secondary" id="screen-refresh-portfolio">↻ Refresh portfolio</button></div>`}</div><p class="screen-disclaimer">This is a holdings explorer, not a market-wide token catalogue. Token lists depend on providers returning holdings for your address. Unknown prices are never guessed.</p></section></section>`;
+    } else if (activeScreen === 'asset' && selectedAsset) {
+      const chain = portfolioSnapshot?.chains.find((c) => c.assets.some((a) => a.name === selectedAsset?.name && a.symbol === selectedAsset?.symbol));
+      const location = selectedAsset.contractAddress ?? selectedAsset.mintAddress;
+      content = `<section class="product-screen"><button class="back-link" data-screen-back="markets" type="button">← Back to markets</button><div class="asset-detail-hero"><div class="asset-detail-mark">${escapeHtml(selectedAsset.symbol.slice(0, 1))}</div><span class="eyebrow">ASSET DETAILS</span><h1 class="screen-title">${escapeHtml(selectedAsset.name)}</h1><p class="screen-intro">${escapeHtml(selectedAsset.symbol)} · ${escapeHtml(chain?.name ?? 'Network not identified')}</p><div class="asset-detail-balance">${escapeHtml(formatBalance(selectedAsset.balance))} <span>${escapeHtml(selectedAsset.symbol)}</span></div><div class="asset-detail-value">${escapeHtml(formatUsd(selectedAsset.usdValue))}</div><span class="tag">${escapeHtml(chain?.status ?? 'Provider status unavailable')}</span></div><section class="screen-panel"><div class="screen-panel-heading"><div><span class="eyebrow">ASSET INFORMATION</span><h2>Details</h2></div></div><div class="detail-list"><div><span>Asset type</span><strong>${escapeHtml(selectedAsset.kind === 'native' ? 'Native coin' : 'Token')}</strong></div><div><span>Decimals</span><strong>${selectedAsset.decimals}</strong></div><div><span>Price data</span><strong>${escapeHtml(selectedAsset.usdValue === undefined ? 'Unavailable' : 'Provider estimate')}</strong></div><div><span>Metadata source</span><strong>${escapeHtml(selectedAsset.source)}</strong></div>${location ? `<div class="detail-address"><span>Contract / mint address</span><code>${escapeHtml(location)}</code><button class="copy-button" data-copy="${escapeHtml(location)}">Copy address</button></div>` : ''}</div><div class="detail-action-row"><button class="secondary" disabled>Send · unavailable</button><button class="secondary" disabled>Swap · unavailable</button></div><p class="screen-disclaimer">Interface preview only. No transaction is constructed, signed or broadcast from this screen.</p></section></section>`;
+    } else if (activeScreen === 'activity') {
+      content = `<section class="product-screen"><div class="screen-topline"><span class="eyebrow">WALLET TIMELINE</span><span class="tag">NOT CONNECTED</span></div><h1 class="screen-title">Activity <span>stream.</span></h1><p class="screen-intro">Incoming, outgoing and pending transactions will appear here when verified history data is available.</p><section class="screen-panel"><div class="screen-panel-heading"><div><span class="eyebrow">TRANSACTION HISTORY</span><h2>Recent activity</h2></div></div><div class="activity-filter-pills"><span class="is-selected">All activity</span><span>Received</span><span>Sent</span><span>Pending</span></div><div class="screen-empty"><span class="empty-orbit">↗</span><h3>No history provider connected</h3><p>History has not been loaded for this wallet. This does not mean the wallet has no past transactions.</p><span class="tag">NO SIMULATED ACTIVITY</span></div></section></section>`;
+    } else if (activeScreen === 'settings') {
+      content = `<section class="product-screen"><div class="screen-topline"><span class="eyebrow">PREFERENCES & SECURITY</span><span class="tag tag-green">LOCAL VAULT</span></div><h1 class="screen-title">Wallet <span>settings.</span></h1><p class="screen-intro">Manage the encrypted wallet in this browser and review feature availability.</p><section class="screen-panel"><div class="settings-profile"><span class="settings-profile-mark">X</span><div><strong>Tradingview X wallet</strong><small>Self-custody · encrypted local vault</small></div><span class="tag tag-green">UNLOCKED</span></div><div class="settings-group-title">WALLET SECURITY</div><button class="settings-row" id="settings-lock-wallet"><span class="settings-row-icon">⌑</span><span><strong>Lock wallet</strong><small>End the unlocked session in this browser.</small></span><b>›</b></button><button class="settings-row" id="settings-remove-wallet"><span class="settings-row-icon settings-danger-icon">×</span><span><strong>Remove encrypted copy</strong><small>Remove the local vault. Back up first.</small></span><b>›</b></button><div class="settings-group-title">APP STATUS</div><div class="settings-info-row"><span>Portfolio data</span><strong>${portfolioSnapshot ? 'Provider data loaded' : 'Not loaded'}</strong></div><div class="settings-info-row"><span>Transaction signing</span><strong class="status-unavailable">Disabled</strong></div><div class="settings-info-row"><span>Swap execution</span><strong class="status-unavailable">Disabled</strong></div><div class="settings-info-row"><span>Independent audit</span><strong class="status-unavailable">Not completed</strong></div><p class="screen-disclaimer">Settings redesign only. No recovery phrase or private keys are displayed here.</p></section></section>`;
+    } else if (activeScreen === 'swap') {
+      content = `<section class="product-screen"><div class="screen-topline"><span class="eyebrow">TRADE INTERFACE PREVIEW</span><span class="tag">NOT ENABLED</span></div><h1 class="screen-title">Swap <span>assets.</span></h1><p class="screen-intro">A planned swap workspace for interface design only. No quotes or transactions are requested here.</p><section class="screen-panel swap-preview-panel"><div class="swap-preview-top"><span>YOU PAY</span><span>Balance unavailable</span></div><div class="swap-token-line"><div class="swap-token-icon">◇</div><div><strong>Select asset</strong><small>Choose a supported network</small></div><span>⌄</span></div><div class="swap-direction">⇅</div><div class="swap-preview-top"><span>YOU RECEIVE</span><span>Estimate unavailable</span></div><div class="swap-token-line"><div class="swap-token-icon muted-token">◇</div><div><strong>Select asset</strong><small>No route quote connected</small></div><span>⌄</span></div><div class="swap-estimate-row"><span>Network fee</span><strong>Unavailable</strong></div><div class="swap-estimate-row"><span>Price impact</span><strong>Unavailable</strong></div><button class="primary active swap-disabled-button" disabled>Swap unavailable in this build</button><p class="screen-disclaimer">Execution stays disabled until verified quotes, safety checks, simulation, local signing, broadcast and failure handling are implemented and tested.</p></section></section>`;
+    } else if (activeScreen === 'send') {
+      content = `<section class="product-screen"><div class="screen-topline"><span class="eyebrow">TRANSFER INTERFACE PREVIEW</span><span class="tag">NOT ENABLED</span></div><h1 class="screen-title">Send <span>crypto.</span></h1><p class="screen-intro">The transfer interface is designed here, but sending is not enabled for this build.</p><section class="screen-panel"><div class="disabled-form-field"><label>Asset</label><button disabled>Select asset · unavailable</button></div><div class="disabled-form-field"><label>Recipient address</label><input disabled placeholder="Recipient address" /></div><div class="disabled-form-field"><label>Amount</label><input disabled placeholder="0.00" /></div><div class="swap-estimate-row"><span>Network fee</span><strong>Unavailable</strong></div><button class="primary active swap-disabled-button" disabled>Sending disabled</button><p class="screen-disclaimer">This preview does not construct, sign or broadcast transactions. Do not use it to send funds.</p></section></section>`;
+    }
+  }
+
   const receiveDialog = view === 'ready' && selectedReceiveAddress ? (() => {
     const address = selectedReceiveAddress;
     const check = validateReceiveAddress(address);
@@ -446,13 +472,37 @@ function bindEvents(): void {
         if (item === button) item.setAttribute('aria-current', 'page');
         else item.removeAttribute('aria-current');
       });
-      if (destination === 'home') window.scrollTo({ top: 0, behavior: 'smooth' });
-      if (destination === 'markets') document.querySelector('#portfolio-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      if (destination === 'settings') openWalletInfo('Wallet settings', 'Manage your encrypted wallet from the wallet controls below. Locking ends the unlocked session in this browser; removing the encrypted copy does not delete assets or accounts from a blockchain.', 'wallet-settings');
-      if (destination === 'activity') openWalletInfo('Activity', 'Transaction history will appear here when a verified history provider is integrated. No transactions are simulated.', 'wallet-activity');
-      if (destination === 'swap') openWalletInfo('Swap', 'Swap is not enabled yet. Before activation, this wallet needs live route quotes, price-impact and minimum-received checks, transaction simulation, local signing, broadcast and tested failure recovery.', 'wallet-swap');
+      if (destination === 'home' || destination === 'markets' || destination === 'activity' || destination === 'settings' || destination === 'swap') { activeScreen = destination; selectedAsset = null; selectedReceiveAddress = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
     });
   });
+
+  document.querySelectorAll<HTMLButtonElement>('[data-network-select]').forEach((button) => button.addEventListener('click', () => {
+    selectedNetwork = button.dataset.networkSelect ?? 'All networks'; activeScreen = 'markets'; selectedAsset = null; render();
+  }));
+  document.querySelector<HTMLInputElement>('#network-search')?.addEventListener('input', (event) => {
+    networkQuery = (event.currentTarget as HTMLInputElement).value;
+    const list = document.querySelector<HTMLElement>('.network-directory-list'); if (!list) return;
+    const names = Array.from(new Set([...(portfolioSnapshot?.chains.map((chain) => chain.name) ?? []), ...addresses.map((address) => address.label)])).sort().filter((name) => name.toLowerCase().includes(networkQuery.toLowerCase()));
+    list.replaceChildren();
+    names.forEach((name) => {
+      const chain = portfolioSnapshot?.chains.find((item) => item.name === name); const button = document.createElement('button'); button.type = 'button'; button.className = 'network-directory-row'; button.dataset.networkSelect = name;
+      const logo = document.createElement('span'); logo.className = 'network-logo'; logo.textContent = name.slice(0, 1); const copy = document.createElement('span'); const strong = document.createElement('strong'); strong.textContent = name; const small = document.createElement('small'); small.textContent = String(chain?.status ?? 'Address derived · balance status unavailable'); copy.append(strong, small); const arrow = document.createElement('span'); arrow.className = 'network-row-arrow'; arrow.textContent = '›'; button.append(logo, copy, arrow);
+      button.addEventListener('click', () => { selectedNetwork = name; activeScreen = 'markets'; selectedAsset = null; render(); }); list.append(button);
+    });
+    if (!names.length) { const empty = document.createElement('p'); empty.className = 'muted-note'; empty.textContent = 'No networks match your search.'; list.append(empty); }
+  });
+  document.querySelectorAll<HTMLElement>('[data-asset-open]').forEach((row) => {
+    const open = () => { const name = row.dataset.assetOpen ?? ''; const symbol = row.dataset.assetSymbol ?? ''; selectedAsset = portfolioSnapshot?.chains.flatMap((chain) => chain.assets).find((asset) => asset.name === name && asset.symbol === symbol) ?? null; if (selectedAsset) { activeScreen = 'asset'; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); } };
+    row.addEventListener('click', open); row.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); open(); } });
+  });
+  document.querySelectorAll<HTMLButtonElement>('[data-screen-back]').forEach((button) => button.addEventListener('click', () => { activeScreen = button.dataset.screenBack === 'markets' ? 'markets' : 'home'; selectedAsset = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }));
+  document.querySelector<HTMLButtonElement>('#screen-refresh-portfolio')?.addEventListener('click', () => { void refreshPortfolio(); });
+  document.querySelector<HTMLButtonElement>('#settings-lock-wallet')?.addEventListener('click', () => { selectedReceiveAddress = null; selectedAsset = null; addresses = []; stopPortfolioAutoRefresh(); errorMessage = ''; view = 'locked'; activeScreen = 'home'; render(); });
+  document.querySelector<HTMLButtonElement>('#settings-remove-wallet')?.addEventListener('click', () => {
+    const confirmed = window.confirm('Remove the encrypted wallet from this browser? Do this only after safely backing up your recovery phrase. This cannot be undone from this browser.'); if (!confirmed) return;
+    removeSavedVault(); selectedReceiveAddress = null; selectedAsset = null; addresses = []; stopPortfolioAutoRefresh(); pendingMnemonic = null; errorMessage = ''; view = 'welcome'; activeScreen = 'home'; render();
+  });
+
   document.querySelector<HTMLButtonElement>('#create-wallet')?.addEventListener('click', async () => {
     setBusy(true, 'Initializing cryptographic engine and generating a new recovery phrase…');
     const button = document.querySelector<HTMLButtonElement>('#create-wallet');
@@ -748,7 +798,9 @@ document.addEventListener('click', (event) => {
   }
   if (action === 'send') openWalletInfo('Send crypto', 'Sending is intentionally disabled until transaction construction, fee estimation, local signing, broadcast, confirmation tracking and failure handling are implemented and tested for the selected network. Never share your recovery phrase or private keys.', 'wallet-send');
   if (action === 'swap') openWalletInfo('Swap', 'Swap is not enabled yet. Live quotes, route validation, price-impact limits, simulation, signing and broadcast must be implemented and tested first.', 'wallet-swap');
-  if (action === 'assets') document.querySelector('#portfolio-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (action === 'assets') { activeScreen = 'markets'; selectedNetwork = 'All networks'; selectedAsset = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  if (action === 'send') { activeScreen = 'send'; selectedAsset = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  if (action === 'swap') { activeScreen = 'swap'; selectedAsset = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
 });
 
 document.addEventListener('keydown', (event) => {
