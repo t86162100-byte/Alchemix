@@ -45,15 +45,91 @@ type ChainConfig = {
   registryId: string;
 };
 
+type RegistryNetwork = {
+  id: string;
+  name: string;
+  symbol: string;
+  decimals?: number;
+  blockchain: string;
+  chainId?: string | number;
+  derivation?: Array<{ path?: string }>;
+  explorer?: { url?: string };
+  info?: { rpc?: string };
+};
+
+const NETWORK_REGISTRY = walletCoreRegistryJson as RegistryNetwork[];
+const EVM_RPC_OVERRIDES: Record<string, string[]> = {
+  ethereum: ['https://ethereum-rpc.publicnode.com', 'https://cloudflare-eth.com'],
+  smartchain: ['https://bsc-rpc.publicnode.com', 'https://bsc-dataseed.binance.org'],
+  base: ['https://base-rpc.publicnode.com', 'https://mainnet.base.org'],
+  polygon: ['https://polygon-bor-rpc.publicnode.com', 'https://polygon-rpc.com'],
+  arbitrum: ['https://arb1.arbitrum.io/rpc'],
+  optimism: ['https://mainnet.optimism.io'],
+  avalanchec: ['https://api.avax.network/ext/bc/C/rpc'],
+  linea: ['https://rpc.linea.build'],
+  mantle: ['https://rpc.mantle.xyz'],
+  scroll: ['https://rpc.scroll.io'],
+  zksync: ['https://mainnet.era.zksync.io'],
+  opbnb: ['https://opbnb-mainnet-rpc.bnbchain.org'],
+  celo: ['https://forno.celo.org'],
+  xdai: ['https://rpc.gnosischain.com'],
+  fantom: ['https://rpcapi.fantom.network'],
+  moonbeam: ['https://rpc.api.moonbeam.network'],
+  moonriver: ['https://moonriver.public.blastapi.io'],
+  sonic: ['https://rpc.soniclabs.com'],
+  hyperevm: ['https://rpc.hyperliquid.xyz/evm'],
+  robinhoodchain: ['https://rpc.mainnet.chain.robinhood.com'],
+};
+
+function validHttpUrl(value: unknown): value is string {
+  if (typeof value !== 'string' || !value.trim()) return false;
+  try { return ['http:', 'https:'].includes(new URL(value).protocol); } catch { return false; }
+}
+
+function buildEvmConfigs(): ChainConfig[] {
+  const configs: ChainConfig[] = [];
+  const usedIds = new Set<string>();
+  const usedChainIds = new Set<number>();
+  for (const entry of NETWORK_REGISTRY) {
+    if (entry.blockchain !== 'Ethereum' || !entry.id || !entry.name || !entry.symbol) continue;
+    // The legacy BSC registry entry has a non-standard derivation path and
+    // duplicates chain 56. The canonical smartchain entry is the supported one.
+    if (entry.id === 'bsc') continue;
+    const chainId = Number(entry.chainId);
+    if (!Number.isSafeInteger(chainId) || chainId <= 0 || usedIds.has(entry.id) || usedChainIds.has(chainId)) continue;
+    const path = entry.derivation?.[0]?.path ?? '';
+    if (!path.startsWith("m/44'")) continue;
+    const rpcUrls = [
+      ...(EVM_RPC_OVERRIDES[entry.id] ?? []),
+      ...(validHttpUrl(entry.info?.rpc) ? [entry.info!.rpc!] : []),
+    ].filter((url, index, all) => all.indexOf(url) === index);
+    // Do not pretend a network is live if the registry has no RPC and we do
+    // not have a vetted override for it.
+    if (!rpcUrls.length) continue;
+    configs.push({
+      id: entry.id,
+      name: entry.id === 'smartchain' ? 'BNB Chain' : entry.name,
+      symbol: entry.symbol,
+      decimals: Number.isInteger(entry.decimals) && Number(entry.decimals) >= 0 && Number(entry.decimals) <= 36 ? Number(entry.decimals) : 18,
+      family: 'evm',
+      chainId,
+      registryId: entry.id,
+      rpcUrls,
+      ...(entry.explorer?.url ? { explorerBase: entry.explorer.url } : {}),
+    });
+    usedIds.add(entry.id);
+    usedChainIds.add(chainId);
+  }
+  return configs;
+}
+
+const EVM_CHAINS = buildEvmConfigs();
 const CHAINS: ChainConfig[] = [
-  { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', decimals: 18, family: 'evm', chainId: 1, registryId: 'ethereum', rpcUrls: ['https://ethereum-rpc.publicnode.com', 'https://cloudflare-eth.com'], explorerBase: 'https://eth.blockscout.com' },
-  { id: 'bsc', name: 'BNB Chain', symbol: 'BNB', decimals: 18, family: 'evm', chainId: 56, registryId: 'smartchain', rpcUrls: ['https://bsc-rpc.publicnode.com', 'https://bsc-dataseed.binance.org'], explorerBase: 'https://bscscan.com' },
-  { id: 'base', name: 'Base', symbol: 'ETH', decimals: 18, family: 'evm', chainId: 8453, registryId: 'base', rpcUrls: ['https://base-rpc.publicnode.com', 'https://mainnet.base.org'], explorerBase: 'https://base.blockscout.com' },
+  ...EVM_CHAINS,
   { id: 'solana', name: 'Solana', symbol: 'SOL', decimals: 9, family: 'solana', registryId: 'solana' },
   { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', decimals: 8, family: 'bitcoin', registryId: 'bitcoin' },
   { id: 'tron', name: 'Tron', symbol: 'TRX', decimals: 6, family: 'tron', registryId: 'tron' },
 ];
-
 const runtimeEnv = (import.meta as ImportMeta & { env?: Record<string, string | undefined> }).env ?? {};
 const ALCHEMY_API_KEY = runtimeEnv.VITE_ALCHEMY_API_KEY?.trim() ?? '';
 const configuredSolanaRpc = runtimeEnv.VITE_SOLANA_RPC_URL?.trim() ?? '';
