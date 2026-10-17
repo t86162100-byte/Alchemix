@@ -383,37 +383,35 @@ function render(): void {
       </article>`;
     }).join('');
     content = `
-      <section class="hero ready-hero">
-        <div class="eyebrow"><span class="eyebrow-line"></span> WALLET CREATED</div>
-        <h1>Your wallet<br /><span>is ready.</span></h1>
-        <p class="intro">The recovery phrase was validated, encrypted, and saved locally. These addresses were derived by Wallet Core; no balances have been requested or simulated.</p>
-        <div class="success-banner"><span class="success-check">✓</span><div><strong>Encrypted local vault saved</strong><span>Your recovery phrase is not stored in plaintext.</span></div></div>
-      </section>
-      <section class="wallet-dashboard" aria-label="Wallet overview">
-        <article class="wallet-balance-card">
-          <div class="wallet-balance-top"><span class="wallet-eyebrow">TOTAL PORTFOLIO</span><span class="wallet-live-status"><i></i> LIVE DATA</span></div>
-          <div class="wallet-balance-label">Your multichain assets</div>
-          <div class="wallet-balance-value" id="wallet-total-balance">Checking balances…</div>
-          <p class="wallet-balance-note" id="wallet-balance-note">Values use available provider data. Missing balances and prices are never invented.</p>
-          <div class="wallet-balance-orb" aria-hidden="true"></div>
-        </article>
+      <div class="welcome-row"><div><div class="eyebrow"><span class="eyebrow-line"></span> YOUR WEB3 HOME</div><h1>Your crypto, clearly.</h1><p class="page-subtitle">Your wallet at a glance. Explore networks and assets in Market.</p></div><button type="button" class="refresh-button" data-nav="markets">View assets <span>↗</span></button></div>
+      <section class="sire-home-value-card" aria-label="Portfolio balance">
+        <div class="sire-home-value-main">
+          <div class="sire-home-value-copy">
+            <div class="sire-home-value-card-top"><span>TOTAL PORTFOLIO VALUE</span><button type="button" class="sire-home-value-eye" id="toggle-balance-visibility" aria-label="Hide balance">◉</button></div>
+            <div class="sire-home-value-amount" id="wallet-total-balance">${portfolioLoading ? 'Checking balances…' : portfolioSnapshot ? (portfolioSnapshot.totalUsd === undefined ? 'Valuation unavailable' : formatUsd(portfolioSnapshot.totalUsd)) : '—'}</div>
+            <p class="page-subtitle" id="wallet-balance-note">${portfolioSnapshot ? `${portfolioSnapshot.pricedAssets} priced assets · ${portfolioSnapshot.unpricedAssets} without a verifiable price` : 'Balances and prices appear only when verified providers return them.'}</p>
+          </div>
+          <div class="sire-home-value-chart" aria-hidden="true"><svg viewBox="0 0 320 100" preserveAspectRatio="none"><path d="M0 78 C35 75 45 68 72 71 S110 62 132 66 S165 48 188 53 S220 39 242 45 S278 25 320 31" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg></div>
+        </div>
         <div class="wallet-quick-actions" aria-label="Quick wallet actions">
           <button class="wallet-action-card" type="button" data-wallet-action="receive"><span class="wallet-action-icon">↓</span><strong>Receive</strong><small>Address & QR</small></button>
-          <button class="wallet-action-card" type="button" data-wallet-action="send"><span class="wallet-action-icon">↑</span><strong>Send</strong><small>Coming soon</small></button>
-          <button class="wallet-action-card" type="button" data-wallet-action="swap"><span class="wallet-action-icon">⇄</span><strong>Swap</strong><small>Coming soon</small></button>
+          <button class="wallet-action-card" type="button" data-wallet-action="send"><span class="wallet-action-icon">↑</span><strong>Send</strong><small>Review only</small></button>
+          <button class="wallet-action-card" type="button" data-wallet-action="swap"><span class="wallet-action-icon">⇄</span><strong>Swap</strong><small>Preview only</small></button>
           <button class="wallet-action-card" type="button" data-wallet-action="assets"><span class="wallet-action-icon">◈</span><strong>My assets</strong><small>Networks & tokens</small></button>
         </div>
       </section>
-      <div class="wallet-section-title"><div><span class="eyebrow">YOUR PORTFOLIO</span><h2>Assets & networks</h2></div><span class="wallet-section-caption">Verified provider data</span></div>
-      <section class="address-panel portfolio-panel" id="portfolio-panel">${renderPortfolioPanel()}</section>
-      <section class="address-panel">
-        <div class="section-heading"><div><span class="eyebrow">RECEIVING ADDRESSES</span><h2>Your first addresses</h2></div><span class="tag tag-green">DERIVED LOCALLY · ${addresses.length} CHAINS</span></div>
-        ${addressRows}
-        <p class="muted-note">EVM networks intentionally share the same Ethereum account address and derivation path. Network connections, balances, token discovery, and transactions are not enabled by this step.</p>
-        <div class="ready-actions"><button class="secondary" id="run-key-tests">Run derivation tests</button><button class="secondary" id="lock-wallet">Lock wallet</button><button class="danger-button" id="remove-wallet">Remove encrypted copy</button></div>
+      <section class="panel activity-panel home-assets-summary">
+        <div class="panel-heading"><div><h2>Assets & networks</h2><p>Verified balances returned by connected providers.</p></div><button type="button" class="panel-action" data-nav="markets">Open Market ↗</button></div>
+        <div class="market-summary-strip">
+          <div><small>NETWORKS</small><strong>${portfolioSnapshot?.chains.length ?? '—'}</strong></div>
+          <div><small>DETECTED ASSETS</small><strong>${portfolioSnapshot ? portfolioSnapshot.chains.reduce((count, chain) => count + chain.assets.length, 0) : '—'}</strong></div>
+          <div><small>LAST UPDATE</small><strong>${portfolioSnapshot?.updatedAt ? new Date(portfolioSnapshot.updatedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : 'Pending'}</strong></div>
+        </div>
+        <p class="muted-note">Missing balances and prices are never treated as zero. Use Market to filter networks, inspect detected assets, and refresh provider data.</p>
       </section>
+      <section id="portfolio-panel" class="portfolio-panel" hidden>${renderPortfolioPanel()}</section>
       <section id="key-test-results" class="address-panel test-results" hidden aria-live="polite"></section>
-      <div class="warning-box bottom-warning"><strong>Still a development build.</strong> Do not deposit real funds. Wallet creation and restore need automated test vectors, browser/device testing, and independent security review before production use.</div>`;
+`;
   }
 
   if (view === 'ready' && activeScreen !== 'home') {
@@ -429,7 +427,11 @@ function render(): void {
     } else if (activeScreen === 'activity') {
       content = `<section class="product-screen"><div class="screen-topline"><span class="eyebrow">WALLET TIMELINE</span><span class="tag">NOT CONNECTED</span></div><h1 class="screen-title">Activity <span>stream.</span></h1><p class="screen-intro">Incoming, outgoing and pending transactions will appear here when verified history data is available.</p><section class="screen-panel"><div class="screen-panel-heading"><div><span class="eyebrow">TRANSACTION HISTORY</span><h2>Recent activity</h2></div></div><div class="activity-filter-pills"><span class="is-selected">All activity</span><span>Received</span><span>Sent</span><span>Pending</span></div><div class="screen-empty"><span class="empty-orbit">↗</span><h3>No history provider connected</h3><p>History has not been loaded for this wallet. This does not mean the wallet has no past transactions.</p><span class="tag">NO SIMULATED ACTIVITY</span></div></section></section>`;
     } else if (activeScreen === 'settings') {
-      content = `<section class="product-screen"><div class="screen-topline"><span class="eyebrow">PREFERENCES & SECURITY</span><span class="tag tag-green">LOCAL VAULT</span></div><h1 class="screen-title">Wallet <span>settings.</span></h1><p class="screen-intro">Manage the encrypted wallet in this browser and review feature availability.</p><section class="screen-panel"><div class="settings-profile"><span class="settings-profile-mark">X</span><div><strong>Tradingview X wallet</strong><small>Self-custody · encrypted local vault</small></div><span class="tag tag-green">UNLOCKED</span></div><div class="settings-group-title">WALLET SECURITY</div><button class="settings-row" id="settings-lock-wallet"><span class="settings-row-icon">⌑</span><span><strong>Lock wallet</strong><small>End the unlocked session in this browser.</small></span><b>›</b></button><button class="settings-row" id="settings-remove-wallet"><span class="settings-row-icon settings-danger-icon">×</span><span><strong>Remove encrypted copy</strong><small>Remove the local vault. Back up first.</small></span><b>›</b></button><div class="settings-group-title">APP STATUS</div><div class="settings-info-row"><span>Portfolio data</span><strong>${portfolioSnapshot ? 'Provider data loaded' : 'Not loaded'}</strong></div><div class="settings-info-row"><span>Transaction signing</span><strong class="status-unavailable">Disabled</strong></div><div class="settings-info-row"><span>Swap execution</span><strong class="status-unavailable">Disabled</strong></div><div class="settings-info-row"><span>Independent audit</span><strong class="status-unavailable">Not completed</strong></div><p class="screen-disclaimer">Settings redesign only. No recovery phrase or private keys are displayed here.</p></section></section>`;
+      content = `<section class="product-screen"><div class="screen-topline"><span class="eyebrow">PREFERENCES & SECURITY</span><span class="tag tag-green">LOCAL VAULT</span></div><h1 class="screen-title">Wallet <span>settings.</span></h1><p class="screen-intro">Manage the encrypted wallet in this browser and review feature availability.</p><section class="screen-panel"><div class="settings-profile"><span class="settings-profile-mark">X</span><div><strong>Tradingview X wallet</strong><small>Self-custody · encrypted local vault</small></div><span class="tag tag-green">UNLOCKED</span></div><div class="settings-group-title">WALLET SECURITY</div><button class="settings-row" id="settings-lock-wallet"><span class="settings-row-icon">⌑</span><span><strong>Lock wallet</strong><small>End the unlocked session in this browser.</small></span><b>›</b></button><button class="settings-row" id="settings-remove-wallet"><span class="settings-row-icon settings-danger-icon">×</span><span><strong>Remove encrypted copy</strong><small>Remove the local vault. Back up first.</small></span><b>›</b></button><div class="settings-group-title">APP STATUS</div><div class="settings-info-row"><span>Portfolio data</span><strong>${portfolioSnapshot ? 'Provider data loaded' : 'Not loaded'}</strong></div><div class="settings-info-row"><span>Transaction signing</span><strong class="status-unavailable">Disabled</strong></div><div class="settings-info-row"><span>Swap execution</span><strong class="status-unavailable">Disabled</strong></div><div class="settings-info-row"><span>Independent audit</span><strong class="status-unavailable">Not completed</strong></div><p class="screen-disclaimer">Settings redesign only. No recovery phrase or private keys are displayed here.</p></section>
+      <section class="screen-panel receiving-addresses-settings"><div class="screen-panel-heading"><div><span class="eyebrow">RECEIVE</span><h2>Receiving addresses</h2></div><span class="screen-panel-meta">${addresses.length} derived</span></div>
+      <p class="screen-disclaimer">Choose Receive to view the locally generated QR and full address. Confirm network compatibility before any deposit.</p>
+      ${addresses.map((address) => { const check = validateReceiveAddress(address); const key = address.registryId ?? address.label; return `<article class="address-row"><div class="coin-icon">${escapeHtml(address.ticker.slice(0,1))}</div><div class="address-info"><strong>${escapeHtml(address.label)}</strong><span>${escapeHtml(address.ticker)} · ${check.valid ? 'format check passed' : 'receiving not verified'}</span><code>${escapeHtml(address.value)}</code><small class="path-note">${escapeHtml(address.derivationPath)}</small></div><button class="receive-button" data-receive="${escapeHtml(key)}" ${check.valid ? '' : 'disabled'}>Receive</button><button class="copy-button" data-copy="${escapeHtml(address.value)}">Copy</button></article>`; }).join('')}
+      </section></section>`;
     } else if (activeScreen === 'swap') {
       content = `<section class="product-screen"><div class="screen-topline"><span class="eyebrow">TRADE INTERFACE PREVIEW</span><span class="tag">NOT ENABLED</span></div><h1 class="screen-title">Swap <span>assets.</span></h1><p class="screen-intro">A planned swap workspace for interface design only. No quotes or transactions are requested here.</p><section class="screen-panel swap-preview-panel"><div class="swap-preview-top"><span>YOU PAY</span><span>Balance unavailable</span></div><div class="swap-token-line"><div class="swap-token-icon">◇</div><div><strong>Select asset</strong><small>Choose a supported network</small></div><span>⌄</span></div><div class="swap-direction">⇅</div><div class="swap-preview-top"><span>YOU RECEIVE</span><span>Estimate unavailable</span></div><div class="swap-token-line"><div class="swap-token-icon muted-token">◇</div><div><strong>Select asset</strong><small>No route quote connected</small></div><span>⌄</span></div><div class="swap-estimate-row"><span>Network fee</span><strong>Unavailable</strong></div><div class="swap-estimate-row"><span>Price impact</span><strong>Unavailable</strong></div><button class="primary active swap-disabled-button" disabled>Swap unavailable in this build</button><p class="screen-disclaimer">Execution stays disabled until verified quotes, safety checks, simulation, local signing, broadcast and failure handling are implemented and tested.</p></section></section>`;
     } else if (activeScreen === 'send') {
@@ -484,6 +486,15 @@ function render(): void {
 }
 
 function bindEvents(): void {
+  document.querySelector<HTMLButtonElement>('#toggle-balance-visibility')?.addEventListener('click', (event) => {
+    const button = event.currentTarget as HTMLButtonElement;
+    const total = document.querySelector<HTMLElement>('#wallet-total-balance');
+    if (!total) return;
+    const hidden = button.dataset.hidden === 'true';
+    if (!hidden) { button.dataset.originalValue = total.textContent ?? '—'; total.textContent = '••••••'; button.dataset.hidden = 'true'; button.textContent = '◎'; button.setAttribute('aria-label', 'Show balance'); }
+    else { total.textContent = button.dataset.originalValue ?? '—'; button.dataset.hidden = 'false'; button.textContent = '◉'; button.setAttribute('aria-label', 'Hide balance'); }
+  });
+
   document.querySelectorAll<HTMLButtonElement>('[data-nav]').forEach((button) => {
     button.addEventListener('click', () => {
       const destination = button.dataset.nav;
@@ -812,8 +823,8 @@ document.addEventListener('click', (event) => {
   if (!button) return;
   const action = button.dataset.walletAction;
   if (action === 'receive') {
-    const receive = document.querySelector<HTMLButtonElement>('[data-receive]:not(:disabled)');
-    if (receive) receive.click();
+    const receive = addresses.find(item => validateReceiveAddress(item).valid);
+    if (receive) { selectedReceiveAddress = receive; render(); }
     else openWalletInfo('Receive', 'Unlock the wallet and wait for a verified receiving address to become available.', 'wallet-receive');
   }
   if (action === 'assets') { activeScreen = 'markets'; selectedNetwork = 'All networks'; selectedAsset = null; render(); window.scrollTo({ top: 0, behavior: 'smooth' }); }
