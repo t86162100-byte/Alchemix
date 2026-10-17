@@ -266,19 +266,22 @@ function render(): void {
     : '<p class="form-error" id="form-error" role="alert" hidden></p>';
   const header = `
     <header class="topbar">
-      <a class="brand" href="#" aria-label="Tradingview X home"><span class="brand-mark">X</span><span>Tradingview <strong>X</strong></span></a>
-      <span class="environment"><span class="dot"></span> DEVELOPMENT BUILD</span>
+      <div class="breadcrumb"><span>TRADINGVIEW X</span><span>/</span><strong>${activeScreen === 'home' ? 'Home' : activeScreen === 'markets' || activeScreen === 'asset' ? 'Market' : activeScreen === 'activity' ? 'Activity' : activeScreen === 'swap' ? 'Swap' : activeScreen === 'send' ? 'Send' : 'Settings'}</strong></div>
+      <div class="topbar-actions">
+        <button type="button" class="network-picker" data-nav="markets" aria-label="Open market and network filters"><span class="chain-dot"></span><span>${selectedNetwork === 'All networks' ? 'All networks' : escapeHtml(selectedNetwork)}</span><span>⌄</span></button>
+        <button type="button" class="connect-button ${view === 'ready' ? 'connected' : ''}" data-wallet-action="assets"><span class="connected-dot"></span>${view === 'ready' ? 'Wallet unlocked' : 'Get started'}</button>
+      </div>
     </header>`;
   const footer = `
-    <footer><span>TRADINGVIEW X <span class="footer-sep">/</span> WALLET FOUNDATION</span><span>Self-custody first · No simulated balances</span></footer>`;
+    <footer class="footer"><div><span class="footer-logo">TRADINGVIEW X</span><span>Self-custody first · No simulated balances</span></div><div class="footer-right"><span><span class="status-dot"></span> Wallet foundation</span></div></footer>`;
 
   const bottomNav = view === 'ready' ? `
-    <nav class="floating-nav" aria-label="Main navigation">
-      <button class="nav-item ${activeScreen === 'home' ? 'is-active' : ''}" data-nav="home"><span class="nav-icon">⌂</span><span>Home</span></button>
-      <button class="nav-item ${activeScreen === 'markets' || activeScreen === 'asset' ? 'is-active' : ''}" data-nav="markets"><span class="nav-icon">◈</span><span>Markets</span></button>
-      <button class="nav-item nav-swap ${activeScreen === 'swap' ? 'is-active' : ''}" data-nav="swap"><span class="nav-icon">⇄</span><span>Swap</span></button>
-      <button class="nav-item ${activeScreen === 'activity' ? 'is-active' : ''}" data-nav="activity"><span class="nav-icon">↗</span><span>Activity</span></button>
-      <button class="nav-item ${activeScreen === 'settings' ? 'is-active' : ''}" data-nav="settings"><span class="nav-icon">⚙</span><span>Settings</span></button>
+    <nav class="bottom-navigation" aria-label="Main navigation">
+      <button type="button" class="${activeScreen === 'home' ? 'active' : ''}" data-nav="home"><span class="nav-icon">⌂</span><span>Home</span></button>
+      <button type="button" class="${activeScreen === 'markets' || activeScreen === 'asset' ? 'active' : ''}" data-nav="markets"><span class="nav-icon">◈</span><span>Market</span></button>
+      <button type="button" class="${activeScreen === 'swap' ? 'active' : ''}" data-nav="swap"><span class="nav-icon">⇄</span><span>Swap</span></button>
+      <button type="button" class="${activeScreen === 'activity' ? 'active' : ''}" data-nav="activity"><span class="nav-icon">↗</span><span>Activity</span></button>
+      <button type="button" class="${activeScreen === 'settings' ? 'active' : ''}" data-nav="settings"><span class="nav-icon">⚙</span><span>Settings</span></button>
     </nav>` : '';
 
   let content = '';
@@ -454,7 +457,23 @@ function render(): void {
         </section>
       </div>`;
   })() : '';
-  app.innerHTML = `<main class="shell">${header}<div class="content-area">${content}</div>${footer}${bottomNav}${receiveDialog}</main>`;
+  const sidebar = view === 'ready' ? `
+    <aside class="sidebar" aria-label="Wallet navigation">
+      <div class="brand"><div class="brand-mark">X</div><span>Tradingview <span class="brand-light">X</span></span></div>
+      <div class="workspace-label">WALLET</div>
+      <nav class="main-nav">
+        <button type="button" class="nav-item ${activeScreen === 'home' ? 'active' : ''}" data-nav="home"><span>⌂</span><span>Home</span></button>
+        <button type="button" class="nav-item ${activeScreen === 'markets' || activeScreen === 'asset' ? 'active' : ''}" data-nav="markets"><span>◈</span><span>Market</span></button>
+        <button type="button" class="nav-item ${activeScreen === 'swap' ? 'active' : ''}" data-nav="swap"><span>⇄</span><span>Swap</span><span class="soon-tag">PREVIEW</span></button>
+        <button type="button" class="nav-item ${activeScreen === 'activity' ? 'active' : ''}" data-nav="activity"><span>↗</span><span>Activity</span></button>
+        <button type="button" class="nav-item ${activeScreen === 'settings' ? 'active' : ''}" data-nav="settings"><span>⚙</span><span>Settings</span></button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="security-card"><div class="security-icon">◇</div><div><strong>Your keys, your control</strong><p>Encrypted wallet data stays in this browser.</p></div></div>
+        <div class="profile-row"><div class="profile-avatar">X</div><div class="profile-info"><strong>Tradingview X</strong><span>Self-custody wallet</span></div><span class="connected-dot"></span></div>
+      </div>
+    </aside>` : '';
+  app.innerHTML = `<div class="app-shell">${sidebar}<main class="${view === 'ready' ? 'main-content' : 'onboarding-main'}">${header}<div class="page-wrap">${content}</div>${footer}</main>${bottomNav}${receiveDialog}</div>`;
   bindEvents();
   if (view === 'ready') {
     bindPortfolioEvents();
@@ -469,7 +488,7 @@ function bindEvents(): void {
     button.addEventListener('click', () => {
       const destination = button.dataset.nav;
       document.querySelectorAll('.nav-item').forEach((item) => {
-        item.classList.toggle('is-active', item === button);
+        item.classList.toggle('is-active', item === button); item.classList.toggle('active', item === button);
         if (item === button) item.setAttribute('aria-current', 'page');
         else item.removeAttribute('aria-current');
       });
