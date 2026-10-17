@@ -180,7 +180,7 @@ function parseRawTokenBalance(raw: unknown): string | undefined {
   const value = String(raw).trim();
   try {
     if (/^0x[0-9a-f]+$/i.test(value)) return BigInt(value).toString();
-    if (/^\\d+$/.test(value)) return BigInt(value).toString();
+    if (/^\d+$/.test(value)) return BigInt(value).toString();
   } catch { return undefined; }
   return undefined;
 }
