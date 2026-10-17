@@ -248,6 +248,15 @@ function render(): void {
   const footer = `
     <footer><span>TRADINGVIEW X <span class="footer-sep">/</span> WALLET FOUNDATION</span><span>Self-custody first · No simulated balances</span></footer>`;
 
+  const bottomNav = view === 'ready' ? `
+    <nav class="floating-nav" aria-label="Main navigation">
+      <button class="nav-item is-active" data-nav="home" aria-current="page"><span class="nav-icon">⌂</span><span>Home</span></button>
+      <button class="nav-item" data-nav="markets"><span class="nav-icon">◈</span><span>Markets</span></button>
+      <button class="nav-item nav-swap" data-nav="swap" aria-label="Swap, coming soon"><span class="nav-icon">⇄</span><span>Swap</span></button>
+      <button class="nav-item" data-nav="activity"><span class="nav-icon">↗</span><span>Activity</span></button>
+      <button class="nav-item" data-nav="settings"><span class="nav-icon">⚙</span><span>Settings</span></button>
+    </nav>` : '';
+
   let content = '';
   if (view === 'welcome') {
     content = `
@@ -384,7 +393,7 @@ function render(): void {
         </section>
       </div>`;
   })() : '';
-  app.innerHTML = `<main class="shell">${header}<div class="content-area">${content}</div>${footer}${receiveDialog}</main>`;
+  app.innerHTML = `<main class="shell">${header}<div class="content-area">${content}</div>${footer}${bottomNav}${receiveDialog}</main>`;
   bindEvents();
   if (view === 'ready') {
     bindPortfolioEvents();
@@ -395,6 +404,23 @@ function render(): void {
 }
 
 function bindEvents(): void {
+  document.querySelectorAll<HTMLButtonElement>('[data-nav]').forEach((button) => {
+    button.addEventListener('click', () => {
+      const destination = button.dataset.nav;
+      document.querySelectorAll('.nav-item').forEach((item) => {
+        item.classList.toggle('is-active', item === button);
+        if (item === button) item.setAttribute('aria-current', 'page');
+        else item.removeAttribute('aria-current');
+      });
+      if (destination === 'home') window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (destination === 'markets') document.querySelector('#portfolio-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (destination === 'settings') document.querySelector('.address-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (destination === 'activity' || destination === 'swap') {
+        const message = destination === 'swap' ? 'Swap is not enabled yet. Tradingview X will only enable swaps after quote validation, transaction signing, broadcast, and failure handling are implemented and tested.' : 'Transaction activity will appear here when verified transaction-history indexing is implemented.';
+        window.alert(message);
+      }
+    });
+  });
   document.querySelector<HTMLButtonElement>('#create-wallet')?.addEventListener('click', async () => {
     setBusy(true, 'Initializing cryptographic engine and generating a new recovery phrase…');
     const button = document.querySelector<HTMLButtonElement>('#create-wallet');
