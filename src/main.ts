@@ -362,6 +362,22 @@ function render(): void {
         <p class="intro">The recovery phrase was validated, encrypted, and saved locally. These addresses were derived by Wallet Core; no balances have been requested or simulated.</p>
         <div class="success-banner"><span class="success-check">✓</span><div><strong>Encrypted local vault saved</strong><span>Your recovery phrase is not stored in plaintext.</span></div></div>
       </section>
+      <section class="wallet-dashboard" aria-label="Wallet overview">
+        <article class="wallet-balance-card">
+          <div class="wallet-balance-top"><span class="wallet-eyebrow">TOTAL PORTFOLIO</span><span class="wallet-live-status"><i></i> LIVE DATA</span></div>
+          <div class="wallet-balance-label">Your multichain assets</div>
+          <div class="wallet-balance-value" id="wallet-total-balance">Checking balances…</div>
+          <p class="wallet-balance-note" id="wallet-balance-note">Values use available provider data. Missing balances and prices are never invented.</p>
+          <div class="wallet-balance-orb" aria-hidden="true"></div>
+        </article>
+        <div class="wallet-quick-actions" aria-label="Quick wallet actions">
+          <button class="wallet-action-card" type="button" data-wallet-action="receive"><span class="wallet-action-icon">↓</span><strong>Receive</strong><small>Address & QR</small></button>
+          <button class="wallet-action-card" type="button" data-wallet-action="send"><span class="wallet-action-icon">↑</span><strong>Send</strong><small>Coming soon</small></button>
+          <button class="wallet-action-card" type="button" data-wallet-action="swap"><span class="wallet-action-icon">⇄</span><strong>Swap</strong><small>Coming soon</small></button>
+          <button class="wallet-action-card" type="button" data-wallet-action="assets"><span class="wallet-action-icon">◈</span><strong>My assets</strong><small>Networks & tokens</small></button>
+        </div>
+      </section>
+      <div class="wallet-section-title"><div><span class="eyebrow">YOUR PORTFOLIO</span><h2>Assets & networks</h2></div><span class="wallet-section-caption">Verified provider data</span></div>
       <section class="address-panel portfolio-panel" id="portfolio-panel">${renderPortfolioPanel()}</section>
       <section class="address-panel">
         <div class="section-heading"><div><span class="eyebrow">RECEIVING ADDRESSES</span><h2>Your first addresses</h2></div><span class="tag tag-green">DERIVED LOCALLY · ${addresses.length} CHAINS</span></div>
@@ -414,11 +430,9 @@ function bindEvents(): void {
       });
       if (destination === 'home') window.scrollTo({ top: 0, behavior: 'smooth' });
       if (destination === 'markets') document.querySelector('#portfolio-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      if (destination === 'settings') document.querySelector('.address-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      if (destination === 'activity' || destination === 'swap') {
-        const message = destination === 'swap' ? 'Swap is not enabled yet. Tradingview X will only enable swaps after quote validation, transaction signing, broadcast, and failure handling are implemented and tested.' : 'Transaction activity will appear here when verified transaction-history indexing is implemented.';
-        window.alert(message);
-      }
+      if (destination === 'settings') openWalletInfo('Wallet settings', 'Manage your encrypted wallet from the wallet controls below. Locking ends the unlocked session in this browser; removing the encrypted copy does not delete assets or accounts from a blockchain.', 'wallet-settings');
+      if (destination === 'activity') openWalletInfo('Activity', 'Transaction history will appear here when a verified history provider is integrated. No transactions are simulated.', 'wallet-activity');
+      if (destination === 'swap') openWalletInfo('Swap', 'Swap is not enabled yet. Before activation, this wallet needs live route quotes, price-impact and minimum-received checks, transaction simulation, local signing, broadcast and tested failure recovery.', 'wallet-swap');
     });
   });
   document.querySelector<HTMLButtonElement>('#create-wallet')?.addEventListener('click', async () => {
@@ -681,6 +695,47 @@ function bindEvents(): void {
     });
   });
 }
+
+
+function openWalletInfo(title: string, description: string, kind: string): void {
+  document.querySelector('#wallet-info-dialog')?.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'wallet-info-dialog';
+  overlay.className = 'wallet-dialog-backdrop';
+  const safeTitle = escapeHtml(title);
+  const safeDescription = escapeHtml(description);
+  overlay.innerHTML = `<section class="wallet-dialog" role="dialog" aria-modal="true" aria-labelledby="wallet-dialog-title">
+    <div class="wallet-dialog-head"><div><span class="eyebrow">TRADINGVIEW X</span><h2 id="wallet-dialog-title">${safeTitle}</h2></div><button class="wallet-dialog-close" type="button" aria-label="Close dialog">×</button></div>
+    <p>${safeDescription}</p>
+    ${kind === 'wallet-settings' ? '<div class="wallet-dialog-settings"><button type="button" class="secondary" id="dialog-lock-wallet">Lock wallet</button><button type="button" class="danger-button" id="dialog-remove-wallet">Remove encrypted copy</button></div>' : ''}
+    <div class="wallet-dialog-note">Security first · No fake balances · No unverified transactions</div>
+  </section>`;
+  document.body.append(overlay);
+  const close = () => overlay.remove();
+  overlay.querySelector('.wallet-dialog-close')?.addEventListener('click', close);
+  overlay.addEventListener('click', (event) => { if (event.target === overlay) close(); });
+  overlay.querySelector('#dialog-lock-wallet')?.addEventListener('click', () => { close(); document.querySelector<HTMLButtonElement>('#lock-wallet')?.click(); });
+  overlay.querySelector('#dialog-remove-wallet')?.addEventListener('click', () => { close(); document.querySelector<HTMLButtonElement>('#remove-wallet')?.click(); });
+  overlay.addEventListener('keydown', (event) => { if (event.key === 'Escape') close(); });
+}
+
+document.addEventListener('click', (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>('[data-wallet-action]');
+  if (!button) return;
+  const action = button.dataset.walletAction;
+  if (action === 'receive') {
+    const receive = document.querySelector<HTMLButtonElement>('[data-receive]:not(:disabled)');
+    if (receive) receive.click();
+    else openWalletInfo('Receive', 'Unlock the wallet and wait for a verified receiving address to become available.', 'wallet-receive');
+  }
+  if (action === 'send') openWalletInfo('Send crypto', 'Sending is intentionally disabled until transaction construction, fee estimation, local signing, broadcast, confirmation tracking and failure handling are implemented and tested for the selected network. Never share your recovery phrase or private keys.', 'wallet-send');
+  if (action === 'swap') openWalletInfo('Swap', 'Swap is not enabled yet. Live quotes, route validation, price-impact limits, simulation, signing and broadcast must be implemented and tested first.', 'wallet-swap');
+  if (action === 'assets') document.querySelector('#portfolio-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') document.querySelector('#wallet-info-dialog')?.remove();
+});
 
 try {
   view = getSavedVault() ? 'locked' : 'welcome';
