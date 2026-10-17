@@ -520,7 +520,7 @@ function bindEvents(): void {
     const matches = names.filter((name) => (networkDrawerCategory === 'All' || (networkDrawerCategory === 'EVM' ? evm.has(name) : !evm.has(name) && name !== 'All networks')) && name.toLowerCase().includes(networkDrawerSearch.toLowerCase()));
     const list = document.querySelector<HTMLElement>('.network-drawer-options');
     if (list) list.innerHTML = matches.map((name) => `<button type="button" class="network-option ${selectedNetwork === name ? 'selected' : ''}" data-drawer-network="${escapeHtml(name)}"><span class="network-option-text"><strong>${escapeHtml(name)}</strong><small>${escapeHtml(portfolioSnapshot?.chains.find(chain => chain.name === name)?.status ?? (name === 'All networks' ? 'Show all detected wallet assets' : 'Network directory entry'))}</small></span>${selectedNetwork === name ? '<span class="current-tag">SELECTED</span>' : '<span>›</span>'}</button>`).join('') || '<p class="empty-inline">No networks match this filter.</p>';
-    list.querySelectorAll<HTMLButtonElement>('[data-drawer-network]').forEach((button) => button.addEventListener('click', () => { selectedNetwork = button.dataset.drawerNetwork ?? 'All networks'; activeScreen = 'markets'; networkDrawerOpen = false; render(); window.scrollTo({top:0,behavior:'smooth'}); }));
+    list?.querySelectorAll<HTMLButtonElement>('[data-drawer-network]').forEach((button) => button.addEventListener('click', () => { selectedNetwork = button.dataset.drawerNetwork ?? 'All networks'; activeScreen = 'markets'; networkDrawerOpen = false; render(); window.scrollTo({top:0,behavior:'smooth'}); }));
   });
 
   document.querySelector<HTMLButtonElement>('#toggle-balance-visibility')?.addEventListener('click', (event) => {
